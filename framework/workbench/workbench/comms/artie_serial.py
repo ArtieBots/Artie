@@ -2,6 +2,7 @@
 This module contains the code for communicating with an Artie over serial to its
 Controller Node.
 """
+from workbench.comms import base
 from workbench.util import error
 from workbench.util import log
 import dataclasses
@@ -19,26 +20,15 @@ class WifiNetwork:
     flags: str
     ssid: str
 
-class ArtieSerialConnection:
-    def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 1.0):
+class ArtieSerialConnection(base.ArtieCommsBase):
+    def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 1.0, logging_handler=None):
+        super().__init__(logging_handler)
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
 
         # The underlying connection
         self._serial_connection = None
-
-    def __enter__(self):
-        """Open the serial connection when entering context"""
-        self.open()
-
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Close the serial connection when exiting context"""
-        self.close()
-
-        return False
 
     @staticmethod
     def list_ports() -> list[str]:
@@ -50,18 +40,15 @@ class ArtieSerialConnection:
 
     def close(self):
         """Close the connection."""
+        super().close()
         if self._serial_connection and self._serial_connection.is_open:
             self._serial_connection.close()
 
     def open(self):
         """Open the underlying connection."""
+        super().open()
         if self.port:
             self._serial_connection = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
-
-    def reset(self):
-        """Close and re-open the connection."""
-        self.close()
-        self.open()
 
     def scan_for_wifi_networks(self) -> tuple[Exception, list[WifiNetwork]]:
         """Scan for wifi networks and return a list of them."""
@@ -78,8 +65,13 @@ class ArtieSerialConnection:
         if err:
             return err, []
 
+        # Stop any existing wpa_supplicant systemd services
+        err, _ = self._run_cmd("systemctl stop wpa_supplicant@wlan0".encode())
+        if err:
+            return err, []
+
         # Now start a new wpa_supplicant instance in the background
-        err, _ = self._run_cmd("wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf".encode(), check_return_code=True)
+        err, _ = self._run_cmd("wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant-wlan0.conf".encode(), check_return_code=True)
         if err:
             return err, []
         
@@ -101,6 +93,7 @@ class ArtieSerialConnection:
         # bssid              frequency signal_level flags                   ssid
         # But there are plenty of lines that do not conform to this format,
         # so we use a regex to extract the fields.
+        lines = lines.splitlines()
         pattern = re.compile(r'^(?P<bssid>([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s+(?P<frequency>\d+)\s+(?P<signal_level>(-)?\d+)\s+(?P<flags>.*)\s+(?P<ssid>.*)$')  # hex:hex:hex:hex:hex:hex<whitespace>frequency<whitespace>signal_level<whitespace>flags<whitespace>ssid
         networks = []
         for line in lines:
@@ -171,8 +164,27 @@ class ArtieSerialConnection:
         if err:
             return err
 
-        # TODO: Password needs to be masked or cleared from bash history
-        err, _ = self._run_cmd(f'wpa_cli set_network {network_id} psk \'"{password}"\''.encode(), check_return_code=True)
+        err = self._write_line(f"wpa_passphrase '{ssid}' '{password}'".encode(), log_mask=password)
+        if err:
+            return err
+
+        # Parse out the PSK from the output
+        psk = None
+        err, data = self._read_until("}".encode())
+        if err:
+            return err
+        for line in data.decode().splitlines():
+            psk_match = re.match(r'\s+psk=(.+)', line)
+            if psk_match:
+                psk = psk_match.group(1)
+                break
+
+        # Clear the bash history to avoid leaving the password in there
+        err = self._write_line("history -c".encode())
+        if err:
+            return err
+
+        err, _ = self._run_cmd(f'wpa_cli set_network {network_id} psk \'"{psk}"\''.encode(), check_return_code=True)
         if err:
             return err
         
@@ -222,8 +234,13 @@ class ArtieSerialConnection:
                 return err
 
         # Now set wpa_supplicant in systemd
-        # TODO: Need to start wpa_supplicant on startup via systemd
-        #err, _ = self._run_cmd("wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf".encode(), check_return_code=True)
+        err, _ = self._run_cmd("systemctl enable wpa_supplicant@wlan0".encode(), check_return_code=True)
+        if err:
+            return err
+
+        err, _ = self._run_cmd("systemctl start wpa_supplicant@wlan0".encode(), check_return_code=True)
+        if err:
+            return err
 
         return None
 
@@ -248,11 +265,11 @@ class ArtieSerialConnection:
         if err:
             return err, None
         
-        err, data = self._read_until("3 packets transmitted".encode())
+        err, data = self._read_until("3 packets transmitted".encode(), timeout_s=10.0)
         if err:
             return err, None
         
-        if '0 received' in data.encode():
+        if '0 received' in data.decode():
             return Exception("Test packets not received. WiFi connection may have failed."), None
 
         # Return the IP address of Artie
@@ -288,7 +305,7 @@ class ArtieSerialConnection:
 
         return None, lines
 
-    def _read_until(self, terminator_or_regex: bytes|re.Pattern) -> tuple[Exception, bytes|None]:
+    def _read_until(self, terminator_or_regex: bytes|re.Pattern, timeout_s=None) -> tuple[Exception, bytes|None]:
         """
         Read from the serial connection until the terminator is found or
         until the regular expression pattern is matched.
@@ -302,6 +319,11 @@ class ArtieSerialConnection:
         else:
             terminator = terminator_or_regex
 
+        # Update timeout if provided
+        old_timeout = self._serial_connection.timeout
+        if timeout_s is not None:
+            self._serial_connection.timeout = timeout_s
+
         # Read out bytes until we find the terminator or match the regex
         # (or we timeout)
         buffer = b''
@@ -309,22 +331,26 @@ class ArtieSerialConnection:
             try:
                 byte = self._serial_connection.read(1)
             except serial.SerialException as e:
+                self._serial_connection.timeout = old_timeout
                 return error.SerialConnectionError(str(e)), None
 
             if not byte:
                 # Timeout reached
                 log.warning(f"Read {buffer} from serial but did not find terminator or match regex ({terminator_or_regex}) before timeout.")
+                self._serial_connection.timeout = old_timeout
                 return error.SerialConnectionError(f"Read timeout while looking for {terminator_or_regex}."), None
 
             buffer += byte
 
             if is_regex:
                 if pattern.search(buffer.decode(errors='ignore')):
-                    log.write(f"Matched regex pattern {pattern.pattern} in buffer: {buffer}")
+                    log.debug(f"Matched regex pattern {pattern.pattern} in buffer: {buffer}")
+                    self._serial_connection.timeout = old_timeout
                     return None, buffer
             else:
                 if buffer.endswith(terminator):
-                    log.write(f"Found terminator {terminator} in buffer: {buffer}")
+                    log.debug(f"Found terminator {terminator} in buffer: {buffer}")
+                    self._serial_connection.timeout = old_timeout
                     return None, buffer
 
     def _run_cmd(self, command: bytes, check_return_code=False) -> tuple[Exception, str|None]:
@@ -334,7 +360,7 @@ class ArtieSerialConnection:
             return err, None
 
         # username@host:path#
-        pattern = re.compile(r"^(?P<user>[\w\-]+)@(?P<host>[\w\-]+):(?P<path>.+)#$")
+        pattern = re.compile(r"^(?P<user>[\w\-]+)@(?P<host>[\w\-]+):(?P<path>.+)#\s*$", re.MULTILINE)
         err, data = self._read_until(pattern)
         if err:
             return err, None
@@ -369,12 +395,13 @@ class ArtieSerialConnection:
         # TODO: Implement the actual sign-in and username/password change logic for artie-image-release
         self._write_line("root".encode())
 
-    def _write_line(self, data: bytes) -> Exception|None:
+    def _write_line(self, data: bytes, log_mask: str = None) -> Exception|None:
         """Write a line to the serial connection."""
         try:
-            log.debug(f"Writing to serial: ".encode() + data)
-            self._serial_connection.write(data + b'\n')
-            self._read_until(data)  # Read out the echo
+            log.debug(f"Writing to serial: {data.replace(log_mask.encode(), b'***') if log_mask else data}")
+            self._serial_connection.write(data + b'\r\n')
+            b = self._serial_connection.read(len(data + b'\r\n'))  # Echo back
+            log.debug(f"Echoed from serial: {b.replace(log_mask.encode(), b'***') if log_mask else b}")
             return None
         except serial.SerialException as e:
             return error.SerialConnectionError(str(e))

@@ -1,8 +1,44 @@
 from artie_tooling import artie_profile
+from workbench.gui.utils import loghandler
 from PyQt6 import QtWidgets, QtCore
 from comms import artie_serial
 from ... import colors
 
+
+class WiFiVerificationThread(QtCore.QThread):
+    """Thread for verifying WiFi connection"""
+    
+    # Signals to communicate with the main thread
+    success_signal = QtCore.pyqtSignal(str)  # Emits IP address on success
+    failure_signal = QtCore.pyqtSignal(Exception)
+    log_message_signal = QtCore.pyqtSignal(str)
+    
+    def __init__(self, serial_port: str, bssid: str, ssid: str, password: str):
+        super().__init__()
+        self.serial_port = serial_port
+        self.bssid = bssid
+        self.ssid = ssid
+        self.password = password
+    
+    def run(self):
+        """Run the WiFi verification in a separate thread"""
+        try:
+            self.log_message_signal.emit("Attempting to connect to WiFi network...")
+            self.log_message_signal.emit("Sending WiFi credentials to Artie...")
+            
+            with artie_serial.ArtieSerialConnection(port=self.serial_port, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as connection:
+                err = connection.select_wifi(self.bssid, self.ssid, self.password)
+                if err:
+                    self.failure_signal.emit(err)
+                    return
+                
+                err, ip_address = connection.verify_wifi_connection()
+                if err:
+                    self.failure_signal.emit(err)
+
+                self.success_signal.emit(ip_address)
+        except Exception as e:
+            self.failure_signal.emit(e)
 
 class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
     """Page that verifies the WiFi connection"""
@@ -38,8 +74,6 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         
         # Output details (collapsible)
         self.details_group = QtWidgets.QGroupBox("Connection Details")
-        self.details_group.setCheckable(True)
-        self.details_group.setChecked(False)
         details_layout = QtWidgets.QVBoxLayout(self.details_group)
         
         self.details_text = QtWidgets.QTextEdit()
@@ -48,15 +82,12 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         self.details_text.setMaximumHeight(150)
         details_layout.addWidget(self.details_text)
         
-        # Connect checkbox to toggle visibility
-        self.details_group.toggled.connect(self.details_text.setVisible)
-        self.details_text.setVisible(False)
-        
         layout.addWidget(self.details_group)
         
         layout.addStretch()
         
         self.connection_verified = False
+        self.verification_thread = None
     
     def initializePage(self):
         """Start the WiFi verification when page is shown"""
@@ -69,31 +100,27 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         
         # Log WiFi details
         self.details_text.append(f"Network SSID: {self.field('wifi.ssid')}\n")
-        self.details_text.append(f"Artie IP: {self.config.controller_node_ip}\n")
         
-        QtCore.QTimer.singleShot(500, self._verify_connection)
+        # Start verification in a separate thread for real-time progress updates
+        self.verification_thread = WiFiVerificationThread(
+            serial_port=self.field('serial.port'),
+            bssid=self.field('wifi.bssid'),
+            ssid=self.field('wifi.ssid'),
+            password=self.field('wifi.password')
+        )
+        self.verification_thread.success_signal.connect(self._handle_success_signal)
+        self.verification_thread.failure_signal.connect(self._handle_failure_signal)
+        self.verification_thread.log_message_signal.connect(self.details_text.append)
+        self.verification_thread.start()
     
-    def _verify_connection(self):
-        """Verify the WiFi connection"""
-        self.details_text.append("Attempting to connect to WiFi network...")
-        self.details_text.append("Sending WiFi credentials to Artie...")
+    def isComplete(self):
+        """Only allow next when connection is verified"""
+        return self.connection_verified
 
-        ###################### DEBUG TODO ############################
-        self._connection_success()
-        return
-        ##############################################################
-        
-        with artie_serial.ArtieSerialConnection(port=self.field('serial.port')) as connection:
-            err = connection.verify_wifi_connection()
-            if err:
-                self._connection_failure(err)
-            else:
-                self._connection_success()
-    
-    def _connection_success(self):
+    def _handle_success_signal(self, ip_address: str):
         """Successful connection"""
         self.details_text.append("\nConnection established!")
-        self.details_text.append("Artie is now connected to the network.")
+        self.details_text.append(f"Artie is now connected to the network with IP address: {ip_address}.")
         
         # Update UI
         self.status_label.setText("✅\n\nConnected!")
@@ -104,8 +131,11 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         
         self.connection_verified = True
         self.completeChanged.emit()
+
+        # Update the config
+        self.config.controller_node_ip = ip_address
     
-    def _connection_failure(self, err: Exception):
+    def _handle_failure_signal(self, err: Exception):
         """Connection failure"""
         self.details_text.append(f"\nERROR: Failed to connect to network: {err}")
         self.details_text.append("Please check the WiFi password and try again.")
@@ -120,6 +150,3 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         self.connection_verified = False
         self.completeChanged.emit()
     
-    def isComplete(self):
-        """Only allow next when connection is verified"""
-        return self.connection_verified
