@@ -31,6 +31,16 @@ def initialize_logger(level: int = logging.DEBUG, fpath: str = None) -> logging.
     
     return logger
 
+def add_handler(handler: logging.Handler):
+    """Add a logging handler to the Workbench logger."""
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.addHandler(handler)
+
+def remove_handler(handler: logging.Handler):
+    """Remove a logging handler from the Workbench logger."""
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.removeHandler(handler)
+
 def debug(message: str):
     """Log a debug message."""
     logger = logging.getLogger(LOGGER_NAME)

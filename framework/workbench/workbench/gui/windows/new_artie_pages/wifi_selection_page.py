@@ -27,8 +27,9 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         layout.addWidget(network_label)
         
         self.network_table = QtWidgets.QTableWidget()
-        self.network_table.setColumnCount(3)
-        self.network_table.setHorizontalHeaderLabels(["SSID", "Signal Level", "BSSID"])
+        header_labels = ["SSID", "Signal Level", "BSSID", "Frequency"]
+        self.network_table.setColumnCount(len(header_labels))
+        self.network_table.setHorizontalHeaderLabels(header_labels)
         self.network_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.network_table)
         
@@ -47,15 +48,21 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.ssid_input = QtWidgets.QLineEdit()
         self.ssid_input.setPlaceholderText("Selected network SSID")
         self.ssid_input.setReadOnly(True)
-        self.registerField('wifi.ssid*', self.ssid_input)
         credentials_layout.addRow("SSID:", self.ssid_input)
         
         self.wifi_password_input = QtWidgets.QLineEdit()
         self.wifi_password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.wifi_password_input.setPlaceholderText("Enter WiFi password")
         credentials_layout.addRow("Password:", self.wifi_password_input)
+
+        self.bssid_input = QtWidgets.QLineEdit()
+        self.bssid_input.setPlaceholderText("Selected network BSSID")
+        self.bssid_input.setReadOnly(True)
+        credentials_layout.addRow("BSSID:", self.bssid_input)
         
         layout.addWidget(credentials_group)
+
+        # TODO: Add option for static IP to the GUI
         
         # Connect list selection to SSID field
         self.network_table.itemSelectionChanged.connect(self._on_network_selected)
@@ -65,6 +72,11 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         note_label.setWordWrap(True)
         note_label.setStyleSheet(f"color: {colors.BasePalette.GRAY};")
         layout.addWidget(note_label)
+
+        # Pass the SSID, password, and BSSID to the next page
+        self.registerField('wifi.ssid', self.ssid_input, 'text')
+        self.registerField('wifi.password', self.wifi_password_input, 'text')
+        self.registerField('wifi.bssid', self.bssid_input, 'text')
     
     def _spawn_scan_thread(self):
         """Scan for available WiFi networks"""
@@ -99,6 +111,7 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
             self.network_table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(network.ssid))
             self.network_table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(str(network.signal_level)))
             self.network_table.setItem(row_position, 2, QtWidgets.QTableWidgetItem(network.bssid))
+            self.network_table.setItem(row_position, 3, QtWidgets.QTableWidgetItem(str(network.frequency)))
             row_position += 1
 
         self._enable_scan_button()
@@ -130,17 +143,19 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         if selected_items:
             ssid = selected_items[0].text()
             self.ssid_input.setText(ssid)
+            bssid = selected_items[2].text()
+            self.bssid_input.setText(bssid)
     
     def validatePage(self):
         """Validate WiFi selection"""
         ssid = self.ssid_input.text()
+        bssid = self.bssid_input.text()
         password = self.wifi_password_input.text()
 
-        # Get the BSSID of the selected network
-        selected_items = self.network_table.selectedItems()
-        bssid = None
-        if selected_items:
-            bssid = selected_items[2].text()
+        # Pass the SSID, password, and BSSID to the next page
+        self.setField('wifi.ssid', ssid)
+        self.setField('wifi.password', password)
+        self.setField('wifi.bssid', bssid)
         
         if not ssid:
             QtWidgets.QMessageBox.warning(self, "No Network Selected", "Please select a WiFi network.")
@@ -153,13 +168,5 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         if not bssid:
             QtWidgets.QMessageBox.warning(self, "No Network Selected", "Please select a WiFi network.")
             return False
-
-        # Store WiFi credentials on Artie
-        # TODO: Add option for static IP to the GUI, then pass the settings here
-        with artie_serial.ArtieSerialConnection(port=self.field('serial.port')) as connection:
-            err = connection.select_wifi(bssid, ssid, password)
-            if err:
-                QtWidgets.QMessageBox.critical(self, "Error Selecting Wifi Network", f"An error occurred while selecting the wifi network: {err}.")
-                return False
 
         return True

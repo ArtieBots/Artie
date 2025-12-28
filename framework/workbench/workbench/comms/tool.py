@@ -1,17 +1,19 @@
 """
 This module contains code for doing ArtieTool stuff.
 """
+from workbench.comms import base
 import json
 import subprocess
 from artie_tooling import artie_profile
 from artie_tooling import hw_config
 
-class ArtieToolInvoker:
+class ArtieToolInvoker(base.ArtieCommsBase):
     """
     Class for invoking ArtieTool commands asyncronously,
     allowing for reading out the live output at the same time.
     """
-    def __init__(self, config: artie_profile.ArtieProfile):
+    def __init__(self, config: artie_profile.ArtieProfile, logging_handler=None):
+        super().__init__(logging_handler)
         self.config = config
         self._process = None
         self._retcode = None
@@ -20,6 +22,16 @@ class ArtieToolInvoker:
     def success(self) -> bool:
         """Returns True if the subprocess completed successfully."""
         return self._retcode == 0
+
+    def open(self):
+        """No-op for ArtieToolInvoker."""
+        pass
+
+    def close(self):
+        """Terminate the subprocess if it's still running."""
+        if self._process and self._process.poll() is None:
+            self._process.terminate()
+            self._process.wait()
 
     def deploy(self, configuration: str) -> Exception|None:
         """Run the deploy command, returning an error if something goes wrong."""

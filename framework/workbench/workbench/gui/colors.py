@@ -47,6 +47,9 @@ class BasePalette(enum.StrEnum):
     
     GREEN_LIGHT = "#4ee75e"
     """Light green for hover state."""
+
+    RED = "#e04b4b"
+    """Red color for errors and warnings."""
     
     # Special
     TRANSPARENT = "transparent"
