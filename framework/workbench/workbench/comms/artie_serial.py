@@ -20,6 +20,14 @@ class WifiNetwork:
     flags: str
     ssid: str
 
+@dataclasses.dataclass
+class StaticIPConfig:
+    """Configuration for static IP settings"""
+    ip_address: str
+    subnet_mask: str = None
+    gateway: str = None
+    dns: str = None
+
 class ArtieSerialConnection(base.ArtieCommsBase):
     def __init__(self, port: str = None, baudrate: int = 115200, timeout: float = 1.0, logging_handler=None):
         super().__init__(logging_handler)
@@ -74,7 +82,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         err, _ = self._run_cmd("wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant-wlan0.conf".encode(), check_return_code=True)
         if err:
             return err, []
-        
+
         # Initiate a scan
         err, _ = self._run_cmd("wpa_cli scan".encode(), check_return_code=True)
         if err:
@@ -109,11 +117,11 @@ class ArtieSerialConnection(base.ArtieCommsBase):
                     ssid=match.group('ssid')
                 )
                 networks.append(network)
-        
+
         log.info(f"Total networks found: {len(networks)}")
         return None, networks
 
-    def select_wifi(self, bssid: str, ssid: str, password: str, static_ip: str = None) -> Exception|None:
+    def select_wifi(self, bssid: str, ssid: str, password: str, static_ip: StaticIPConfig = None) -> Exception|None:
         """Select the wifi network and enter its password."""
         if not self._serial_connection or not self._serial_connection.is_open:
             return error.SerialConnectionError("Connection not open.")
@@ -122,7 +130,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         err, response_lines = self._run_cmd('wpa_cli list_networks'.encode())
         if err:
             return err
-        
+
         if len(response_lines) > 1:
             # How many networks are there?
             pattern = re.compile(r'^(?P<id>\d+)\s+$')
@@ -170,7 +178,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
         # Parse out the PSK from the output
         psk = None
-        err, data = self._read_until("}".encode())
+        err, data = self._read_until("}".encode(), log_mask=password)
         if err:
             return err
         for line in data.decode().splitlines():
@@ -184,52 +192,20 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         if err:
             return err
 
-        err, _ = self._run_cmd(f'wpa_cli set_network {network_id} psk \'"{psk}"\''.encode(), check_return_code=True)
+        err, _ = self._run_cmd(f'wpa_cli set_network {network_id} psk "{psk}"'.encode(), check_return_code=True)
         if err:
             return err
-        
+
         err, _ = self._run_cmd(f'wpa_cli enable_network {network_id}'.encode(), check_return_code=True)
         if err:
             return err
-        
+
         err, _ = self._run_cmd('wpa_cli save_config'.encode(), check_return_code=True)
         if err:
             return err
 
-        # If static IP is provided, configure it
-        if static_ip:
-            # Get the DNS IP
-            err, ip_lines = self._run_cmd("cat /etc/resolv.conf | grep nameserver".encode(), check_return_code=True)
-            if err:
-                return err
-
-            dns_ip = None
-            for line in ip_lines.splitlines():
-                match = re.match(r'nameserver (\d+\.\d+\.\d+\.\d+)', line)
-                if match:
-                    dns_ip = match.group(1)
-                    break
-
-            if not dns_ip:
-                return error.SerialConnectionError("Could not determine DNS IP from /etc/resolv.conf.")
-
-            # Get the Gateway IP
-            err, route_lines = self._run_cmd("ip route | grep default".encode(), check_return_code=True)
-            if err:
-                return err
-
-            gateway_ip = None
-            for line in route_lines.splitlines():
-                match = re.match(r'default via (\d+\.\d+\.\d+\.\d+)', line)
-                if match:
-                    gateway_ip = match.group(1)
-                    break
-
-            if not gateway_ip:
-                return error.SerialConnectionError("Could not determine Gateway IP from ip route.")
-
-            # Update the network configuration
-            err = self._write_line(f'echo -e "[Match]\\nName=wlan0\\n\\n[Network]\\nAddress={static_ip}/24\\nGateway={gateway_ip.decode().strip()}\\nDNS={dns_ip.decode().strip()}" > /etc/systemd/network/80-wifi-station.network'.encode())
+        if static_ip is not None:
+            err = self._set_static_ip(static_ip)
             if err:
                 return err
 
@@ -264,11 +240,11 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         err = self._write_line("ping -c 3 8.8.8.8".encode())
         if err:
             return err, None
-        
+
         err, data = self._read_until("3 packets transmitted".encode(), timeout_s=10.0)
         if err:
             return err, None
-        
+
         if '0 received' in data.decode():
             return Exception("Test packets not received. WiFi connection may have failed."), None
 
@@ -276,16 +252,17 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         err = self._write_line("ip addr show wlan0 | grep 'inet '".encode())
         if err:
             return err, None
-        
-        err, data = self._read_until("inet ".encode())
+
+        err, inet_lines = self._read_all_lines()
         if err:
             return err, None
-        
-        ip_match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', data.decode())
+
+        # Search for the IP address in the output
+        ip_match = re.search(r'inet (?P<ip>(\d+\.\d+\.\d+\.\d+))', "\n".join(inet_lines))
         if not ip_match:
             return Exception("Could not find IP address."), None
-        
-        ip_address = ip_match.group(1)
+
+        ip_address = ip_match.group('ip')
         return None, ip_address
 
     def _read_all_lines(self) -> tuple[Exception, list[str]|None]:
@@ -305,7 +282,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
         return None, lines
 
-    def _read_until(self, terminator_or_regex: bytes|re.Pattern, timeout_s=None) -> tuple[Exception, bytes|None]:
+    def _read_until(self, terminator_or_regex: bytes|re.Pattern, timeout_s=None, log_mask=None) -> tuple[Exception, bytes|None]:
         """
         Read from the serial connection until the terminator is found or
         until the regular expression pattern is matched.
@@ -336,7 +313,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
             if not byte:
                 # Timeout reached
-                log.warning(f"Read {buffer} from serial but did not find terminator or match regex ({terminator_or_regex}) before timeout.")
+                log.warning(f"Read {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer} from serial but did not find terminator or match regex ({terminator_or_regex}) before timeout.")
                 self._serial_connection.timeout = old_timeout
                 return error.SerialConnectionError(f"Read timeout while looking for {terminator_or_regex}."), None
 
@@ -344,12 +321,12 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
             if is_regex:
                 if pattern.search(buffer.decode(errors='ignore')):
-                    log.debug(f"Matched regex pattern {pattern.pattern} in buffer: {buffer}")
+                    log.debug(f"Matched regex pattern {pattern.pattern} in buffer: {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer}")
                     self._serial_connection.timeout = old_timeout
                     return None, buffer
             else:
                 if buffer.endswith(terminator):
-                    log.debug(f"Found terminator {terminator} in buffer: {buffer}")
+                    log.debug(f"Found terminator {terminator} in buffer: {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer}")
                     self._serial_connection.timeout = old_timeout
                     return None, buffer
 
@@ -405,3 +382,62 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             return None
         except serial.SerialException as e:
             return error.SerialConnectionError(str(e))
+
+    def _set_static_ip(self, static_ip: StaticIPConfig) -> Exception|None:
+        """Configure static IP settings on the Artie."""
+        # Get the DNS IP
+        if not static_ip.dns:
+            err, ip_lines = self._run_cmd("cat /etc/resolv.conf | grep nameserver".encode(), check_return_code=True)
+            if err:
+                return err
+
+            dns_ip = None
+            for line in ip_lines.splitlines():
+                match = re.match(r'nameserver (?P<ip>(\d+\.\d+\.\d+\.\d+))', line)
+                if match:
+                    dns_ip = match.group('ip')
+                    break
+
+            if not dns_ip:
+                return error.SerialConnectionError("Could not determine DNS IP from /etc/resolv.conf.")
+        else:
+            dns_ip = static_ip.dns
+
+        # Get the Gateway IP
+        if not static_ip.gateway:
+            err, route_lines = self._run_cmd("ip route | grep default".encode(), check_return_code=True)
+            if err:
+                return err
+
+            gateway_ip = None
+            for line in route_lines.splitlines():
+                match = re.match(r'default via (?P<ip>(\d+\.\d+\.\d+\.\d+))', line)
+                if match:
+                    gateway_ip = match.group('ip')
+                    break
+
+            if not gateway_ip:
+                return error.SerialConnectionError("Could not determine Gateway IP from ip route.")
+        else:
+            gateway_ip = static_ip.gateway
+
+        # Determine the subnet mask (CIDR notation or full address)
+        if static_ip.subnet_mask:
+            # If subnet mask is provided, convert to CIDR if it's in dotted decimal notation
+            if '.' in static_ip.subnet_mask:
+                # Convert subnet mask like "255.255.255.0" to CIDR like "/24"
+                cidr = sum([bin(int(x)).count('1') for x in static_ip.subnet_mask.split('.')])
+                address_with_mask = f"{static_ip.ip_address}/{cidr}"
+            else:
+                # Assume it's already in CIDR format
+                address_with_mask = f"{static_ip.ip_address}/{static_ip.subnet_mask}"
+        else:
+            # Default to /24 if no subnet mask provided
+            address_with_mask = f"{static_ip.ip_address}/24"
+
+        # Update the network configuration
+        err = self._write_line(f'echo -e "[Match]\\nName=wlan0\\n\\n[Network]\\nAddress={address_with_mask}\\nGateway={gateway_ip}\\nDNS={dns_ip}" > /etc/systemd/network/80-wifi-station.network'.encode())
+        if err:
+            return err
+
+        return None
