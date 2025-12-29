@@ -7,22 +7,22 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
 
     _NO_PORTS_FOUND_TEXT = "No ports found"
     """The text we display when there are no ports found."""
-    
+
     def __init__(self):
         super().__init__()
         self.setTitle(f"<span style='color:{colors.BasePalette.BLACK};'>Connect Serial Port USB</span>")
         self.setSubTitle(f"<span style='color:{colors.BasePalette.DARK_GRAY};'>Please connect Artie's serial port USB cable and select the port.</span>")
-        
+
         layout = QtWidgets.QVBoxLayout(self)
-        
+
         # Add illustration/icon
         icon_label = QtWidgets.QLabel()
         icon_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        icon_label.setMinimumHeight(200)
+        icon_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         icon_label.setText("🔗")
-        icon_label.setStyleSheet(f"font-size: 48px; color: {colors.BasePalette.GRAY};")
+        icon_label.setStyleSheet(f"font-size: 3em; color: {colors.BasePalette.GRAY}; padding: 1em;")
         layout.addWidget(icon_label)
-        
+
         # Instructions
         instructions = QtWidgets.QLabel(
             "<ol>"
@@ -34,26 +34,26 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
         )
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
-        
+
         # Serial port selection
         port_group = QtWidgets.QGroupBox("Serial Port")
         port_layout = QtWidgets.QHBoxLayout(port_group)
-        
+
         port_label = QtWidgets.QLabel("Port:")
         port_layout.addWidget(port_label)
-        
+
         self.port_combo = QtWidgets.QComboBox()
-        self.port_combo.setMinimumWidth(200)
+        self.port_combo.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         port_layout.addWidget(self.port_combo)
-        
+
         self.refresh_button = QtWidgets.QPushButton("Refresh")
         self.refresh_button.clicked.connect(self._refresh_ports)
         port_layout.addWidget(self.refresh_button)
-        
+
         port_layout.addStretch()
-        
+
         layout.addWidget(port_group)
-        
+
         layout.addStretch()
 
         # We are not complete until a valid port is selected
@@ -61,7 +61,7 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
 
         # If the selected port changes, inform the wizard to re-check completeness
         self.port_combo.currentIndexChanged.connect(self.isComplete)
-        
+
         # Populate ports on initialization
         self._refresh_ports()
 
@@ -69,12 +69,12 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
         # in the wizard access to its value.
         self.registerField('serial.port', self.port_combo, 'currentText')
         self.isComplete()
-    
+
     def _refresh_ports(self):
         """Refresh the list of available serial ports"""
         self.port_combo.clear()
         ports = artie_serial.ArtieSerialConnection.list_ports()
-        
+
         if ports:
             self.port_combo.addItems(ports)
             self.port_combo.setEnabled(True)
@@ -92,7 +92,7 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
                 self._complete = False
                 self.completeChanged.emit()
             return False
-        
+
         # If the "No ports found" text is selected, we are not complete
         selected_port = self.port_combo.currentText()
         if selected_port == self._NO_PORTS_FOUND_TEXT:
@@ -100,23 +100,22 @@ class SerialConnectionPage(QtWidgets.QWizardPage):
                 self._complete = False
                 self.completeChanged.emit()
             return False
-        
+
         # Otherwise, we are complete
         if not self._complete:
             self._complete = True
             self.completeChanged.emit()
         return True
-    
+
     def validatePage(self):
         """Validate that a port is selected"""
         if self.port_combo.count() == 0 or not self.port_combo.isEnabled():
             QtWidgets.QMessageBox.warning(self, "No Port Selected", "No serial ports detected. Please connect the USB cable and click Refresh.")
             return False
-        
+
         selected_port = self.port_combo.currentText()
         if selected_port == self._NO_PORTS_FOUND_TEXT:
             QtWidgets.QMessageBox.warning(self, "No Port Selected", "No serial ports detected. Please connect the USB cable and click Refresh.")
             return False
-        
+
         return True
-    

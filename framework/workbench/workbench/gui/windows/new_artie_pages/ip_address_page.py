@@ -14,11 +14,10 @@ class IPAddressPage(QtWidgets.QWizardPage):
         self.setSubTitle(f"<span style='color:{colors.BasePalette.DARK_GRAY};'>Enter the IP address for the admin server.</span>")
 
         layout = QtWidgets.QFormLayout(self)
-        log.debug(f"Pre-filling Artie IP with {config.controller_node_ip}")
 
         # Artie IP
         self.artie_ip_input = QtWidgets.QLineEdit()
-        self.artie_ip_input.setText(config.controller_node_ip)
+        self.artie_ip_input.setText("")
         self.artie_ip_input.setReadOnly(True)
         layout.addRow("Artie IP Address:", self.artie_ip_input)
 
@@ -40,6 +39,11 @@ class IPAddressPage(QtWidgets.QWizardPage):
         info_label.setWordWrap(True)
         info_label.setStyleSheet(f"color: {colors.BasePalette.GRAY};")
         layout.addRow(info_label)
+
+    def initializePage(self):
+        """Initialize fields with current config values"""
+        super().initializePage()
+        self.artie_ip_input.setText(self.config.controller_node_ip)
 
     def validatePage(self):
         """Validate IP addresses"""
