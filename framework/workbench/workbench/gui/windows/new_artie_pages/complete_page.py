@@ -5,7 +5,7 @@ import pathlib
 
 class CompletePage(QtWidgets.QWizardPage):
     """Final completion page"""
-    
+
     def __init__(self, config: artie_profile.ArtieProfile):
         super().__init__()
         self.setTitle(f"<span style='color:{colors.BasePalette.BLACK};'>Setup Complete!</span>")
@@ -20,8 +20,9 @@ class CompletePage(QtWidgets.QWizardPage):
         # Success icon
         icon_label = QtWidgets.QLabel()
         icon_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        icon_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         icon_label.setText("✅\n\nSetup Successful!")
-        icon_label.setStyleSheet(f"font-size: 48px; color: {colors.BasePalette.GREEN};")
+        icon_label.setStyleSheet(f"font-size: 3em; color: {colors.BasePalette.GREEN}; padding: 1em;")
         text_layout.addWidget(icon_label)
 
         # Summary
@@ -45,21 +46,21 @@ class CompletePage(QtWidgets.QWizardPage):
 
         # Create a horizontal layout for path selection
         path_layout = QtWidgets.QHBoxLayout()
-        
+
         # Line edit for folder path
         self.folder_line_edit = QtWidgets.QLineEdit()
         self.folder_line_edit.setText(str(artie_profile.DEFAULT_SAVE_PATH))
         self.folder_line_edit.setPlaceholderText("Select a folder to save the Artie profile")
         path_layout.addWidget(self.folder_line_edit)
-        
+
         # Browse button
         browse_button = QtWidgets.QPushButton("Browse...")
         browse_button.clicked.connect(self._browse_folder)
         path_layout.addWidget(browse_button)
-        
+
         layout.addLayout(path_layout)
         self.registerField("complete.savefolder", self.folder_line_edit)
-        
+
         layout.addStretch()
 
     def _browse_folder(self):

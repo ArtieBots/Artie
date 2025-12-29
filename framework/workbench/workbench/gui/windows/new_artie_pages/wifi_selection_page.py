@@ -31,11 +31,14 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.network_table.setColumnCount(len(header_labels))
         self.network_table.setHorizontalHeaderLabels(header_labels)
         self.network_table.horizontalHeader().setStretchLastSection(True)
+        self.network_table.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.network_table.setMinimumHeight(self.network_table.fontInfo().pixelSize() * 10)
         layout.addWidget(self.network_table)
 
         # Scan button
         scan_layout = QtWidgets.QHBoxLayout()
         self.scan_button = QtWidgets.QPushButton("Scan for Networks")
+        self.scan_button.setSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         self.scan_button.clicked.connect(self._spawn_scan_thread)
         scan_layout.addWidget(self.scan_button)
         scan_layout.addStretch()
@@ -48,16 +51,19 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.ssid_input = QtWidgets.QLineEdit()
         self.ssid_input.setPlaceholderText("Selected network SSID")
         self.ssid_input.setReadOnly(True)
+        self.ssid_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("SSID:", self.ssid_input)
 
         self.wifi_password_input = QtWidgets.QLineEdit()
         self.wifi_password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.wifi_password_input.setPlaceholderText("Enter WiFi password")
+        self.wifi_password_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("Password:", self.wifi_password_input)
 
         self.bssid_input = QtWidgets.QLineEdit()
         self.bssid_input.setPlaceholderText("Selected network BSSID")
         self.bssid_input.setReadOnly(True)
+        self.bssid_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("BSSID:", self.bssid_input)
 
         layout.addWidget(credentials_group)
@@ -73,23 +79,27 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.static_ip_input = QtWidgets.QLineEdit()
         self.static_ip_input.setPlaceholderText("e.g., 192.168.1.100")
         self.static_ip_input.setEnabled(False)
+        self.static_ip_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         static_ip_layout.addRow("IP Address:", self.static_ip_input)
 
         self.subnet_mask_input = QtWidgets.QLineEdit()
         self.subnet_mask_input.setPlaceholderText("e.g., 255.255.255.0")
         self.subnet_mask_input.setText("255.255.255.0")
         self.subnet_mask_input.setEnabled(False)
+        self.subnet_mask_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         static_ip_layout.addRow("Subnet Mask:", self.subnet_mask_input)
 
         self.gateway_input = QtWidgets.QLineEdit()
         self.gateway_input.setPlaceholderText("e.g., 192.168.1.1")
         self.gateway_input.setEnabled(False)
+        self.gateway_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         static_ip_layout.addRow("Gateway:", self.gateway_input)
 
         self.dns_input = QtWidgets.QLineEdit()
         self.dns_input.setPlaceholderText("e.g., 8.8.8.8")
         self.dns_input.setText("8.8.8.8")
         self.dns_input.setEnabled(False)
+        self.dns_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         static_ip_layout.addRow("DNS Server:", self.dns_input)
 
         layout.addWidget(static_ip_group)
@@ -115,6 +125,16 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.registerField('wifi.subnet_mask', self.subnet_mask_input, 'text')
         self.registerField('wifi.gateway', self.gateway_input, 'text')
         self.registerField('wifi.dns', self.dns_input, 'text')
+
+    def initializePage(self):
+        super().initializePage()
+        # Resize the wizard to fit the content
+        self.wizard().resize(self.sizeHint())
+        # Re-center the wizard on screen
+        qr = self.wizard().frameGeometry()
+        cp = QtWidgets.QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.wizard().move(qr.topLeft())
 
     def _on_static_ip_toggled(self, checked: bool):
         """Enable/disable static IP fields based on checkbox state"""

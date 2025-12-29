@@ -31,16 +31,16 @@ class PageID(enum.IntEnum):
 
 class NewArtieWizard(QtWidgets.QWizard):
     """Wizard for adding and configuring a new Artie robot"""
-   
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("New Artie Setup Wizard")
         self.setWizardStyle(QtWidgets.QWizard.WizardStyle.ModernStyle)
-        self.setMinimumSize(700, 500)
-        
+        self.setMinimumSize(400, 400)
+
         # Artie configuration data and serial connection
         self.artie_config = artie_profile.ArtieProfile()
-        
+
         # Add wizard pages
         self.setPage(PageID.POWER, power_connection_page.PowerConnectionPage())
         self.setPage(PageID.SERIAL, serial_connection_page.SerialConnectionPage())
