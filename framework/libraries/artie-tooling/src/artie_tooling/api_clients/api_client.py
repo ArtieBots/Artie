@@ -24,24 +24,24 @@ class APIClient:
         self.session = requests.Session()
 
         # Set up authentication TO the server
-        if profile.username and profile.password:
-            self.session.auth = (profile.username, profile.password)
-        elif profile.api_server_bearer_token:
-            self.session.headers.update({'Authorization': f'Bearer {profile.api_server_bearer_token}'})
+        if profile.credentials.username and profile.credentials.password:
+            self.session.auth = (profile.credentials.username, profile.credentials.password)
+        elif profile.api_server_info.bearer_token:
+            self.session.headers.update({'Authorization': f'Bearer {profile.api_server_info.bearer_token}'})
 
         # Set up authentication OF the server
-        if profile.api_server_cert_path:
-            self.session.verify = profile.api_server_cert_path
+        if profile.api_server_info.cert_path:
+            self.session.verify = profile.api_server_info.cert_path
 
         # Determine IP and port based on whether we're in test mode
         # Also, if we are in test mode, we do not need verification
         if integration_test or unit_test:
             # Determined by docker compose files
-            self.ip_and_port = f"{profile.api_server_host}:{profile.api_server_port}"
+            self.ip_and_port = f"{profile.api_server_info.host}:{profile.api_server_info.port}"
             self.session.verify = False
         else:
             # Determined by Helm chart
-            self.ip_and_port = f"{profile.api_server_host}-{self.artie.artie_name}:{self.artie.api_server_port}"
+            self.ip_and_port = f"{profile.api_server_info.host}-{profile.artie_name}:{profile.api_server_info.port}"
 
     def get(self, endpoint: str, params=None, https=True) -> requests.Response:
         """

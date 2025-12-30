@@ -16,7 +16,8 @@ class PowerConnectionPage(QtWidgets.QWizardPage):
         icon_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         icon_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         icon_label.setText("🔌")
-        icon_label.setStyleSheet(f"font-size: 3em; color: {colors.BasePalette.GRAY}; padding: 1em;")
+        icon_label.setObjectName("icon_label")
+        icon_label.setProperty(colors.QWizardPageStyle.wizard_page_property(), True)
         layout.addWidget(icon_label)
 
         # Instructions
@@ -29,6 +30,8 @@ class PowerConnectionPage(QtWidgets.QWizardPage):
             "</ol>"
         )
         instructions.setWordWrap(True)
+        instructions.setObjectName("instructions_label")
+        instructions.setProperty(colors.QWizardPageStyle.wizard_page_property(), True)
         layout.addWidget(instructions)
 
         layout.addStretch()

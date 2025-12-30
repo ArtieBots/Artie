@@ -2,10 +2,16 @@
 This module contains code for doing ArtieTool stuff.
 """
 from workbench.comms import base
-import json
-import subprocess
+from workbench.util import log
 from artie_tooling import artie_profile
 from artie_tooling import hw_config
+import datetime
+import json
+import pathlib
+import subprocess
+
+# Path to artie-tool.py
+ARTIE_TOOL_PATH = pathlib.Path(__file__).parent.parent.parent.parent / "artie-tool.py"
 
 class ArtieToolInvoker(base.ArtieCommsBase):
     """
@@ -34,17 +40,18 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             self._process.wait()
 
     def deploy(self, configuration: str) -> Exception|None:
-        """Run the deploy command, returning an error if something goes wrong."""
+        """Run the deploy command asynchronously, returning an error if something goes wrong launching it."""
         cmd = [
             "python",
             "artie-tool.py",
             "deploy",
             configuration
         ]
+        log.debug(f"Running command: {str(cmd)}")
         return self._run_cmd(cmd)
 
     def get_hw_config(self) -> tuple[Exception|None, hw_config.HWConfig|None]:
-        """Get hardware configuration, returning an error if something goes wrong."""
+        """Get hardware configuration synchronously, returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -52,6 +59,7 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "hw-config",
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, data, stderr = self._run_cmd_blocking(cmd, json_output=True)
         if err:
             return (err, None)
@@ -63,26 +71,39 @@ class ArtieToolInvoker(base.ArtieCommsBase):
 
         return artie_hw_config
 
-    def install(self) -> Exception|None:
-        """Run the install command, returning an error if something goes wrong."""
+    def install(self, hw_config_fpath: str) -> Exception|None:
+        """Run the install command asynchronously, returning an error if something goes wrong launching it."""
         cmd = [
             "python",
             "artie-tool.py",
             "install",
-            "--username", self.config.username,
+            "--username", self.config.credentials.username,
             "--artie-ip", self.config.controller_node_ip,
-            "--admin-ip", self.config.admin_node_ip,
-            "--artie-name", self.config.artie_name
+            "--admin-ip", self.config.k3s_info.admin_node_ip,
+            "--artie-name", self.config.artie_name,
+            "--artie-type-file", hw_config_fpath,
         ]
+        log.debug(f"Running command: {str(cmd)}")
         return self._run_cmd(cmd)
 
-    def join(self, timeout_s=None) -> Exception|None:
-        """Wait until the subprocess finishes, then return. Optionally include a timeout."""
-        try:
-            self._process.wait(timeout=timeout_s)
-            return None
-        except subprocess.TimeoutExpired as e:
-            return e
+    def join(self, timeout_s=None) -> tuple[Exception|None, bool]:
+        """
+        Wait until the subprocess finishes, then return. Optionally include a timeout.
+        Returns a tuple of (error, success). If timeout occurs, error will be a TimeoutExpired exception.
+        """
+        deadline = datetime.datetime.now() + datetime.timedelta(seconds=timeout_s) if timeout_s else None
+        while self._process and self._process.poll() is None:
+            if deadline and datetime.datetime.now() >= deadline:
+                return (subprocess.TimeoutExpired(self._process.args, timeout_s), False)
+
+            if self._process.stdout:
+                log.info(self._process.stdout.readline().decode().strip())
+
+            if self._process.stderr:
+                log.error(self._process.stderr.readline().decode().strip())
+
+        self._retcode = self._process.returncode
+        return (None, self.success)
 
     def list_deployments(self) -> tuple[Exception|None, list[str]]:
         """List deployments, returning an error if something goes wrong, otherwise a list of deployment names."""
@@ -93,6 +114,7 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "list",
             "--loglevel", "error"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, _ = self._run_cmd_blocking(cmd)
         if err:
             return (err, [])
@@ -132,7 +154,7 @@ class ArtieToolInvoker(base.ArtieCommsBase):
         self._retcode = self._process.returncode
 
     def status_actuators(self, actuator: str = "all") -> tuple[Exception|None, dict|None]:
-        """Get actuator status as JSON dict, returning an error if something goes wrong."""
+        """Get actuator status as JSON dict (see the artie-tool status API document), returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -141,14 +163,15 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--actuator", actuator,
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, stderr = self._run_cmd_blocking(cmd, json_output=True)
         if err:
             return (err, None)
-        
+
         return (None, stdout)
 
     def status_mcus(self, mcu: str = "all") -> tuple[Exception|None, dict|None]:
-        """Get MCU status as JSON dict, returning an error if something goes wrong."""
+        """Get MCU status as JSON dict (see the artie-tool status API document), returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -157,14 +180,15 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--mcu", mcu,
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, stderr = self._run_cmd_blocking(cmd)
         if err:
             return (err, None)
-        
+
         return (None, stdout)
 
     def status_nodes(self, node: str = "all") -> tuple[Exception|None, dict|None]:
-        """Get node status as JSON dict, returning an error if something goes wrong."""
+        """Get node status as JSON dict (see the artie-tool status API document), returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -173,14 +197,15 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--node", node,
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, stderr = self._run_cmd_blocking(cmd)
         if err:
             return (err, None)
-        
+
         return (None, stdout)
 
     def status_pods(self, pod: str = "all") -> tuple[Exception|None, dict|None]:
-        """Get pod status as JSON dict, returning an error if something goes wrong."""
+        """Get pod status as JSON dict (see the artie-tool status API document), returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -189,14 +214,15 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--pod", pod,
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, stderr = self._run_cmd_blocking(cmd)
         if err:
             return (err, None)
-        
+
         return (None, stdout)
 
     def status_sensors(self, sensor: str = "all") -> tuple[Exception|None, dict|None]:
-        """Get sensor status as JSON dict, returning an error if something goes wrong."""
+        """Get sensor status as JSON dict (see the artie-tool status API document), returning an error if something goes wrong."""
         cmd = [
             "python",
             "artie-tool.py",
@@ -205,10 +231,11 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--sensor", sensor,
             "--json"
         ]
+        log.debug(f"Running command: {str(cmd)}")
         err, stdout, stderr = self._run_cmd_blocking(cmd)
         if err:
             return (err, None)
-        
+
         return (None, stdout)
 
     def test(self, test_type: str) -> Exception|None:
@@ -219,17 +246,21 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "test",
             test_type
         ]
+        log.debug(f"Running command: {str(cmd)}")
         return self._run_cmd(cmd)
 
     def _run_cmd(self, cmd: list[str]) -> Exception|None:
         """Run the command in a subprocess asynchronously."""
         try:
-            self._process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self._process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=ARTIE_TOOL_PATH.parent, text=False)
         except OSError as err:
             return err
 
-    def _run_cmd_blocking(self, cmd: list[str], json_output: bool = False) -> tuple[Exception|None, str, str]:
-        """Run the command in a subprocess, blocking until it completes. Return an exception or None, stdout, and stderr."""
+    def _run_cmd_blocking(self, cmd: list[str], json_output: bool = False) -> tuple[Exception|None, str|dict, str]:
+        """
+        Run the command in a subprocess, blocking until it completes. Return an exception or None, stdout, and stderr.
+        If the json_output flag is set, attempt to parse stdout as JSON and return the parsed object instead of raw string.
+        """
         try:
             completed_process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
             stdout = completed_process.stdout.decode('utf-8', errors='replace')

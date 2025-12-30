@@ -8,7 +8,6 @@ setup(
     package_dir={"artie_gpio": "src/artie_gpio"},
     install_requires=[
         "artie-util",
-        "RPi.GPIO",
     ],
     extras_require={
         "rpi": [

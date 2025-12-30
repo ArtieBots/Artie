@@ -39,6 +39,9 @@ class Sensor:
     name: str
     """The name of the sensor, such as 'eye-left'"""
 
+    type: str
+    """The type of sensor, such as 'camera'"""
+
     bus: str
     """The bus this sensor is found on. This is a bus ID, such as csi0."""
 
@@ -49,6 +52,9 @@ class Actuator:
     """
     name: str
     """The name of the actuator, such as 'eyebrow-left'"""
+
+    type: str
+    """The type of actuator, such as 'lcd'"""
 
     bus: str
     """The bus this actuator is found on. This is a bus ID, such as lcd0."""
@@ -69,6 +75,14 @@ class HWConfig:
 
     actuators: list[Actuator]
     """The list of actuators this type of Artie has."""
+
+    @property
+    def controller_node(self) -> SBC|None:
+        """Return the SBC that is the controller node."""
+        for sbc in self.sbcs:
+            if sbc.name == "controller-node":
+                return sbc
+        return None
 
     @staticmethod
     def from_json(fpath: str|bytes) -> "HWConfig":

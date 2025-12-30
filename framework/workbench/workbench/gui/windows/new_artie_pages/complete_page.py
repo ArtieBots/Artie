@@ -22,7 +22,8 @@ class CompletePage(QtWidgets.QWizardPage):
         icon_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         icon_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         icon_label.setText("✅\n\nSetup Successful!")
-        icon_label.setStyleSheet(f"font-size: 3em; color: {colors.BasePalette.GREEN}; padding: 1em;")
+        icon_label.setObjectName("icon_label")
+        icon_label.setProperty(colors.QWizardPageStyle.wizard_page_property(), True)
         text_layout.addWidget(icon_label)
 
         # Summary
@@ -35,6 +36,8 @@ class CompletePage(QtWidgets.QWizardPage):
         )
         summary_label.setWordWrap(True)
         summary_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        summary_label.setObjectName("instructions_label")
+        summary_label.setProperty(colors.QWizardPageStyle.wizard_page_property(), True)
         text_layout.addWidget(summary_label)
 
         text_frame.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)

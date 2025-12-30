@@ -37,7 +37,6 @@ class IPAddressPage(QtWidgets.QWizardPage):
             "/var/lib/rancher/k3s/server/node-token</i>"
         )
         info_label.setWordWrap(True)
-        info_label.setStyleSheet(f"color: {colors.BasePalette.GRAY};")
         layout.addRow(info_label)
 
     def initializePage(self):
@@ -58,7 +57,7 @@ class IPAddressPage(QtWidgets.QWizardPage):
             return False
 
         # Store IP address and token
-        self.config.admin_node_ip = admin_ip
-        self.config.token = admin_token
+        self.config.k3s_info.admin_node_ip = admin_ip
+        self.config.k3s_info.token = admin_token
 
         return True

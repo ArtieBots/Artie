@@ -4,10 +4,9 @@ from setuptools import setup
 setup(
     name='artiecli',
     version="0.0.1",
-    python_requires=">=3.10,<3.12",
+    python_requires=">=3.10",
     license="MIT",
     install_requires=[
-        "requests<2.29.0",
         "urllib3<2.0.0",
         "artie-tooling>=0.0.1",
         "requests>=2.28.0",

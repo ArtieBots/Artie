@@ -2,10 +2,12 @@
 This module contains the code for communicating with an Artie over serial to its
 Controller Node.
 """
+from artie_tooling import hw_config
 from workbench.comms import base
 from workbench.util import error
 from workbench.util import log
 import dataclasses
+import datetime
 import re
 import serial
 import serial.tools.list_ports
@@ -58,6 +60,20 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         if self.port:
             self._serial_connection = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
 
+    def get_hardware_config(self) -> tuple[Exception|None, hw_config.HWConfig|None]:
+        """Get the hardware configuration from the connected Artie."""
+        if not self._serial_connection or not self._serial_connection.is_open:
+            return error.SerialConnectionError("Connection not open."), None
+
+        # TODO: Implement the actual logic to retrieve the hardware configuration
+        return None, hw_config.HWConfig(
+            artie_type_name="artieTestType",
+            sbcs=[hw_config.SBC(name="controller-node", architecture="linux/arm64", buses=["i2c0"])],
+            mcus=[hw_config.MCU(name="mcu0", buses=["i2c0"])],
+            sensors=[],
+            actuators=[]
+        )
+
     def scan_for_wifi_networks(self) -> tuple[Exception, list[WifiNetwork]]:
         """Scan for wifi networks and return a list of them."""
         if not self._serial_connection or not self._serial_connection.is_open:
@@ -75,6 +91,10 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
         # Stop any existing wpa_supplicant systemd services
         err, _ = self._run_cmd("systemctl stop wpa_supplicant@wlan0".encode())
+        if err:
+            return err, []
+
+        err, _ = self._run_cmd("systemctl stop wpa_supplicant".encode())
         if err:
             return err, []
 
@@ -105,7 +125,6 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         pattern = re.compile(r'^(?P<bssid>([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2})\s+(?P<frequency>\d+)\s+(?P<signal_level>(-)?\d+)\s+(?P<flags>.*)\s+(?P<ssid>.*)$')  # hex:hex:hex:hex:hex:hex<whitespace>frequency<whitespace>signal_level<whitespace>flags<whitespace>ssid
         networks = []
         for line in lines:
-            log.debug(f"Scan result line: {line}")
             match = pattern.match(line)
             if match:
                 log.info(f"Found a network: SSID={match.group('ssid')}, BSSID={match.group('bssid')}, Signal Level={match.group('signal_level')}, Frequency={match.group('frequency')}, Flags={match.group('flags')}")
@@ -118,7 +137,6 @@ class ArtieSerialConnection(base.ArtieCommsBase):
                 )
                 networks.append(network)
 
-        log.info(f"Total networks found: {len(networks)}")
         return None, networks
 
     def select_wifi(self, bssid: str, ssid: str, password: str, static_ip: StaticIPConfig = None) -> Exception|None:
@@ -131,7 +149,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         if err:
             return err
 
-        if len(response_lines) > 1:
+        if len(response_lines.splitlines()) > 1:
             # How many networks are there?
             pattern = re.compile(r'^(?P<id>\d+)\s+$')
             network_ids = []
@@ -139,7 +157,6 @@ class ArtieSerialConnection(base.ArtieCommsBase):
                 match = pattern.match(line)
                 if match:
                     network_ids.append(match.group('id'))
-            log.debug(f"Existing network IDs: {network_ids}")
 
             # Remove existing networks
             for network_id in network_ids:
@@ -209,6 +226,11 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             if err:
                 return err
 
+        # Stop the wpa_supplicant instance we started
+        err, _ = self._run_cmd("wpa_cli terminate".encode())
+        if err:
+            return err, []
+
         # Now set wpa_supplicant in systemd
         err, _ = self._run_cmd("systemctl enable wpa_supplicant@wlan0".encode(), check_return_code=True)
         if err:
@@ -217,6 +239,31 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         err, _ = self._run_cmd("systemctl start wpa_supplicant@wlan0".encode(), check_return_code=True)
         if err:
             return err
+
+        # Wait a bit for wpa_supplicant to start
+        deadline = datetime.datetime.now() + datetime.timedelta(seconds=10)
+        while (result := self._run_cmd("systemctl status wpa_supplicant@wlan0 -l".encode(), check_return_code=True)):
+            err, status_output = result
+            if err:
+                return err
+
+            # There are color codes in the output, so we have to ignore them
+            pattern = re.compile(r'\x1b\[[0-9;]*m')
+            status_output = pattern.sub('', status_output)
+            if "Active: active (running)" in status_output and "CTRL-EVENT-CONNECTED" in status_output:
+                break
+
+            if datetime.datetime.now() > deadline:
+                # We did our best. Maybe it is working anyway. Just return and let
+                # the caller verify the connection later.
+                log.warning("Timeout waiting for wpa_supplicant to start. Proceeding anyway.")
+                break
+            else:
+                time.sleep(1)
+
+        # Ensure we wait at least a few seconds. Pinging seems to be unavailable for at least a few seconds.
+        log.info("Waiting a few seconds to ensure WiFi connection is fully established...")
+        time.sleep(5)
 
         return None
 
@@ -271,7 +318,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         while True:
             try:
                 line = self._serial_connection.readline()
-                log.debug(f"Read from serial: ".encode() + line)
+                log.debug("<-- " + line.decode(errors='ignore').strip())
             except serial.SerialException as e:
                 return error.SerialConnectionError(str(e)), None
 
@@ -321,12 +368,12 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
             if is_regex:
                 if pattern.search(buffer.decode(errors='ignore')):
-                    log.debug(f"Matched regex pattern {pattern.pattern} in buffer: {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer}")
+                    log.debug(f"<-- {buffer.replace(log_mask.encode(), b'***').decode(errors='ignore') if log_mask else buffer.decode(errors='ignore')}")
                     self._serial_connection.timeout = old_timeout
                     return None, buffer
             else:
                 if buffer.endswith(terminator):
-                    log.debug(f"Found terminator {terminator} in buffer: {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer}")
+                    log.debug(f"<-- {buffer.replace(log_mask.encode(), b'***').decode(errors='ignore') if log_mask else buffer.decode(errors='ignore')}")
                     self._serial_connection.timeout = old_timeout
                     return None, buffer
 
@@ -350,12 +397,12 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             self._serial_connection.write(b'echo $?\n')
             err, ret_code_lines = self._read_all_lines()
             if err:
-                return err
+                return err, None
 
             if not any([line.strip() == '0' for line in ret_code_lines]):
                 ret_code_str = ", ".join(ret_code_lines)
                 log.error(f"Command returned non-zero exit code: {ret_code_str}")
-                return error.SerialConnectionError(f"Command returned non-zero exit code: {ret_code_str}")
+                return error.SerialConnectionError(f"Command returned non-zero exit code: {ret_code_str}"), None
 
         return None, "\n".join(lines[:-1])
 
@@ -375,10 +422,9 @@ class ArtieSerialConnection(base.ArtieCommsBase):
     def _write_line(self, data: bytes, log_mask: str = None) -> Exception|None:
         """Write a line to the serial connection."""
         try:
-            log.debug(f"Writing to serial: {data.replace(log_mask.encode(), b'***') if log_mask else data}")
+            log.debug(f"--> {data.replace(log_mask.encode(), b'***').decode(errors='ignore').strip() if log_mask else data.decode(errors='ignore').strip()}")
             self._serial_connection.write(data + b'\r\n')
-            b = self._serial_connection.read(len(data + b'\r\n'))  # Echo back
-            log.debug(f"Echoed from serial: {b.replace(log_mask.encode(), b'***') if log_mask else b}")
+            _ = self._serial_connection.read(len(data + b'\r\n'))  # Echo back
             return None
         except serial.SerialException as e:
             return error.SerialConnectionError(str(e))

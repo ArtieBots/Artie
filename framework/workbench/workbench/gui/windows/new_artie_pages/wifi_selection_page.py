@@ -32,7 +32,8 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.network_table.setHorizontalHeaderLabels(header_labels)
         self.network_table.horizontalHeader().setStretchLastSection(True)
         self.network_table.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        self.network_table.setMinimumHeight(self.network_table.fontInfo().pixelSize() * 10)
+        self.network_table.setMinimumHeight(self.network_table.fontInfo().pixelSize() * 15)
+        self.network_table.setMinimumWidth(self.network_table.fontInfo().pixelSize() * 60)
         layout.addWidget(self.network_table)
 
         # Scan button
@@ -51,18 +52,24 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.ssid_input = QtWidgets.QLineEdit()
         self.ssid_input.setPlaceholderText("Selected network SSID")
         self.ssid_input.setReadOnly(True)
+        self.ssid_input.setMinimumHeight(self.ssid_input.fontInfo().pixelSize() * 3)
+        self.ssid_input.setMinimumWidth(self.ssid_input.fontInfo().pixelSize() * 20)
         self.ssid_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("SSID:", self.ssid_input)
 
         self.wifi_password_input = QtWidgets.QLineEdit()
         self.wifi_password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.wifi_password_input.setPlaceholderText("Enter WiFi password")
+        self.wifi_password_input.setMinimumHeight(self.wifi_password_input.fontInfo().pixelSize() * 3)
+        self.wifi_password_input.setMinimumWidth(self.wifi_password_input.fontInfo().pixelSize() * 20)
         self.wifi_password_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("Password:", self.wifi_password_input)
 
         self.bssid_input = QtWidgets.QLineEdit()
         self.bssid_input.setPlaceholderText("Selected network BSSID")
         self.bssid_input.setReadOnly(True)
+        self.bssid_input.setMinimumHeight(self.bssid_input.fontInfo().pixelSize() * 3)
+        self.bssid_input.setMinimumWidth(self.bssid_input.fontInfo().pixelSize() * 20)
         self.bssid_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         credentials_layout.addRow("BSSID:", self.bssid_input)
 
@@ -97,10 +104,12 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
 
         self.dns_input = QtWidgets.QLineEdit()
         self.dns_input.setPlaceholderText("e.g., 8.8.8.8")
-        self.dns_input.setText("8.8.8.8")
         self.dns_input.setEnabled(False)
         self.dns_input.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         static_ip_layout.addRow("DNS Server:", self.dns_input)
+
+        static_ip_group.setMinimumHeight(self.static_ip_input.fontInfo().pixelSize() * 30)
+        static_ip_group.setMinimumWidth(self.static_ip_input.fontInfo().pixelSize() * 60)
 
         layout.addWidget(static_ip_group)
 
@@ -113,7 +122,6 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         # Note
         note_label = QtWidgets.QLabel("<i>Note: WiFi credentials are stored on Artie's OS, not in the Workbench.</i>")
         note_label.setWordWrap(True)
-        note_label.setStyleSheet(f"color: {colors.BasePalette.GRAY};")
         layout.addWidget(note_label)
 
         # Pass the SSID, password, and BSSID to the next page
@@ -121,20 +129,56 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.registerField('wifi.password', self.wifi_password_input, 'text')
         self.registerField('wifi.bssid', self.bssid_input, 'text')
         self.registerField('wifi.use_static_ip', self.use_static_ip)
-        self.registerField('wifi.static_ip', self.static_ip_input, 'text')
-        self.registerField('wifi.subnet_mask', self.subnet_mask_input, 'text')
-        self.registerField('wifi.gateway', self.gateway_input, 'text')
-        self.registerField('wifi.dns', self.dns_input, 'text')
+        self.registerField('wifi.static_ip.address', self.static_ip_input, 'text')
+        self.registerField('wifi.static_ip.subnet', self.subnet_mask_input, 'text')
+        self.registerField('wifi.static_ip.gateway', self.gateway_input, 'text')
+        self.registerField('wifi.static_ip.dns', self.dns_input, 'text')
 
     def initializePage(self):
+        """Initialize the page and add skip button"""
         super().initializePage()
+
+        # Add skip button to the wizard button layout
+        skip_button = QtWidgets.QPushButton("Skip")
+        skip_button.setToolTip("Skip if you already have networking configured")
+        skip_button.clicked.connect(self._on_skip_clicked)
+
+        # Add skip button to wizard's custom button 1 position
+        self.wizard().setButton(QtWidgets.QWizard.WizardButton.CustomButton1, skip_button)
+        self.wizard().setOption(QtWidgets.QWizard.WizardOption.HaveCustomButton1, True)
+
+        # Set button layout to include our custom button
+        button_layout = [
+            QtWidgets.QWizard.WizardButton.Stretch,
+            QtWidgets.QWizard.WizardButton.CustomButton1,
+            QtWidgets.QWizard.WizardButton.BackButton,
+            QtWidgets.QWizard.WizardButton.NextButton,
+            QtWidgets.QWizard.WizardButton.CancelButton
+        ]
+        self.wizard().setButtonLayout(button_layout)
+
         # Resize the wizard to fit the content
         self.wizard().resize(self.sizeHint())
         # Re-center the wizard on screen
-        qr = self.wizard().frameGeometry()
-        cp = QtWidgets.QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.wizard().move(qr.topLeft())
+        self.wizard().setGeometry(
+            QtWidgets.QStyle.alignedRect(
+                QtCore.Qt.LayoutDirection.LeftToRight,
+                QtCore.Qt.AlignmentFlag.AlignCenter,
+                self.wizard().size(),
+                QtWidgets.QApplication.primaryScreen().availableGeometry()
+            )
+        )
+
+    def _on_skip_clicked(self):
+        """Handle skip button click by clearing required fields and moving to next page"""
+        # Clear all WiFi-related fields to allow validation to pass on skip
+        self.setField('wifi.ssid', 'Custom Configuration')
+        self.setField('wifi.password', '')
+        self.setField('wifi.bssid', '')
+        self.setField('wifi.use_static_ip', False)
+
+        # Skip this page
+        self.wizard().next()
 
     def _on_static_ip_toggled(self, checked: bool):
         """Enable/disable static IP fields based on checkbox state"""
@@ -222,6 +266,10 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
         self.setField('wifi.password', password)
         self.setField('wifi.bssid', bssid)
 
+        # Allow skipping if all fields are empty (user clicked skip)
+        if ssid == 'Custom Configuration':
+            return True
+
         if not ssid:
             QtWidgets.QMessageBox.warning(self, "No Network Selected", "Please select a WiFi network.")
             return False
@@ -244,10 +292,10 @@ class WiFiSelectionPage(QtWidgets.QWizardPage):
 
             # Store static IP configuration
             self.setField('wifi.use_static_ip', True)
-            self.setField('wifi.static_ip', static_ip)
-            self.setField('wifi.subnet_mask', self.subnet_mask_input.text().strip())
-            self.setField('wifi.gateway', self.gateway_input.text().strip())
-            self.setField('wifi.dns', self.dns_input.text().strip())
+            self.setField('wifi.static_ip.address', static_ip)
+            self.setField('wifi.static_ip.subnet', self.subnet_mask_input.text().strip())
+            self.setField('wifi.static_ip.gateway', self.gateway_input.text().strip())
+            self.setField('wifi.static_ip.dns', self.dns_input.text().strip())
         else:
             self.setField('wifi.use_static_ip', False)
 
