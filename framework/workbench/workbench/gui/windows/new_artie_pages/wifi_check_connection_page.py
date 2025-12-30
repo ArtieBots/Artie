@@ -23,10 +23,32 @@ class WiFiVerificationThread(QtCore.QThread):
 
     def run(self):
         """Run the WiFi verification in a separate thread"""
-        try:
-            self.log_message_signal.emit("Attempting to connect to WiFi network...")
-            self.log_message_signal.emit("Sending WiFi credentials to Artie...")
+        self.log_message_signal.emit("Attempting to connect to WiFi network...")
+        if self.ssid == "Custom Configuration":
+            self._check_custom_configuration()
+        else:
+            self._connect_to_wifi()
 
+    def _check_custom_configuration(self):
+        """Check if Artie is already connected to WiFi with a custom configuration"""
+        self.log_message_signal.emit("Checking existing WiFi connection on Artie...")
+
+        try:
+            with artie_serial.ArtieSerialConnection(port=self.serial_port, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as connection:
+                err, ip_address = connection.verify_wifi_connection()
+                if err:
+                    self.failure_signal.emit(err)
+                    return
+
+                self.success_signal.emit(ip_address)
+        except Exception as e:
+            self.failure_signal.emit(e)
+
+    def _connect_to_wifi(self):
+        """Connect to the specified WiFi network and verify connection"""
+        self.log_message_signal.emit("Sending WiFi credentials to Artie...")
+
+        try:
             with artie_serial.ArtieSerialConnection(port=self.serial_port, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as connection:
                 err = connection.select_wifi(self.bssid, self.ssid, self.password, self.static_ip_config)
                 if err:
@@ -59,7 +81,8 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         self.status_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.status_label.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.status_label.setText("📡\n\nConnecting...")
-        self.status_label.setStyleSheet(f"font-size: 1.5em; color: {colors.BasePalette.GRAY}; padding: 1em;")
+        self.status_label.setObjectName("icon_label")
+        self.status_label.setProperty(colors.QWizardPageStyle.wizard_page_property(), True)
         layout.addWidget(self.status_label)
 
         # Progress indicator
@@ -74,14 +97,14 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
         self.status_text.setText("Please wait while we verify the WiFi connection...")
         layout.addWidget(self.status_text)
 
-        # Output details (collapsible)
+        # Output details
         self.details_group = QtWidgets.QGroupBox("Connection Details")
         details_layout = QtWidgets.QVBoxLayout(self.details_group)
 
         self.details_text = QtWidgets.QTextEdit()
         self.details_text.setReadOnly(True)
-        self.details_text.setStyleSheet(f"font-family: monospace; background-color: {colors.BasePalette.WHITE}; color: {colors.BasePalette.BLACK};")
         self.details_text.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Maximum)
+        self.details_text.setMinimumHeight(self.details_text.fontMetrics().lineSpacing() * 20)  # At least 20 lines high
         details_layout.addWidget(self.details_text)
 
         layout.addWidget(self.details_group)
@@ -93,10 +116,22 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
 
     def initializePage(self):
         """Start the WiFi verification when page is shown"""
+        
+        # Reset wizard button layout to default (remove skip button from previous page)
+        self.wizard().setOption(QtWidgets.QWizard.WizardOption.HaveCustomButton1, False)
+        button_layout = [
+            QtWidgets.QWizard.WizardButton.Stretch,
+            QtWidgets.QWizard.WizardButton.BackButton,
+            QtWidgets.QWizard.WizardButton.NextButton,
+            QtWidgets.QWizard.WizardButton.CommitButton,
+            QtWidgets.QWizard.WizardButton.FinishButton,
+            QtWidgets.QWizard.WizardButton.CancelButton
+        ]
+        self.wizard().setButtonLayout(button_layout)
+
         self.connection_verified = False
         self.details_text.clear()
         self.status_label.setText("📡\n\nConnecting...")
-        self.status_label.setStyleSheet(f"font-size: 1.5em; color: {colors.BasePalette.GRAY}; padding: 1em;")
         self.status_text.setText("Please wait while we verify the WiFi connection...")
         self.progress.setRange(0, 0)  # Indeterminate
 
@@ -132,7 +167,6 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
 
         # Update UI
         self.status_label.setText("✅\n\nConnected!")
-        self.status_label.setStyleSheet(f"font-size: 1.5em; color: {colors.BasePalette.GREEN}; padding: 1em;")
         self.status_text.setText(f"Successfully connected to {self.field('wifi.ssid')}.")
         self.progress.setRange(0, 1)
         self.progress.setValue(1)
@@ -151,7 +185,6 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
 
         # Update UI
         self.status_label.setText("❌\n\nConnection Failed")
-        self.status_label.setStyleSheet(f"font-size: 1.5em; color: {colors.BasePalette.RED}; padding: 1em;")
         self.status_text.setText("Failed to connect to WiFi. Please go back and check your credentials.")
         self.progress.setRange(0, 1)
         self.progress.setValue(0)

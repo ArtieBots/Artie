@@ -21,7 +21,7 @@ def delete_secret(key: str):
     # TODO: Linux: use Secret Service API (libsecret)?
     pass
 
-def retrieve_api_server_cert() -> str:
+def retrieve_api_server_cert(key: str) -> str:
     """Retrieve a path to the API server certificate bundle."""
     # TODO
     return ""

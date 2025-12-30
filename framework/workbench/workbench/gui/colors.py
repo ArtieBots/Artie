@@ -7,57 +7,57 @@ import enum
 
 class BasePalette(enum.StrEnum):
     """Base colors used in workbench windows."""
-    
+
     # Dark backgrounds
     DARKEST = "#1e1e1e"
     """Very dark background color."""
-    
+
     DARK = "#2b2b2b"
     """Dark background color."""
-    
+
     DARK_ACCENT = "#3c3c3c"
     """Lighter dark background color."""
-    
+
     MEDIUM_DARK = "#4a4a4a"
     """Medium dark background/hover color."""
-    
+
     # Grays
     GRAY = "#555555"
     """Medium gray for borders and handles."""
-    
+
     GRAY_DISABLED = "#777777"
     """Gray for disabled text."""
-    
+
     GRAY_LIGHT = "#999999"
     """Light gray for disabled elements."""
-    
+
     # Light colors
     LIGHT = "#e0e0e0"
     """Light gray text color."""
-    
+
     WHITE = "#ffffff"
     """Pure white color."""
-    
+
     # Green accents
     GREEN_DARK = "#2da042"
     """Dark green for pressed state."""
-    
+
     GREEN = "#41cd52"
     """Primary green accent color."""
-    
+
     GREEN_LIGHT = "#4ee75e"
     """Light green for hover state."""
 
     RED = "#e04b4b"
     """Red color for errors and warnings."""
-    
+
     # Special
     TRANSPARENT = "transparent"
     """Transparent color."""
-    
+
     BLACK = "#000000"
     """Pure black color."""
-    
+
     DARK_GRAY = "#333333"
     """Dark gray color."""
 
@@ -66,9 +66,9 @@ class QMainWindowStyle(enum.StrEnum):
     """Colors for QMainWindow styling."""
     BACKGROUND = BasePalette.DARK
     COLOR = BasePalette.LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QMainWindow stylesheet."""
         return f"""
 QMainWindow {{
@@ -86,9 +86,9 @@ class QMenuBarStyle(enum.StrEnum):
     ITEM_SELECTED_BG = BasePalette.GREEN
     ITEM_SELECTED_COLOR = BasePalette.WHITE
     ITEM_PRESSED_BG = BasePalette.GREEN_DARK
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QMenuBar stylesheet."""
         return f"""
 QMenuBar {{
@@ -123,9 +123,9 @@ class QMenuStyle(enum.StrEnum):
     ITEM_SELECTED_BG = BasePalette.GREEN
     ITEM_SELECTED_COLOR = BasePalette.WHITE
     SEPARATOR = BasePalette.GRAY
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QMenu stylesheet."""
         return f"""
 QMenu {{
@@ -161,9 +161,9 @@ class QPushButtonStyle(enum.StrEnum):
     PRESSED_BG = BasePalette.GREEN_DARK
     DISABLED_BG = BasePalette.GRAY
     DISABLED_COLOR = BasePalette.GRAY_LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QPushButton stylesheet."""
         return f"""
 QPushButton {{
@@ -201,9 +201,9 @@ class QTabWidgetStyle(enum.StrEnum):
     TAB_SELECTED_BG = BasePalette.GREEN
     TAB_SELECTED_COLOR = BasePalette.WHITE
     TAB_HOVER_BG = BasePalette.MEDIUM_DARK
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QTabWidget stylesheet."""
         return f"""
 QTabWidget::pane {{
@@ -242,9 +242,9 @@ class QTextEditStyle(enum.StrEnum):
     BORDER = BasePalette.GRAY
     SELECTION_BG = BasePalette.GREEN
     SELECTION_COLOR = BasePalette.WHITE
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QTextEdit stylesheet."""
         return f"""
 QTextEdit, QTextBrowser {{
@@ -269,9 +269,9 @@ class QLineEditStyle(enum.StrEnum):
     DISABLED_COLOR = BasePalette.GRAY_DISABLED
     SELECTION_BG = BasePalette.GREEN
     SELECTION_COLOR = BasePalette.WHITE
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QLineEdit stylesheet."""
         return f"""
 QLineEdit {{
@@ -308,9 +308,9 @@ class QComboBoxStyle(enum.StrEnum):
     VIEW_BORDER = BasePalette.GREEN
     SELECTION_BG = BasePalette.GREEN
     SELECTION_COLOR = BasePalette.WHITE
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QComboBox stylesheet."""
         return f"""
 QComboBox {{
@@ -363,9 +363,9 @@ class QCheckBoxStyle(enum.StrEnum):
     CHECKED_BG = BasePalette.GREEN
     CHECKED_BORDER = BasePalette.GREEN
     CHECKED_HOVER_BG = BasePalette.GREEN_LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QCheckBox stylesheet."""
         return f"""
 QCheckBox {{
@@ -405,9 +405,9 @@ class QSpinBoxStyle(enum.StrEnum):
     FOCUS_BORDER = BasePalette.GREEN
     BUTTON_BG = BasePalette.MEDIUM_DARK
     BUTTON_HOVER_BG = BasePalette.GREEN
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QSpinBox stylesheet."""
         return f"""
 QSpinBox {{
@@ -437,9 +437,9 @@ QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
 class QLabelStyle(enum.StrEnum):
     """Colors for QLabel styling."""
     COLOR = BasePalette.LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QLabel stylesheet."""
         return f"""
 QLabel {{
@@ -453,9 +453,9 @@ class QGroupBoxStyle(enum.StrEnum):
     COLOR = BasePalette.LIGHT
     BORDER = BasePalette.GRAY
     TITLE_COLOR = BasePalette.GREEN
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QGroupBox stylesheet."""
         return f"""
 QGroupBox {{
@@ -481,9 +481,9 @@ class QStatusBarStyle(enum.StrEnum):
     BACKGROUND = BasePalette.DARK_ACCENT
     COLOR = BasePalette.LIGHT
     BORDER = BasePalette.GRAY
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QStatusBar stylesheet."""
         return f"""
 QStatusBar {{
@@ -503,9 +503,9 @@ class QScrollBarStyle(enum.StrEnum):
     BACKGROUND = BasePalette.DARK
     HANDLE = BasePalette.GRAY
     HANDLE_HOVER = BasePalette.GREEN
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QScrollBar stylesheet."""
         return f"""
 QScrollBar:vertical {{
@@ -554,9 +554,9 @@ class QDialogStyle(enum.StrEnum):
     """Colors for QDialog styling."""
     BACKGROUND = BasePalette.DARK
     COLOR = BasePalette.LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QDialog stylesheet."""
         return f"""
 QDialog {{
@@ -570,9 +570,9 @@ class QMessageBoxStyle(enum.StrEnum):
     """Colors for QMessageBox styling."""
     BACKGROUND = BasePalette.DARK
     LABEL_COLOR = BasePalette.LIGHT
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QMessageBox stylesheet."""
         return f"""
 QMessageBox {{
@@ -594,9 +594,9 @@ class QToolTipStyle(enum.StrEnum):
     BACKGROUND = BasePalette.DARK_ACCENT
     COLOR = BasePalette.LIGHT
     BORDER = BasePalette.GREEN
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QToolTip stylesheet."""
         return f"""
 QToolTip {{
@@ -617,9 +617,9 @@ class QTableWidgetStyle(enum.StrEnum):
     HEADER_COLOR = BasePalette.LIGHT
     SELECTED_BG = BasePalette.GREEN
     SELECTED_COLOR = BasePalette.WHITE
-    
-    @property
-    def stylesheet(self) -> str:
+
+    @staticmethod
+    def stylesheet() -> str:
         """Generate QTableWidget stylesheet."""
         return f"""
 QTableWidget {{
@@ -642,32 +642,69 @@ QTableWidget::item:selected {{
 }}
 """
 
+class QWizardPageStyle(enum.StrEnum):
+    """
+    Styles for QWizard page elements. Wizard page elements should have a dynamic
+    property "wizardPage" set to true to apply these styles.
+    """
+    pass
+
+    @staticmethod
+    def wizard_page_property() -> str:
+        """Return the dynamic property that should be set on wizard pages."""
+        return "wizardPage"
+
+    @staticmethod
+    def stylesheet() -> str:
+        """Return the stylesheet string."""
+        return f"""
+*[{QWizardPageStyle.wizard_page_property()}=true] {{
+    background-color: {BasePalette.DARK};
+    color: {BasePalette.LIGHT};
+}}
+
+/* QWizarPage central icon label */
+QLabel[{QWizardPageStyle.wizard_page_property()}=true]#icon_label {{
+    font-size: 48px;
+    color: {BasePalette.GRAY};
+    padding: 2px;
+}}
+
+/* QWizardPage instructions or summary label */
+QLabel[{QWizardPageStyle.wizard_page_property()}=true]#instructions_label {{
+    font-size: 14px;
+    color: {BasePalette.LIGHT};
+    padding: 4px;
+}}
+"""
+
 def generate_full_stylesheet() -> str:
     """
     Generate the complete application stylesheet by combining all component stylesheets.
-    
+
     Returns:
         Complete Qt stylesheet string for the application.
     """
     styles = [
-        QMainWindowStyle.BACKGROUND.stylesheet,
-        QMenuBarStyle.BACKGROUND.stylesheet,
-        QMenuStyle.BACKGROUND.stylesheet,
-        QPushButtonStyle.BACKGROUND.stylesheet,
-        QTabWidgetStyle.PANE_BG.stylesheet,
-        QTextEditStyle.BACKGROUND.stylesheet,
-        QLineEditStyle.BACKGROUND.stylesheet,
-        QComboBoxStyle.BACKGROUND.stylesheet,
-        QCheckBoxStyle.COLOR.stylesheet,
-        QSpinBoxStyle.BACKGROUND.stylesheet,
-        QLabelStyle.COLOR.stylesheet,
-        QGroupBoxStyle.COLOR.stylesheet,
-        QStatusBarStyle.BACKGROUND.stylesheet,
-        QScrollBarStyle.BACKGROUND.stylesheet,
-        QDialogStyle.BACKGROUND.stylesheet,
-        QMessageBoxStyle.BACKGROUND.stylesheet,
-        QToolTipStyle.BACKGROUND.stylesheet,
-        QTableWidgetStyle.BACKGROUND.stylesheet,
+        QMainWindowStyle.stylesheet(),
+        QMenuBarStyle.stylesheet(),
+        QMenuStyle.stylesheet(),
+        QPushButtonStyle.stylesheet(),
+        QTabWidgetStyle.stylesheet(),
+        QTextEditStyle.stylesheet(),
+        QLineEditStyle.stylesheet(),
+        QComboBoxStyle.stylesheet(),
+        QCheckBoxStyle.stylesheet(),
+        QSpinBoxStyle.stylesheet(),
+        QLabelStyle.stylesheet(),
+        QGroupBoxStyle.stylesheet(),
+        QStatusBarStyle.stylesheet(),
+        QScrollBarStyle.stylesheet(),
+        QDialogStyle.stylesheet(),
+        QMessageBoxStyle.stylesheet(),
+        QToolTipStyle.stylesheet(),
+        QTableWidgetStyle.stylesheet(),
+        QWizardPageStyle.stylesheet(),
     ]
-    
+
     return "/* Qt Green Theme - Generated from colors.py */\n" + "\n".join(styles)
