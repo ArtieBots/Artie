@@ -96,11 +96,11 @@ class HWConfig:
             with open(fpath, 'r') as f:
                 raw = json.load(f)
 
-        api_version = raw.get('api-version', 'v1')
+        api_version = raw.get('api_version', 'v1')
         if api_version == 'v1':
             return HWConfig._from_config_v1(raw)
         else:
-            raise NotImplementedError(f"api-version found in HW configuration is not one we know how to handle. Version found: {api_version}")
+            raise NotImplementedError(f"api_version found in HW configuration is not one we know how to handle. Version found: {api_version}")
 
     @staticmethod
     def from_config(fpath: str|bytes) -> "HWConfig":
@@ -114,30 +114,33 @@ class HWConfig:
             with open(fpath, 'r') as f:
                 raw = yaml.safe_load(f)
 
-        api_version = raw.get('api-version', 'v1')
+        api_version = raw.get('api_version', 'v1')
         if api_version == 'v1':
             return HWConfig._from_config_v1(raw)
         else:
-            raise NotImplementedError(f"api-version found in HW configuration is not one we know how to handle. Version found: {api_version}")
+            raise NotImplementedError(f"api_version found in HW configuration is not one we know how to handle. Version found: {api_version}")
 
     @staticmethod
     def _from_config_v1(raw):
-        if "artie-type-name" not in raw:
-            raise KeyError(f"Cannot find 'artie-type-name' in Artie type file")
+        if "artie_type_name" not in raw:
+            raise KeyError(f"Cannot find 'artie_type_name' in Artie HW config file")
 
-        if "single-board-computers" not in raw:
-            raise KeyError(f"Cannot find 'single-board-computers' in Artie type file")
+        if "sbcs" not in raw:
+            raise KeyError(f"Cannot find 'sbcs' in Artie HW config file")
 
-        if "microcontrollers" not in raw:
-            raise KeyError(f"Cannot find 'microcontrollers' in Artie type file")
+        if "mcus" not in raw:
+            raise KeyError(f"Cannot find 'mcus' in Artie HW config file")
 
         if "actuators" not in raw:
-            raise KeyError(f"Cannot find 'actuators' in Artie type file")
+            raise KeyError(f"Cannot find 'actuators' in Artie HW config file")
+
+        if "sensors" not in raw:
+            raise KeyError(f"Cannot find 'sensors' in Artie HW config file")
 
         return HWConfig(
-            artie_type_name=raw["artie-type-name"],
-            sbcs=[SBC(**sbc) for sbc in raw["single-board-computers"]],
-            mcus=[MCU(**mcu) for mcu in raw["microcontrollers"]],
+            artie_type_name=raw["artie_type_name"],
+            sbcs=[SBC(**sbc) for sbc in raw["sbcs"]],
+            mcus=[MCU(**mcu) for mcu in raw["mcus"]],
             sensors=[Sensor(**sensor) for sensor in raw["sensors"]],
             actuators=[Actuator(**actuator) for actuator in raw["actuators"]],
         )

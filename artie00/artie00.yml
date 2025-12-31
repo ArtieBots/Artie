@@ -1,11 +1,11 @@
 # TODO: The Controller Node should query the various buses
 #       and populate this file itself. Hand-crafting a HW file should only
 #       be necessary for unusual custom hardware configurations.
-api-version: v1 # Update this if you make changes to this YAML specification that requires changes to hw_config.py
+api_version: v1 # Update this if you make changes to this YAML specification that requires changes to hw_config.py
 
-artie-type-name: artie00
+artie_type_name: artie00
 
-single-board-computers:
+sbcs:
   - name: controller-node # This node name is required in every Artie
     architecture: linux/arm64
     buses:
@@ -28,7 +28,7 @@ single-board-computers:
       - can0
       - power-input1
 
-microcontrollers:
+mcus:
   - name: eyebrow-left
     buses:
       - can0

@@ -116,7 +116,6 @@ class WiFiCheckConnectionPage(QtWidgets.QWizardPage):
 
     def initializePage(self):
         """Start the WiFi verification when page is shown"""
-        
         # Reset wizard button layout to default (remove skip button from previous page)
         self.wizard().setOption(QtWidgets.QWizard.WizardOption.HaveCustomButton1, False)
         button_layout = [

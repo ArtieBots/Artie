@@ -8,3 +8,7 @@ class WorkbenchError(Exception):
 class SerialConnectionError(WorkbenchError):
     """Raised when there is an error with the serial connection."""
     pass
+
+class SerialTimeoutError(SerialConnectionError):
+    """Raised when a serial operation times out."""
+    pass
