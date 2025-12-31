@@ -66,13 +66,16 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             return error.SerialConnectionError("Connection not open."), None
 
         # TODO: Implement the actual logic to retrieve the hardware configuration
-        return None, hw_config.HWConfig(
+        config = hw_config.HWConfig(
             artie_type_name="artieTestType",
             sbcs=[hw_config.SBC(name="controller-node", architecture="linux/arm64", buses=["i2c0"])],
             mcus=[hw_config.MCU(name="mcu0", buses=["i2c0"])],
             sensors=[],
             actuators=[]
         )
+
+        log.info(f"Retrieved hardware configuration: {config}")
+        return None, config
 
     def scan_for_wifi_networks(self) -> tuple[Exception, list[WifiNetwork]]:
         """Scan for wifi networks and return a list of them."""
@@ -95,6 +98,21 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             return err, []
 
         err, _ = self._run_cmd("systemctl stop wpa_supplicant".encode())
+        if err:
+            return err, []
+
+        # Create the wpa_supplicant directory if it doesn't exist
+        err, _ = self._run_cmd("mkdir /etc/wpa_supplicant".encode())
+        if err:
+            return err, []
+
+         # Touch the config file to ensure it exists
+        err, _ = self._run_cmd("touch /etc/wpa_supplicant/wpa_supplicant-wlan0.conf".encode())
+        if err:
+            return err, []
+
+        # Ensure the config file has at least the basic contents
+        err, _ = self._run_cmd(f'echo -e "ctrl_interface=/var/run/wpa_supplicant\\nctrl_interface_group=0\\nupdate_config=1\\n\\nnetwork={{\\n        key_mgmt=NONE\\n}}" > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf'.encode(), check_return_code=True)
         if err:
             return err, []
 
@@ -149,20 +167,19 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         if err:
             return err
 
-        if len(response_lines.splitlines()) > 1:
-            # How many networks are there?
-            pattern = re.compile(r'^(?P<id>\d+)\s+$')
-            network_ids = []
-            for line in response_lines[1:]:
-                match = pattern.match(line)
-                if match:
-                    network_ids.append(match.group('id'))
+        # How many networks are there?
+        pattern = re.compile(r'^(?P<id>\d+)\s+.*$')
+        network_ids = []
+        for line in response_lines:
+            match = pattern.match(line)
+            if match:
+                network_ids.append(match.group('id'))
 
-            # Remove existing networks
-            for network_id in network_ids:
-                err, _ = self._run_cmd(f'wpa_cli remove_network {network_id}'.encode(), check_return_code=True)
-                if err:
-                    return err
+        # Remove existing networks
+        for network_id in network_ids:
+            err, _ = self._run_cmd(f'wpa_cli remove_network {network_id}'.encode(), check_return_code=True)
+            if err:
+                return err
 
         # Add a new network
         err, response_lines = self._run_cmd(f'wpa_cli add_network'.encode(), check_return_code=True)
@@ -171,6 +188,8 @@ class ArtieSerialConnection(base.ArtieCommsBase):
 
         # The network ID is the first line that just has a single integer
         network_id = None
+        log.debug(f"wpa_cli add_network response lines: {response_lines}")
+        response_lines = response_lines.splitlines()
         for line in response_lines:
             line = line.strip()
             if line.isdigit():
@@ -293,7 +312,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
             return err, None
 
         if '0 received' in data.decode():
-            return Exception("Test packets not received. WiFi connection may have failed."), None
+            return error.SerialConnectionError("Test packets not received. WiFi connection may have failed."), None
 
         # Return the IP address of Artie
         err = self._write_line("ip addr show wlan0 | grep 'inet '".encode())
@@ -307,7 +326,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         # Search for the IP address in the output
         ip_match = re.search(r'inet (?P<ip>(\d+\.\d+\.\d+\.\d+))', "\n".join(inet_lines))
         if not ip_match:
-            return Exception("Could not find IP address."), None
+            return error.SerialConnectionError("Could not find IP address."), None
 
         ip_address = ip_match.group('ip')
         return None, ip_address
@@ -362,7 +381,7 @@ class ArtieSerialConnection(base.ArtieCommsBase):
                 # Timeout reached
                 log.warning(f"Read {buffer.replace(log_mask.encode(), b'***') if log_mask else buffer} from serial but did not find terminator or match regex ({terminator_or_regex}) before timeout.")
                 self._serial_connection.timeout = old_timeout
-                return error.SerialConnectionError(f"Read timeout while looking for {terminator_or_regex}."), None
+                return error.SerialTimeoutError(f"Read timeout while looking for {terminator_or_regex}."), None
 
             buffer += byte
 
@@ -411,13 +430,29 @@ class ArtieSerialConnection(base.ArtieCommsBase):
         if not self._serial_connection or not self._serial_connection.is_open:
             return serial.SerialException("Connection not open.")
 
-        try:
-            self._read_until("login: ".encode())
-        except error.SerialConnectionError:
-            pass  # Possibly already logged in
+        # First, try to log in with the provided credentials
+        err = self._write_line(username.encode())
+        if err:
+            return err
 
-        # TODO: Implement the actual sign-in and username/password change logic for artie-image-release
-        self._write_line("root".encode())
+        # If we were not logged in, we will now get a Password prompt.
+        err, _ = self._read_until("Password: ".encode())
+        if err and issubclass(type(err), error.SerialTimeoutError):
+            # We timed out waiting for the Password prompt, so assume we are already logged in
+            log.info("Assuming already logged in (no Password prompt found in terminal output).")
+            return None
+        elif err:
+            return err
+
+        err = self._write_line(password.encode(), log_mask=password)
+        if err:
+            return err
+
+        err, _ = self._run_cmd(b'echo "Signed in."')
+        if err:
+            return err
+
+        return None
 
     def _write_line(self, data: bytes, log_mask: str = None) -> Exception|None:
         """Write a line to the serial connection."""

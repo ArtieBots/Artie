@@ -31,13 +31,15 @@ class ArtieToolInvoker(base.ArtieCommsBase):
 
     def open(self):
         """No-op for ArtieToolInvoker."""
-        pass
+        super().open()
 
     def close(self):
         """Terminate the subprocess if it's still running."""
         if self._process and self._process.poll() is None:
             self._process.terminate()
             self._process.wait()
+
+        super().close()
 
     def deploy(self, configuration: str) -> Exception|None:
         """Run the deploy command asynchronously, returning an error if something goes wrong launching it."""
@@ -82,7 +84,11 @@ class ArtieToolInvoker(base.ArtieCommsBase):
             "--admin-ip", self.config.k3s_info.admin_node_ip,
             "--artie-name", self.config.artie_name,
             "--artie-type-file", hw_config_fpath,
+            "--password", self.config.credentials.password,
+            "--token", self.config.k3s_info.token
         ]
+        # TODO: When we require username/password, make sure to mask them in the logs
+        #log.debug(f"Running command: {str(cmd)}".replace(self.config.credentials.password, "****").replace(self.config.k3s_info.token, "****"))
         log.debug(f"Running command: {str(cmd)}")
         return self._run_cmd(cmd)
 
@@ -97,10 +103,20 @@ class ArtieToolInvoker(base.ArtieCommsBase):
                 return (subprocess.TimeoutExpired(self._process.args, timeout_s), False)
 
             if self._process.stdout:
-                log.info(self._process.stdout.readline().decode().strip())
+                msg = self._process.stdout.readline().decode().strip()
+                if msg:
+                    log.info(msg)
 
+            # If we get something on stderr, it means something went wrong, and we should read
+            # the entire stdout first, then read out the stderr
             if self._process.stderr:
-                log.error(self._process.stderr.readline().decode().strip())
+                err_msg = self._process.stderr.readline().decode().strip()
+                if err_msg:
+                    # Read remaining stdout
+                    if self._process.stdout:
+                        log.info(self._process.stdout.read().decode().strip())
+                    err_msg += self._process.stderr.read().decode().strip()
+                    log.error(err_msg)
 
         self._retcode = self._process.returncode
         return (None, self.success)

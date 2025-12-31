@@ -8,6 +8,7 @@ from .. import common
 from .. import kube
 from artie_tooling import hw_config
 import argparse
+import base64
 import datetime
 import getpass
 import os
@@ -78,9 +79,23 @@ def _initialize_controller_node(args, sbc_config: hw_config.SBC, artie_name: str
 
     Returns: (success, controller node CA bundle, API server certificate)
     """
-    node_name = f"{sbc_config.name}-{artie_name}"
+    node_name = f"{sbc_config.name}-{artie_name}".lower()
 
     common.info(f"Initializing SBC: {sbc_config.name} (node: {node_name})...")
+
+    # A PEM passphrase will be required to create the controller node's CA and sign the API server certificate.
+    # If args has a 'pem_passphrase' attribute, use that.
+    # If not, we try the user password, but if that passphrase is too short (must be at least 4 chars),
+    # we create one by base64 encoding the user name + password + artie name and take the first 8 characters.
+    if hasattr(args, 'pem_passphrase') and args.pem_passphrase is not None:
+        pem_passphrase = args.pem_passphrase
+    elif len(artie_password) >= 4 and len(artie_password) <= 1024:
+        pem_passphrase = artie_password
+    else:
+        common.info(f"User password length {len(artie_password)} is not suitable for use as a PEM passphrase (must be between 4 and 1024 characters). Generating a passphrase instead...")
+        raw_pass = f"{artie_username}:{artie_password}:{artie_name}".encode('utf-8')
+        b64_pass = base64.b64encode(raw_pass).decode('utf-8')
+        pem_passphrase = b64_pass[:8]
 
     # Create K3S config file
     config_file_contents = "\n".join([
@@ -94,10 +109,14 @@ def _initialize_controller_node(args, sbc_config: hw_config.SBC, artie_name: str
         f.write(config_file_contents)
 
     # Copy config to the SBC
+    common.debug(f"Copying K3S config to controller node at /etc/rancher/k3s/config.yaml...")
+    common.ssh("mkdir -p /etc/rancher/k3s", artie_ip, artie_username, artie_password)
+    common.ssh("rm -rf /etc/rancher/k3s/config.yaml", artie_ip, artie_username, artie_password, fail_okay=True)
     common.scp_to(artie_ip, artie_username, artie_password, target=config_file, dest="/etc/rancher/k3s/config.yaml")
     os.remove(config_file)
 
     # Restart k3s agent
+    common.debug("Restarting k3s-agent.service...")
     common.ssh("systemctl daemon-reload", artie_ip, artie_username, artie_password)
     common.ssh("systemctl restart k3s-agent.service", artie_ip, artie_username, artie_password)
 
@@ -106,7 +125,9 @@ def _initialize_controller_node(args, sbc_config: hw_config.SBC, artie_name: str
     # is done by CAs, and the way that works is that the CAs present an API that requires
     # a csr file which contains the request and associated metadata. The CA then returns
     # the requested .crt file, signed by the CA.
-    common.ssh(f"mkdir -p /artie/controller-node-CA", )
+    common.debug("Generating controller node CA and API server certificate...")
+    common.ssh("rm -rf /artie/controller-node-CA", artie_ip, artie_username, artie_password, fail_okay=True)
+    common.ssh(f"mkdir -p /artie/controller-node-CA", artie_ip, artie_username, artie_password)
     with open(os.path.join(common.get_scratch_location(), "extfile"), 'w') as f:
         f.write(
 """authorityKeyIdentifier=keyid,issuer
@@ -118,21 +139,17 @@ DNS.1 = artie-api-server.local
 """)
     common.scp_to(artie_ip, artie_username, artie_password, target=os.path.join(common.get_scratch_location(), "extfile"), dest="/artie/controller-node-CA/api-server.v3.ext")
     ## Create the RSA key
-    common.ssh(f"openssl genrsa -aes256 -out /artie/controller-node-CA/controller-node.key 4096", artie_ip, artie_username, artie_password)
+    common.ssh(f"openssl genrsa -aes256 -passout pass:{pem_passphrase} -out /artie/controller-node-CA/controller-node.key 4096", artie_ip, artie_username, artie_password)
     ## Generate a CA root (that's what the -x509 arg does)
-    common.ssh(f"openssl req -x509 -new -nodes -key /artie/controller-node-CA/controller-node.key -sha256 -out /artie/controller-node-CA/controller-node.crt -subj '/CN={artie_name}-controller-node/O=Artie'", artie_ip, artie_username, artie_password)
+    common.ssh(f"openssl req -x509 -passin pass:{pem_passphrase} -new -nodes -key /artie/controller-node-CA/controller-node.key -sha256 -out /artie/controller-node-CA/controller-node.crt -subj '/CN={artie_name}-controller-node/O=Artie'", artie_ip, artie_username, artie_password)
     ## Generate the CSR (the signing request) that we will use to get a cert for our Artie API server
-    common.ssh(f"openssl req -new -nodes -out /artie/controller-node-CA/api-server.csr -newkey rsa:4096 -keyout /artie/controller-node-CA/api-server.key -subj '/CN={artie_name}-api-server/O=Artie'", artie_ip, artie_username, artie_password)
+    common.ssh(f"openssl req -new -passin pass:{pem_passphrase} -nodes -out /artie/controller-node-CA/api-server.csr -newkey rsa:4096 -keyout /artie/controller-node-CA/api-server.key -subj '/CN={artie_name}-api-server/O=Artie'", artie_ip, artie_username, artie_password)
     ## Use the CSR to create a controller-node-signed cert for the Artie API server
-    common.ssh(f"openssl x509 -req -in /artie/controller-node-CA/api-server.csr -CA /artie/controller-node-CA/controller-node.crt -CAkey /artie/controller-node-CA/controller-node.key -CAcreateserial -out /artie/controller-node-CA/api-server.crt -days 3650 -sha256 -extfile /artie/controller-node-CA/api-server.v3.ext", artie_ip, artie_username, artie_password)
+    common.ssh(f"openssl x509 -req -passin pass:{pem_passphrase} -in /artie/controller-node-CA/api-server.csr -CA /artie/controller-node-CA/controller-node.crt -CAkey /artie/controller-node-CA/controller-node.key -CAcreateserial -out /artie/controller-node-CA/api-server.crt -days 3650 -sha256 -extfile /artie/controller-node-CA/api-server.v3.ext", artie_ip, artie_username, artie_password)
 
     # Copy the CA bundle and API server cert from the controller node to this machine
     ca_bundle = common.scp_from(artie_ip, artie_username, artie_password, target="/artie/controller-node-CA/controller-node.crt", dest=None)
     api_server_cert = common.scp_from(artie_ip, artie_username, artie_password, target="/artie/controller-node-CA/api-server.crt", dest=None)
-
-    # Decode the bundle and cert from bytes into str
-    ca_bundle = ca_bundle.decode('utf-8')
-    api_server_cert = api_server_cert.decode('utf-8')
 
     return True, ca_bundle, api_server_cert
 
@@ -141,6 +158,7 @@ def _create_artie_metadata_configmap(args, artie_name: str, artie_config: hw_con
     Create a ConfigMap in Kubernetes containing metadata about this Artie's hardware configuration.
     """
     common.info("Creating Artie hardware metadata ConfigMap...")
+    configmap_name = f"artie-hw-config-{artie_name}".lower()
 
     # Build the metadata structure
     metadata = {
@@ -156,12 +174,12 @@ def _create_artie_metadata_configmap(args, artie_name: str, artie_config: hw_con
         'apiVersion': 'v1',
         'kind': 'ConfigMap',
         'metadata': {
-            'name': f'artie-hw-config-{artie_name}',
-            'namespace': kube.ArtieK8sValues.NAMESPACE,
+            'name': configmap_name,
+            'namespace': str(kube.ArtieK8sValues.NAMESPACE),
             'labels': {
                 'app.kubernetes.io/name': 'artie-hw-config',
                 'app.kubernetes.io/part-of': 'artie',
-                kube.ArtieK8sKeys.ARTIE_ID: artie_name,
+                str(kube.ArtieK8sKeys.ARTIE_ID): artie_name,
             }
         },
         'data': metadata
@@ -169,14 +187,15 @@ def _create_artie_metadata_configmap(args, artie_name: str, artie_config: hw_con
 
     # Delete existing ConfigMap if it exists
     try:
-        kube.delete_configmap(args, f'artie-hw-config-{artie_name}', ignore_errors=True)
+        kube.delete_configmap(args, configmap_name, ignore_errors=True)
     except:
         pass
 
     # Create the ConfigMap
+    common.debug(f"Creating ConfigMap with the following YAML:\n{yaml.dump(configmap_yaml)}")
     configmap_yaml_str = yaml.dump(configmap_yaml)
     kube.create_from_yaml(args, configmap_yaml_str)
-    common.info(f"Created hardware metadata ConfigMap: artie-hw-config-{artie_name}")
+    common.info(f"Created hardware metadata ConfigMap: {configmap_name}")
 
 def _create_artie_api_server_secret(args, artie_name: str, api_server_cert: str):
     """
@@ -265,7 +284,7 @@ def install(args):
     # Initialize the controller node
     initialized_nodes = []
     controller_node = next((sbc for sbc in artie_config.sbcs if sbc.name == kube.ArtieK8sValues.CONTROLLER_NODE_ID), None)
-    controller_node_name = f"{kube.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}"
+    controller_node_name = f"{kube.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
     if controller_node is None:
         common.error(f"No {controller_node_name} found in this Artie configuration. Cannot proceed with installation.")
         retcode = 1
@@ -279,7 +298,7 @@ def install(args):
 
     # Save the CA bundle to disk
     os.makedirs(args.ca_savedir, exist_ok=True)
-    with open(pathlib.Path(args.ca_savedir / "controller-node-ca.crt"), "w") as f:
+    with open(pathlib.Path(args.ca_savedir) / "controller-node-ca.crt", "w") as f:
         f.write(ca_bundle)
 
     initialized_nodes.append((controller_node_name, controller_node))
@@ -288,6 +307,9 @@ def install(args):
     common.info(f"Initializing {len(artie_config.sbcs)} single board computer(s)...")
     for sbc_config in artie_config.sbcs:
         # Wait for node to come online
+        node_name = f"{sbc_config.name}-{artie_name}".lower()
+        if node_name == controller_node_name:
+            continue
         common.info(f"Waiting for {node_name} to come online...")
         timeout_s = 120
         start_time = datetime.datetime.now().timestamp()
@@ -305,6 +327,7 @@ def install(args):
     common.info("Configuring node labels and taints...")
     for node_name, sbc_config in initialized_nodes:
         # Assign node labels
+        node_name = node_name.lower()
         node_labels = {
             kube.ArtieK8sKeys.ARTIE_ID: artie_name,
             kube.ArtieK8sKeys.NODE_ROLE: sbc_config.name,  # Use the SBC name as the node role
@@ -337,6 +360,7 @@ def fill_subparser(parser_install: argparse.ArgumentParser, parent: argparse.Arg
     parser_install.add_argument("--admin-ip", required=True, type=common.validate_input_ip, help="IP address for the admin server.")
     parser_install.add_argument("--artie-type-file", required=True, type=common.argparse_file_path_type, help="Path to the YAML file defining this Artie's hardware configuration (e.g., artie00/artie00.yml).")
     parser_install.add_argument("--ca-savedir", type=str, default=str(pathlib.Path.home() / ".artie" / "controller-node-CA"), help="Directory to save the CA certificate of the controller node.")
+    parser_install.add_argument("--pem-passphrase", type=str, default=None, help="Passphrase to use for the PEM files created for the controller node's CA and API server certificate. If not given, the user's password will be used if it is between 4 and 1024 characters; otherwise, a passphrase will be generated automatically.")
     parser_install.add_argument("-p", "--password", type=str, default=None, help="The password for the Artie we are adding. It is more secure to pass this in over stdin when prompted, if possible.")
     parser_install.add_argument("-t", "--token", type=str, default=None, help="Token that you were given after installing Artie Admind. If you have lost it, you can find it on the admin server at /var/lib/rancher/k3s/server/node-token. It is more secure to pass this in over stdin when prompted, if possible.")
     parser_install.add_argument("--token-file", type=common.argparse_file_path_type, default=None, help="A file that contains the Artie Admind token as its only contents.")

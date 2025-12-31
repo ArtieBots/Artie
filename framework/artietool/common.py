@@ -15,6 +15,7 @@ import shutil
 import socket
 import string
 import subprocess
+import sys
 import threading
 
 try:
@@ -312,7 +313,7 @@ def set_up_logging(args):
         setattr(args, "loglevel", "info")
     level = getattr(logging, args.loglevel.upper())
 
-    stream_handler= logging.StreamHandler()
+    stream_handler= logging.StreamHandler(sys.stdout)
     handlers = [stream_handler]
     if hasattr(args, 'output') and args.output:
         file_handler = logging.FileHandler(args.output)
@@ -326,7 +327,7 @@ def set_up_logging(args):
     logger = logging.getLogger(LOGGER_NAME)
     logger.setLevel(level)
 
-def scp_from(ip: str, uname: str, password: str, target: str, dest: str|None) -> None|bytes:
+def scp_from(ip: str, uname: str, password: str, target: str, dest: str|None) -> None|str:
     """
     Copy the file from `target` on the remote machine to the `dest` on the local machine.
     If `dest` is `None`, we return the file's contents (as bytes).
@@ -344,17 +345,26 @@ def scp_to(ip: str, uname: str, password: str, target: str, dest: str):
     c = fabric.Connection(ip, uname, forward_agent=True, connect_timeout=30, connect_kwargs={'password': password})
     c.put(target, remote=dest)
 
-def ssh(cmd: str, ip: str, uname: str, password: str, timeout_s=30, fail_okay=False):
+def ssh(cmd: str, ip: str, uname: str, password: str, timeout_s=30, fail_okay=False, additional_responders=None):
     """
     Execute the given command at the given remote host. Will handle 'sudo' password use
     if the command invokes sudo.
 
     If `fail_okay` is given, we ignore any errors on the server that result from running
     the given command.
+
+    If `additional_responders` is given, it should be a list of tuples of the form (pattern: str, response: str)
+    that will be used to respond to prompts from the remote host.
     """
     c = fabric.Connection(ip, uname, forward_agent=True, connect_timeout=30, connect_kwargs={'password': password})
+
     sudopass = invoke.watchers.Responder(pattern=r'\[sudo\] password:', response=password)
-    c.run(cmd, pty=True, watchers=[sudopass], timeout=timeout_s, hide=True, warn=fail_okay)
+    watchers = [sudopass]
+    if additional_responders:
+        for pattern, response in additional_responders:
+            watchers.append(invoke.watchers.Responder(pattern=pattern, response=response))
+
+    c.run(cmd, pty=True, watchers=watchers, timeout=timeout_s, hide=True, warn=fail_okay)
 
 def _resolve_hostname(user_input: str) -> str:
     """

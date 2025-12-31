@@ -19,21 +19,41 @@ class CredentialsPage(QtWidgets.QWizardPage):
 
         # Username field
         self.username_input = QtWidgets.QLineEdit()
-        self.username_input.setPlaceholderText("Enter username")
-        self.registerField("username*", self.username_input)
+        # TODO: For artie dev images, we ignore this and use "root" with a blank password
+        # TODO: When you implement this, add the '*' to the registerField below
+        ################################################
+        #self.username_input.setPlaceholderText("Enter username")
+        ################################################
+        self.username_input.setText("root")
+        self.username_input.setReadOnly(True)
+        ################################################
+        self.registerField("username", self.username_input)
         layout.addRow("Username:", self.username_input)
 
         # Password field
         self.password_input = QtWidgets.QLineEdit()
         self.password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.password_input.setPlaceholderText("Enter password")
-        self.registerField("password*", self.password_input)
+        # TODO: For artie dev images, we ignore this and use "root" with a blank password
+        # TODO: When you implement this, add the '*' to the registerField below
+        ################################################
+        #self.password_input.setPlaceholderText("Enter password")
+        ################################################
+        self.password_input.setText("")
+        self.password_input.setReadOnly(True)
+        ################################################
+        self.registerField("password", self.password_input)
         layout.addRow("Password:", self.password_input)
 
         # Confirm password field
         self.confirm_password_input = QtWidgets.QLineEdit()
         self.confirm_password_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self.confirm_password_input.setPlaceholderText("Confirm password")
+        # TODO: For artie dev images, we ignore this and use "root" with a blank password
+        ################################################
+        #self.confirm_password_input.setPlaceholderText("Confirm password")
+        ################################################
+        self.confirm_password_input.setText("")
+        self.confirm_password_input.setReadOnly(True)
+        ################################################
         layout.addRow("Confirm Password:", self.confirm_password_input)
 
         # Info label
