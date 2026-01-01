@@ -66,7 +66,7 @@ def uninstall(args):
 
     # Find the nodes to remove
     common.info("Checking existing Arties...")
-    artie_name = args.artie_name
+    artie_name = args.artie_name.lower()
     node_names = kube.get_node_names(args)
     node_names_to_remove = []
     for node in node_names:
@@ -79,7 +79,7 @@ def uninstall(args):
         kube.delete_node(args, node)
 
     # Wait until Artie is removed from cluster, or timeout waiting
-    common.info(f"Waiting for Artie with ID {args.artie_name} to be removed from the cluster...")
+    common.info(f"Waiting for Artie with ID {artie_name} to be removed from the cluster...")
     removed = _wait_for_node_removal(args, node_names_to_remove)
     if not removed:
         retcode = 1
@@ -112,6 +112,10 @@ def uninstall(args):
     # Delete the ghost node now that it has nothing attached to it, ignoring any exceptions.
     for node in node_names_to_remove:
         kube.delete_node(args, node, ignore_errors=True)
+
+    # Delete the namespace associated with this Artie
+    common.info(f"Deleting namespace for Artie {artie_name}...")
+    kube.delete_namespace(args, artie_name, ignore_errors=True)
 
     return retcode
 
