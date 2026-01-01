@@ -152,3 +152,7 @@ class HWConfig:
     def to_yaml_str(self, api_version="v1") -> str:
         """Return a string representing a `HWConfig` in YAML."""
         return yaml.dump(dataclasses.asdict(self))
+
+    def to_yaml_dict(self, api_version="v1") -> dict:
+        """Return a dict representing a `HWConfig` in YAML format."""
+        return dataclasses.asdict(self)

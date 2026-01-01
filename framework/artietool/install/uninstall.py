@@ -7,6 +7,7 @@ from typing import List
 import argparse
 import datetime
 import getpass
+import pathlib
 import time
 
 def _all_nodes_removed(args, node_names: List[str]) -> bool:
@@ -50,6 +51,11 @@ def uninstall(args):
             retcode = 1
             return retcode
 
+    if not args.artie_name:
+        common.error(f"Need the name of the Artie we are uninstalling. Please pass --artie-name <ARTIE_NAME>")
+        retcode = 1
+        return retcode
+
     # Check that we have kubectl access
     common.info("Checking for access to the cluster...")
     access, err = kube.verify_access(args)
@@ -58,33 +64,14 @@ def uninstall(args):
         retcode = 1
         return retcode
 
-    # Check for any already installed arties and get their names
+    # Find the nodes to remove
     common.info("Checking existing Arties...")
-    node_names_to_remove = []
+    artie_name = args.artie_name
     node_names = kube.get_node_names(args)
+    node_names_to_remove = []
     for node in node_names:
-        labels = kube.get_node_labels(args, node)
-        if kube.ArtieK8sKeys.ARTIE_ID in labels and labels[kube.ArtieK8sKeys.ARTIE_ID] == args.artie_name:
+        if node.endswith(f"-{artie_name}"):
             node_names_to_remove.append(node)
-
-    if not node_names_to_remove and args.cluster_only:
-        common.warning(f"Could not find {args.artie_name} in the cluster. Nothing to do.")
-        retcode = 0
-        return retcode
-
-    # Ask for password if we don't have it
-    if not args.cluster_only:
-        artie_ip = args.artie_ip
-        artie_username = args.username
-        artie_password = args.password if args.password is not None else getpass.getpass("Artie's Password: ")
-
-        # Check that we can access Artie
-        common.info("Verifying that we can connect to Artie...")
-        access, err = common.verify_ssh_connection(artie_ip, artie_username, artie_password)
-        if not access:
-            common.error(f"Cannot access Artie at IP address {artie_ip} with username {artie_username} and the given password: {err}")
-            retcode = 1
-            return retcode
 
     # Remove Artie from the cluster
     for node in node_names_to_remove:
@@ -100,6 +87,19 @@ def uninstall(args):
 
     # If that's all, we can exit now
     if args.cluster_only:
+        return retcode
+
+    # Ask for password if we don't have it
+    artie_ip = args.artie_ip
+    artie_username = args.username
+    artie_password = args.password if args.password is not None else getpass.getpass("Artie's Password: ")
+
+    # Check that we can access Artie
+    common.info("Verifying that we can connect to Artie...")
+    access, err = common.verify_ssh_connection(artie_ip, artie_username, artie_password)
+    if not access:
+        common.error(f"Cannot access Artie at IP address {artie_ip} with username {artie_username} and the given password: {err}")
+        retcode = 1
         return retcode
 
     # Remove the cluster's configuration file from Artie so he can't join the cluster again.
@@ -118,6 +118,7 @@ def uninstall(args):
 def fill_subparser(parser_uninstall: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     parser_uninstall.add_argument("--cluster-only", action='store_true', help="If given, we only remove the given Artie from the cluster, but do not attempt to disable Artie from rejoining the cluster if his power is cycled.")
     parser_uninstall.add_argument("-u", "--username", default=None, type=str, help="Username for the Artie we are uninstalling. Required unless --cluster-only.")
-    parser_uninstall.add_argument("--artie-ip", default=None, type=common.validate_input_ip, help="IP address for the Artie we are uninstalling. Required unless --cluster-only.")
     parser_uninstall.add_argument("-p", "--password", type=str, default=None, help="The password for the Artie we are removing. It is more secure to pass this in over stdin when prompted, if possible.")
+    parser_uninstall.add_argument("--ca-savedir", type=str, default=str(pathlib.Path.home() / ".artie" / "controller-node-CA"), help="Directory to where the CA certificate of the controller node were saved so we can remove them.")
+    parser_uninstall.add_argument("--artie-ip", default=None, type=common.validate_input_ip, help="IP address for the Artie we are uninstalling. Required unless --cluster-only.")
     parser_uninstall.set_defaults(cmd=uninstall, module="uninstall-artie")

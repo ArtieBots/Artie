@@ -348,19 +348,30 @@ All deployments start with:
 - *name*: Same as for [build](#build)
 - *labels*: Same as for [build](#build)
 - *dependencies*: Same as for [build](#build)
+- *cli-args*: Same as for [build](#build)
 - *type*: deploy
 - *steps*: A list of `job` items, each of which must be one of the following:
     * [add](#add-deployment-job)
 
+CLI arguments:
+
+- *--release-name*: (Optional, defaults to `what` from the below definition of the `Add Job`).
+  The name of the Helm release to deploy to the cluster.
+- *--chart-path*: (Optional, defaults to the `chart` from the below definition of the `Add Job`).
+  The path to the Helm chart to deploy. This can be either an absolute path or a path relative to the root of the Artie repository.
+
 ### Add Deployment Job
 
 - *job*: add; This adds a deployment.
-- *what*: One of the following:
+- *what*: The name of the Helm deployment. This should be one of:
     * *artie-base*: The common set of containers that other deployments typically depend on.
     * *artie-teleop*: The set of containers required to run the [teleop](../../docs/out-of-the-box/teleop.md) workload.
     * *artie-demo*: The set of containers required to run the [demo stack](../../docs/out-of-the-box/deploy-demo.md) workload.
     * *artie-reference*: The set of containers required to run the [reference stack](../../docs/out-of-the-box/deploy-artie-reference-stack.md) workload.
-- *chart*: Path to the chart, relative to artietool directory. E.g., `deploy-files/artie-teleop`.
+    * *artie-custom*: A custom deployment defined by the user. The name will typically be passed in as an argument
+    (see `--release-name` CLI argument above). TODO: Document this option like the others.
+- *chart*: Path to the chart, relative to artietool directory. E.g., `deploy-files/artie-teleop`, OR `${CHART_PATH}`
+  to use the path from the CLI argument.
 
 ## Constants
 

@@ -596,6 +596,8 @@ def _convert_deploy_what(what_val: str) -> deploy_job.DeploymentConfigurations:
             return deploy_job.DeploymentConfigurations.TELEOP
         case deploy_job.DeploymentConfigurations.DEMO_STACK:
             return deploy_job.DeploymentConfigurations.DEMO_STACK
+        case deploy_job.DeploymentConfigurations.CUSTOM:
+            return deploy_job.DeploymentConfigurations.CUSTOM
         case _:
             raise ValueError(f"Invalid value for 'what' in deployment job: {what_val}")
 
