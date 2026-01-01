@@ -20,39 +20,53 @@ class InstallThread(QtCore.QThread):
         self.config = config
         self.serial_port = serial_port
 
-    def run(self):
-        """Run the installation in a separate thread"""
+    def _get_hw_config(self) -> None:
+        """Retrieve hardware configuration from Artie device"""
+        self.log_message_signal.emit("Retrieving hardware configuration from Artie...")
         try:
-            # First get the hardware configuration from the controller node
-            self.log_message_signal.emit("Retrieving hardware configuration from Artie...")
             with artie_serial.ArtieSerialConnection(port=self.serial_port, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as artie_serial_conn:
                 err, hw_config = artie_serial_conn.get_hardware_config()
                 if err:
                     self.failure_signal.emit(err)
                     return
-                self.config.hardware_config = hw_config
+                else:
+                    self.config.hardware_config = hw_config
+        except Exception as e:
+            self.failure_signal.emit(e)
 
-            with tempfile.NamedTemporaryFile(delete=True, mode='w+', delete_on_close=False) as hw_file:
-                hw_file.write(self.config.hardware_config.to_json_str())
-                hw_file.flush()
-                hw_file.close()
+    def _install(self) -> None:
+        """Install"""
+        with tempfile.NamedTemporaryFile(delete=True, mode='w+', delete_on_close=False) as hw_file:
+            hw_file.write(self.config.hardware_config.to_json_str())
+            hw_file.flush()
+            hw_file.close()
 
-                self.log_message_signal.emit("Starting installation with artie-tool.py...")
-                with tool.ArtieToolInvoker(self.config, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as artie_tool:
-                    err = artie_tool.install(hw_file.name)
-                    if err:
-                        self.failure_signal.emit(err)
-                        return
+            self.log_message_signal.emit("Starting installation with artie-tool.py...")
+            with tool.ArtieToolInvoker(self.config, logging_handler=loghandler.ThreadLogHandler(self.log_message_signal)) as artie_tool:
+                err = artie_tool.install(hw_file.name)
+                if err:
+                    self.failure_signal.emit(err)
+                    return
 
-                    err, success = artie_tool.join(timeout_s=60*10)  # 10 minute timeout
-                    if err:
-                        self.failure_signal.emit(err)
-                        return
+                err, success = artie_tool.join(timeout_s=60*10)  # 10 minute timeout
+                if err:
+                    self.failure_signal.emit(err)
+                    return
 
-                    if not success:
-                        self.failure_signal.emit(Exception("artie-tool.py reported an error."))
-                        return
+                if not success:
+                    self.failure_signal.emit(Exception("artie-tool.py reported an error."))
+                    return
 
+    def run(self):
+        """Run the installation in a separate thread"""
+        try:
+            # First get the hardware configuration from the controller node if we don't already have one
+            if not self.config.hardware_config:
+                self._get_hw_config()
+                if not self.config.hardware_config:
+                    return  # Error already emitted
+
+            self._install()
             self.success_signal.emit()
         except Exception as e:
             self.failure_signal.emit(e)

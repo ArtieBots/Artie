@@ -15,6 +15,7 @@ class DeploymentConfigurations(enum.StrEnum):
     ARTIE_REFERENCE_STACK = "artie-reference"
     TELEOP = "artie-teleop"
     DEMO_STACK = "artie-demo"
+    CUSTOM = "artie-custom"
 
 class AddDeployJob(job.Job):
     """
@@ -30,6 +31,18 @@ class AddDeployJob(job.Job):
         self.chart_reference = chart_reference
 
     def __call__(self, args) -> result.JobResult:
+        # First decide what the name of the rlease is
+        if hasattr(args, 'release_name') and args.release_name is not None:
+            common.info(f"Using release name from args: {args.release_name}")
+            self.what = common.replace_vars_in_string(args.release_name, args)
+            self.chart_name = common.replace_vars_in_string(args.release_name, args)
+
+        # Check if we are overriding the chart path
+        if hasattr(args, 'chart_path') and args.chart_path is not None:
+            common.info(f"Using chart path from args: {args.chart_path}")
+            self.chart_reference = common.replace_vars_in_string(args.chart_path, args)
+
+        # Now either deploy or remove the chart
         if args.delete:
             return self._remove_helm_chart(args)
         else:

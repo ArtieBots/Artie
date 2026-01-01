@@ -7,6 +7,7 @@ from typing import Tuple
 from .. import common
 from .. import kube
 from artie_tooling import hw_config
+from artie_tooling import kubespec
 import argparse
 import base64
 import datetime
@@ -79,7 +80,7 @@ def _initialize_controller_node(args, sbc_config: hw_config.SBC, artie_name: str
 
     Returns: (success, controller node CA bundle, API server certificate)
     """
-    node_name = f"{sbc_config.name}-{artie_name}".lower()
+    node_name = f"{kubespec.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
 
     common.info(f"Initializing SBC: {sbc_config.name} (node: {node_name})...")
 
@@ -158,67 +159,42 @@ def _create_artie_metadata_configmap(args, artie_name: str, artie_config: hw_con
     Create a ConfigMap in Kubernetes containing metadata about this Artie's hardware configuration.
     """
     common.info("Creating Artie hardware metadata ConfigMap...")
-    configmap_name = f"artie-hw-config-{artie_name}".lower()
-
-    # Build the metadata structure
-    metadata = {
-        'artie-name': artie_name,
-        'single-board-computers': yaml.dump(artie_config.sbcs),
-        'microcontrollers': yaml.dump(artie_config.mcus),
-        'sensors': yaml.dump(artie_config.sensors),
-        'actuators': yaml.dump(artie_config.actuators),
-    }
-
-    # Create ConfigMap YAML
-    configmap_yaml = {
-        'apiVersion': 'v1',
-        'kind': 'ConfigMap',
-        'metadata': {
-            'name': configmap_name,
-            'namespace': str(kube.ArtieK8sValues.NAMESPACE),
-            'labels': {
-                'app.kubernetes.io/name': 'artie-hw-config',
-                'app.kubernetes.io/part-of': 'artie',
-                str(kube.ArtieK8sKeys.ARTIE_ID): artie_name,
-            }
-        },
-        'data': metadata
-    }
+    configmap = kubespec.HWConfigMap(artie_name=artie_name, image_tag=args.docker_tag, artie_hw_config=artie_config)
 
     # Delete existing ConfigMap if it exists
     try:
-        kube.delete_configmap(args, configmap_name, ignore_errors=True)
+        kube.delete_configmap(args, configmap.configmap_name, ignore_errors=True, namespace=artie_name)
     except:
         pass
 
     # Create the ConfigMap
-    common.debug(f"Creating ConfigMap with the following YAML:\n{yaml.dump(configmap_yaml)}")
-    configmap_yaml_str = yaml.dump(configmap_yaml)
-    kube.create_from_yaml(args, configmap_yaml_str)
-    common.info(f"Created hardware metadata ConfigMap: {configmap_name}")
+    common.debug(f"Creating ConfigMap with the following YAML:\n{yaml.dump(configmap.to_dict())}")
+    kube.create_from_yaml(args, yaml.dump(configmap.to_dict()), namespace=artie_name)
+    common.info(f"Created hardware metadata ConfigMap: {configmap.configmap_name}")
 
 def _create_artie_api_server_secret(args, artie_name: str, api_server_cert: str):
     """
     Create a Kubernetes Secret containing the API server certificate for this Artie.
     """
-    # Delete existing secret if it exists
-    kube.delete_secret(args, f'artie-api-server-cert-{artie_name}', ignore_errors=True)
+    common.info("Creating Artie API server certificate Secret...")
+    secret = kubespec.ArtieAPIServerCertSecret(artie_name=artie_name, image_tag=args.docker_tag, api_server_cert=api_server_cert)
 
-    # TODO: Decide if we want to create from YAML or if we want to create like this
-    #       If we want to create using a high-level API like this, we should also update
-    #       _create_artie_metadata_configmap to use a high-level API as well.
+    # Delete existing secret if it exists
+    try:
+        kube.delete_secret(args, secret.secret_name, ignore_errors=True, namespace=artie_name)
+    except:
+        pass
 
     # Create the secret
-    common.info("Creating Artie API server certificate Secret...")
-    secret_name = f'artie-api-server-cert-{artie_name}'
-    kube.create_secret(args, secret_name, api_server_cert, namespace=kube.ArtieK8sValues.NAMESPACE)
-    common.info(f"Created API server certificate Secret: {secret_name}")
+    kube.create_from_yaml(args, yaml.dump(secret.to_dict()), namespace=artie_name)
+    common.info(f"Created API server certificate Secret: {secret.secret_name}")
 
 def install(args):
     """
     Top-level install function.
     """
     retcode = 0
+
     # Check that we have kubectl access
     common.info("Checking for access to the cluster...")
     access, err = kube.verify_access(args)
@@ -251,7 +227,7 @@ def install(args):
 
     # Assert that there is at least a controller node
     if artie_config.controller_node is None:
-        common.error(f"No {kube.ArtieK8sValues.CONTROLLER_NODE_ID} found in this Artie configuration. Cannot proceed with installation.")
+        common.error(f"No {kubespec.ArtieK8sValues.CONTROLLER_NODE_ID} found in this Artie configuration. Cannot proceed with installation.")
         retcode = 1
         return retcode
 
@@ -260,6 +236,11 @@ def install(args):
     node_names = kube.get_node_names(args)
     artie_name = args.artie_name if args.artie_name is not None else _create_unique_artie_name(node_names)
     common.info(f"Will use {artie_name} for this Artie's name.")
+
+    # Create the requested namespace if it doesn't already exist
+    common.info(f"Ensuring namespace {artie_name.lower()} exists...")
+    kube.create_namespace_if_not_exists(args, artie_name)
+    common.info(f"Namespace {artie_name.lower()} is ready.")
 
     # Ask for password if we don't have it
     artie_ip = args.artie_ip
@@ -283,8 +264,8 @@ def install(args):
 
     # Initialize the controller node
     initialized_nodes = []
-    controller_node = next((sbc for sbc in artie_config.sbcs if sbc.name == kube.ArtieK8sValues.CONTROLLER_NODE_ID), None)
-    controller_node_name = f"{kube.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
+    controller_node = next((sbc for sbc in artie_config.sbcs if sbc.name == kubespec.ArtieK8sValues.CONTROLLER_NODE_ID), None)
+    controller_node_name = f"{kubespec.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
     if controller_node is None:
         common.error(f"No {controller_node_name} found in this Artie configuration. Cannot proceed with installation.")
         retcode = 1
@@ -301,17 +282,18 @@ def install(args):
     with open(pathlib.Path(args.ca_savedir) / "controller-node-ca.crt", "w") as f:
         f.write(ca_bundle)
 
-    initialized_nodes.append((controller_node_name, controller_node))
-
     # Initialize all other SBCs from the configuration file
     common.info(f"Initializing {len(artie_config.sbcs)} single board computer(s)...")
+    initialized_nodes.append((controller_node_name, controller_node))
     for sbc_config in artie_config.sbcs:
-        # Wait for node to come online
+        # Skip if this is the controller node (we already initialized it)
         node_name = f"{sbc_config.name}-{artie_name}".lower()
         if node_name == controller_node_name:
             continue
-        common.info(f"Waiting for {node_name} to come online...")
+
+        # Wait for node to come online
         timeout_s = 120
+        common.info(f"Waiting up to {timeout_s} seconds for {node_name} to come online...")
         start_time = datetime.datetime.now().timestamp()
         while not kube.node_is_online(args, node_name):
             time.sleep(1)
@@ -327,22 +309,11 @@ def install(args):
     common.info("Configuring node labels and taints...")
     for node_name, sbc_config in initialized_nodes:
         # Assign node labels
-        node_name = node_name.lower()
-        node_labels = {
-            kube.ArtieK8sKeys.ARTIE_ID: artie_name,
-            kube.ArtieK8sKeys.NODE_ROLE: sbc_config.name,  # Use the SBC name as the node role
-        }
+        node_labels = kubespec.generate_artie_node_labels(artie_name, node_name)
         kube.assign_node_labels(args, node_name, node_labels)
 
-        # Assign node taints - all physical bot nodes get the physical bot taint
-        node_taints = {
-            kube.ArtieK8sKeys.PHYSICAL_BOT_NODE_TAINT: ("true", "NoSchedule"),
-        }
-
-        # Controller node gets an additional taint
-        if node_name == controller_node_name:
-            node_taints[kube.ArtieK8sKeys.CONTROLLER_NODE_TAINT] = ("true", "NoSchedule")
-
+        # Assign node taints
+        node_taints = kubespec.generate_node_taints(node_name)
         kube.assign_node_taints(args, node_name, node_taints)
         common.info(f"Configured {node_name}")
 

@@ -1,9 +1,10 @@
 # Default values for artie-base.
 replicaCount: 1
 
+# Labels. Make sure these match those in artie-tooling/kubespec.py
 labels:
-  app.kubernetes.io/name: artie-base
-  helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace \"+\" \"_\" }}"
+  app.kubernetes.io/name: artie
+  helm.sh/chart: '{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}'
   app.kubernetes.io/managed-by: "{{ .Release.Service }}"
   app.kubernetes.io/instance: "{{ .Release.Name }}"
   app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
@@ -45,14 +46,14 @@ driverRestartPolicy: Always
 # telemetryRestartPolicy: The restart policy for telemetry deployments.
 telemetryRestartPolicy: Always
 
-# constantKeys: A list of constants for label or annotation keys.
+# constantKeys: A list of constants for label or annotation keys. Make sure these match those in artie-tooling/kubespec.py
 constantKeys:
   artieId: artie/artie-id
   controllerNodeTaint: artie/controller-node
   nodeRole: artie/node-role
   physicalBotNodeTaint: artie/physical-bot-node
 
-# baseEnvironment: Common env variables for most of the containers.
+# baseEnvironment: Common env variables for most of the containers. Make sure these match those in artie-util/constants.py
 baseEnvironment:
   - name: ARTIE_RUN_MODE
     value: production
@@ -67,7 +68,7 @@ baseEnvironment:
   - name: METRICS_SERVER_PORT
     value: "{{ .Values.ports.metricsCollector }}"
 
-# controllerNodeName: The name of the controller node in the Artie bot.
+# controllerNodeName: The name of the controller node in the Artie bot. Defined in artie-tooling/kubespec.py
 controllerNodeName: "controller-node"
 
 # logCollectorHostName: The hostname of the log collector service.
