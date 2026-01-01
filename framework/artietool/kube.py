@@ -305,6 +305,20 @@ def create_from_yaml(args, yaml_contents: str, namespace=kubespec.ArtieK8sValues
 
     return result
 
+def delete_configmap(args, name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
+    """
+    Delete a configmap.
+    """
+    _configure(args)
+    v1 = k8s.client.CoreV1Api()
+    try:
+        v1.delete_namespaced_config_map(name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
+    except Exception as e:
+        if not ignore_errors:
+            raise e
+        else:
+            common.warning(f"Error deleting config map {str(namespace).lower()}:{name}: {e}")
+
 def delete_helm_release(args, chart_name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE):
     """
     Delete the given Helm chart.
@@ -333,47 +347,19 @@ def delete_job(args, job_name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NA
         else:
             common.warning(f"Error deleting job {str(namespace).lower()}:{job_name}: {e}")
 
-def delete_pod(args, pod_name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
+def delete_namespace(args, namespace: str, ignore_errors=False):
     """
-    Delete a K8s Pod.
-    """
-    _configure(args)
-    v1 = k8s.client.CoreV1Api()
-    try:
-        v1.delete_namespaced_pod(pod_name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
-    except Exception as e:
-        if not ignore_errors:
-            raise e
-        else:
-            common.warning(f"Error deleting pod {str(namespace).lower()}:{pod_name}: {e}")
-
-def delete_configmap(args, name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
-    """
-    Delete a configmap.
+    Delete the given namespace.
     """
     _configure(args)
     v1 = k8s.client.CoreV1Api()
     try:
-        v1.delete_namespaced_config_map(name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
+        v1.delete_namespace(str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
     except Exception as e:
         if not ignore_errors:
             raise e
         else:
-            common.warning(f"Error deleting config map {str(namespace).lower()}:{name}: {e}")
-
-def delete_secret(args, name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
-    """
-    Delete a secret.
-    """
-    _configure(args)
-    v1 = k8s.client.CoreV1Api()
-    try:
-        v1.delete_namespaced_secret(name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
-    except Exception as e:
-        if not ignore_errors:
-            raise e
-        else:
-            common.warning(f"Error deleting secret {str(namespace).lower()}:{name}: {e}")
+            common.warning(f"Error deleting namespace {str(namespace).lower()}: {e}")
 
 def delete_node(args, node_name: str, ignore_errors=False):
     """
@@ -388,6 +374,34 @@ def delete_node(args, node_name: str, ignore_errors=False):
             raise e
         else:
             common.warning(f"Error deleting node {node_name}: {e}")
+
+def delete_pod(args, pod_name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
+    """
+    Delete a K8s Pod.
+    """
+    _configure(args)
+    v1 = k8s.client.CoreV1Api()
+    try:
+        v1.delete_namespaced_pod(pod_name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
+    except Exception as e:
+        if not ignore_errors:
+            raise e
+        else:
+            common.warning(f"Error deleting pod {str(namespace).lower()}:{pod_name}: {e}")
+
+def delete_secret(args, name: str, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE, ignore_errors=False):
+    """
+    Delete a secret.
+    """
+    _configure(args)
+    v1 = k8s.client.CoreV1Api()
+    try:
+        v1.delete_namespaced_secret(name, str(namespace).lower(), grace_period_seconds=0, propagation_policy='Foreground')
+    except Exception as e:
+        if not ignore_errors:
+            raise e
+        else:
+            common.warning(f"Error deleting secret {str(namespace).lower()}:{name}: {e}")
 
 def get_all_pods(args, namespace=kubespec.ArtieK8sValues.DEFAULT_NAMESPACE) -> list[k8s.client.V1Pod]:
     """
