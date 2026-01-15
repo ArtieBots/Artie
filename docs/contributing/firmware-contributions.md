@@ -1,5 +1,7 @@
 # Firmware Contribution Guide
 
+[Back to Mechanical Design](./mechanical-design.md) | [Forward to Yocto Contributions](./yocto-image-contributions.md)
+
 This document provides guidelines and best practices for contributing firmware to the Artie project.
 
 ## Overview of the Firmware
@@ -41,6 +43,9 @@ which does the actual build, and a second step that transfers the built files fr
 
 ## Source Code
 
-The source for the files for most firmware live in `artie-common/firmware/`, including common
-libraries. Firmware is mostly written in C and targets the Raspberry Pi Pico (the first generation,
-but we should probably upgrade at some point).
+The source for the files for most firmware live in `artie-common/firmware/`. Firmware libraries
+live in `framework/ardk/firmware/libraries/`.
+Firmware is mostly written in C and targets the Raspberry Pi Pico 1 and/or 2. But this is not a requirement -
+other MCUs or even FPGAs could be used if desired.
+
+[Back to Mechanical Design](./mechanical-design.md) | [Forward to Yocto Contributions](./yocto-image-contributions.md)

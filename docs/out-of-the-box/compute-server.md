@@ -1,7 +1,7 @@
 # Compute Server Installation
 
 Artie Compute Servers allow you to extend Artie's computational abilities, so that he can respond
-faster or handle more complext work loads.
+faster or handle more complex work loads.
 
 Artie Compute Server nodes are optional, so there are no real system requirements other than
 the bare minimum requirements for the Artie stack itself, which mirror the [K3S requirements](https://docs.k3s.io/installation/requirements).
@@ -14,7 +14,7 @@ and don't have any firewall rules that block traffic on port 6443.
 For each additional compute node you want to add, just follow these steps.
 
 Once you have the Linux server up and running, download this git repository onto it and install the
-comuted (or use the latest release, once we have releases):
+computed daemon (or use the latest release, once we have releases):
 
 * `sudo apt update`
 * `sudo apt install -y git curl dos2unix`
@@ -40,3 +40,8 @@ an NVIDIA Jetson device), use this command instead:
 ```bash
 sudo ./install.sh --token <the token from server> --host-ip <server ip address> --no-docker
 ```
+
+At this point, your compute node should join the Kubernetes cluster managed by the admin server,
+and Artie will be able to use it for additional compute power. The daemon you just installed
+will automatically start on boot, so you don't have to worry about restarting it if the
+machine reboots.

@@ -1,5 +1,7 @@
 # Release Process
 
+[Back to Contributing](../../CONTRIBUTING.md) | [Forward to Development Process](./pull-request-process.md)
+
 This document describes the release process for Artie.
 
 ## Artie vs Artie Type vs Artie Release
@@ -11,7 +13,7 @@ The term "Artie" is highly overloaded, so it's important to clarify the distinct
   Currently, we support:
     - `artie00`: An Artie that is meant to simulate a newborn infant.
 * **Artie Release**: A known, working combination of software, firmware, Yocto images, and bills of materials
-  for each officially supported Artie Type. An Artie Release is identified by a suffix: "Artie Aardvark" for example.
+  for each officially supported Artie Type. An Artie Release is identified by a code name: "Artie Aardvark" for example.
   Each Artie Release is associated with a specific Git tag in this repository, and when all parts of that release
   are downloaded, procured, and built, the resulting robot should work as expected, as outlined by the documentation
   corresponding to that release.
@@ -34,7 +36,7 @@ A release contains the following components:
    with the Yocto images or Docker images.
 1. **Yocto Images**: The custom embedded Linux images required for each supported Artie Type.
 1. **Docker Images**: Any Docker images required for each supported Artie Type.
-1. **Helm Components**: The Helm charts and configuration files required to deploy the any software stack for each supported Artie Type.
+1. **Helm Components**: The Helm charts and configuration files required to deploy the software stack for each supported Artie Type.
    This includes a hierarchy of Helm charts, with a base chart (`artie-base`) and type-specific charts (e.g., `artie00`).
    It also includes a reference deployment configuration for deploying each supported Artie Type.
 1. **Documentation**: Updated documentation for building, deploying, and using each supported Artie Type.
@@ -57,3 +59,6 @@ A release contains the following components:
     - Once approved, merge the pull request into `main`.
     - TODO: Run the release CI pipeline to build and package all release components.
     - Tag the merge commit with the release name (e.g., `Artie-Aardvark`).
+
+
+[Back to Contributing](../../CONTRIBUTING.md) | [Forward to Development Process](./pull-request-process.md)

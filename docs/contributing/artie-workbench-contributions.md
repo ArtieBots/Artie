@@ -1,5 +1,7 @@
 # Artie Workbench Contribution Guide
 
+[Back to Artie Tool Contributions](./artie-tool-contributions.md) | [Forward to Chart Contributions](./chart-contributions.md)
+
 This document provides guidelines and best practices for contributing code
 to Artie Workbench.
 
@@ -15,3 +17,5 @@ TODO: Flesh out this part
 
 Artie Workbench makes use of Artie Tool behind the scenes in order to
 do most of its work.
+
+[Back to Artie Tool Contributions](./artie-tool-contributions.md) | [Forward to Chart Contributions](./chart-contributions.md)

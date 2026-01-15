@@ -1,5 +1,7 @@
 # Artie Tool Contribution Guide
 
+[Back to Artie CLI Contributions](./artie-cli-contributions.md) | [Forward to Artie Workbench Contributions](./artie-workbench-contributions.md)
+
 This document provides guidelines and best practices for contributing changes
 to Artie Tool.
 
@@ -39,7 +41,7 @@ In detail, here is how it works:
 1. The `cmd` argument is run in whichever submodule was chosen.
 1. Depending on what submodule is chosen, the `cmd` argument does different
    things, and for most of the submodules, this is easy to follow.
-   For the more comlicated submodules (the ones that use tasks),
+   For the more complicated submodules (the ones that use tasks),
    the general flow continues with the next step.
 1. Artie Tool determines which task or class of tasks is chosen by
    the user, then calls `run.run_tasks()` to run the tasks.
@@ -72,7 +74,10 @@ In detail, here is how it works:
 
 ## Source Code
 
-Artie Tool's source code lives in `framework/artietool`.
+Artie Tool's source code lives in `framework/artietool`, though (for historical reasons) its main file
+lives in `framework/artie-tool.py`.
 
 Each task type is a class and lives inside `framework/artietool/infrastructure/task.py`. Each type of job is
 also a class and lives inside `framework/artietool/infrastructure/*_job.py`.
+
+[Back to Artie CLI Contributions](./artie-cli-contributions.md) | [Forward to Artie Workbench Contributions](./artie-workbench-contributions.md)

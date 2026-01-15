@@ -15,8 +15,7 @@ fit together:
 Let's go through the diagram in detail, starting from the bottom.
 
 First, we have the physical hardware layer. This layer consists of sensors, actuators, LCD displays, and
-various ICs that need controlling. Each component has a datasheet that can be found
-in its PCB's folder inside the [electrical-schematics folder](../../electrical-schematics/README.md).
+various ICs that need controlling.
 
 These various components can broadly be separated into the following categories, which we
 will be referencing throughout the documentation:
@@ -47,7 +46,7 @@ have direct connections to their single board computers. This is for latency/thr
 The next layer up is the bus layer. Artie makes use of a few different hardware buses, but the main ones are:
 
 * **CAN**: Almost all the SBCs and MCUs are on the CAN bus. We make use of several different protocols
-           on top of the CAN layer to ensure data delivery. See [the CAN protocol details](../sdk/CANProtocol.md)
+           on top of the CAN layer to ensure data delivery. See [the CAN protocol details](../specifications/CANProtocol.md)
            for more details.
 * **I2C**: Some MCUs are peripherals on an I2C bus with the controller node SBC acting as controller.
            This is mostly due to legacy reasons, but is also for physical dimension constraint reasons as well.

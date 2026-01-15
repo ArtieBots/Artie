@@ -2,6 +2,9 @@
 
 **This code is pre-release: you cannot yet build an Artie bot - not all of the software and hardware is ready!**
 
+This repository contains all the software and documentation required to build and use Artie,
+an open source developmental robotics platform.
+
 The purpose of Artie is twofold: data collection and testing developmental robotics theories.
 
 The vision is that Artie will be fully open source, 3D-printable, and as cheap as is feasible,
@@ -32,54 +35,34 @@ The Artie ecosystem consists of the following:
 
 * *Artie*: The actual robot itself - the PCBs, 3D printed parts, the single board computers (SBCs),
            microcontroller units (MCUs), sensors, actuators, LCDs, etc.
+           The first release will be a robot that is physically similar to a full-term newborn infant.
+           This Artie is refered to as Artie00. There are plans for future versions of Artie that
+           are physically similar to older infants and toddlers. But you could also build your own
+           version of Artie that is physically similar to a different age or even a different species!
     - *Firmware*: The MCU firmware.
-    - *Yocto Images*: The custom embedded Linux images.
-    - *Libraries*: Libraries shared between all the software components.
+    - *Yocto Images*: The custom embedded Linux images for the SBCs.
     - *Drivers*: Applications that run on the SBCs and interface with hardware.
-* *Artie CLI*: The simplest way to control a physical Artie. Used mostly for testing.
-* *Artie Tool*: A single tool to flash, test, build, release, etc.
-* *Artie Workbench*: A web app that allows an authenticated user to control and configure Artie.
-* (Planned) *Demo Stack*: A demo that uses traditional robotics algorithms to control Artie.
-* (Planned) *Reference Stack*: A reference implementation of developmental robotics theories used to control Artie.
-* (Planned) *Simulator*: A simulated environment and simulated Artie for training and testing without a physical bot.
-
-Artie is meant to be used to collect data in real-life social situations as well as to test
-theories of developmental robotics.
+* *Artie Framework*: The tooling, services, and libraries that allow users to build applications
+  that run on an Artie and interface with Artie's hardware and software.
+    - *Artie Tool*: A single tool to flash, test, build, release, etc.
+    - *Artie Workbench*: A graphical user interface that allows a user to control and configure an Artie.
+    - *ArDK*: The Artie Development Kit - libraries, base Docker images, and infrastructural applications.
 
 ### Artie Out of the Box
 
-There are three planned ways to deploy an Artie:
-
-* **Cloud**
-  - You own, operate, and maintain Artie's hardware
-  - Artie compute required for administration is provided by the cloud
-  - Any additional compute required for experiments or workload is provided by the cloud
-  - [See here for how to get started with this route](./docs/out-of-the-box/cloud.md)
-* **Fog**
-  - You own, operate, and maintain Artie's hardware
-  - Artie compute required for administration is owned, operated, and maintained by you in the same network as Artie
-  - Any additional compute required for experiments or workload is provided by the cloud
-  - [See here for how to get started with this route](./docs/out-of-the-box/fog.md)
-* **Edge**
-  - You own, operate, and maintain Artie's hardware
-  - Artie compute required for administration is owned, operated, and maintained by you in the same network as Artie
-  - Any additional compute required for experiments or workload is provided by you locally in the same network as Artie
-  - [See here for how to get started with this route](./docs/out-of-the-box/edge.md)
-
-**Note that since Artie is so early in development, none of these are viable options yet!**
-**Additionally, Edge is the highest priority for development, while the other options are ones I hope to get to, but may not.**
+Once you have built an Artie, [see here for instructions on using your Artie](./docs/out-of-the-box/getting-started.md).
 
 ## Motivation
 
 ### Why Developmental Robotics?
 
 Developmental robotics is the study of human development by means of simulating it.
-It is an important field of study for at least the following two reasons:
+It is an important field of study for at least the following reasons:
 
 1. Developmental robotics informs the study of human development. What better way to test a theory
    of how a human develops than to try to build a human?
-1. Developmental robitics informs the study of artificial intelligence. Although not typically the main
-   focus of developmental robotics, AI can benefit from any advances in our understanding of human intelligence.
+1. Developmental robotics informs the study of artificial intelligence. AI can benefit from any advances
+   in our understanding of human intelligence.
 1. Developmental robotics informs the study of robotics. Building a robot always involves solving difficult
    engineering problems. Building a robot that can learn and adapt like a human is even more difficult,
    and any advances in this field will likely have applications in more traditional robotics or in soft robotics.
@@ -108,33 +91,81 @@ build an actual robot? Why not just simulate one in a physics simulator?
 
 The answer is simple: humans aren't simulated - they exist in a messy, physical world. Any theory
 of how a human develops must ultimately be put to the test in the same world with the same parameters.
+In fact, when you try to go from a theory to a physical implementation, you always find that the theory
+was underspecified: in implementing the theory, you have to make decisions about things that the theory
+did not address. This process of implementation forces you to refine the theory and address gaps that
+you did not know existed.
 
 Nonetheless, there is a place for virtual simulation in developmental robotics, and Artie
 will hopefully incorporate a simulator, since working with an actual robot is way less convenient
-than working in a video game.
+than working in a video game, but this simulator is a long way off for now. Get in touch if
+you'd like to help build it!
 
 One last thing about robots: embodiment is a two-way street. Though you can get by to an extent with
 datasets that are impersonal and aggregated (as in the typical supervised learning paradigm of machine learning),
 humans do not learn this way. Humans learn from interacting with their environment and by their environment
-interacting with them. Parents speak directly to their children using infant-directed speech.
-Teenagers navigate social environments that are unique to their particular group of friends.
-Young adults take elective classes at university that are interesting to them.
+interacting with them. Parents speak directly to their children using infant-directed speech, based on
+what their children are currently doing. Teenagers navigate social environments that are unique to their
+particular group of friends. Young adults take elective classes at university that are interesting to them.
 *An intelligent agent has an active, often causative relationship with the data from which it learns.*
 Hence, you need to place the subject into an environment to truly study the development of natural intelligence.
 
-Also, robots are awesome!
+Finally, robots are awesome!
 
 ### Why not Buy a Robot that Already Exists?
 
-A few reasons:
+We found that we needed a robot that fulfilled the following criteria:
 
-* They're so expensive. Holy crap are they expensive:
-  - [Poppy](https://www.generationrobots.com/en/312-poppy-humanoid-robot) ~ $10k
-  - [Nao](https://en.wikipedia.org/wiki/Nao_(robot)) ~ $15k
-  - [iCub](https://icub.iit.it/products/product-catalog) ~ $250k
-* Affordable ones cannot feasibly be used to study human development:
-  - [Hiwonder](https://www.robotshop.com/products/hiwonder-tonypi-ai-intelligent-vision-humanoid-robot-powered-by-raspberry-pi-4b-4gb-advanced-kit)
+* Open Source - both hardware and software
+* Affordable - we wanted to be able to build multiple copies of the robot without grant funding.
+  We think this is key: robotics research is slowly coming to the masses of hobbyists, students,
+  and citizen scientists, but developmental robotics research is still mostly confined to well-funded labs.
+* Designed for Developmental Robotics - many existing robots are designed for other purposes,
+  such as research in traditional robotics, human-robot interaction, or AI. These robots never
+  take into account the specific needs of developmental robotics research, such as the physical constraints
+  of a human infant, or the physiological requirements of various sensor components. Artie is designed
+  from the ground up with developmental robotics in mind: we have compromised on biomimicry only as far
+  as is absolutely necessary to make the robot affordable and buildable.
+* Modular and Extensible - we wanted a robot that could be easily modified, extended, and repaired.
+  Research moves quickly, and we wanted a robot that could keep pace.
+  We also wanted a robot that could be customized to fit the needs of different researchers
+  and different experiments, which means that we aren't building a robot - we are building a robotics ecosystem.
+* Easy to Build - we wanted a robot that could be built by a single person with moderate technical skills
+  and a small budget. This means that we had to make the robot as easy to assemble as possible,
+  while still maintaining the other criteria.
+* Professional grade - we wanted a robot that was reliable and fun to use. Every layer of Artie's
+  software stack is designed to be robust, maintainable, and to follow engineering best practices,
+  so that researchers can focus on their research, not on debugging the robot.
+* Data provenance and reproducibility - we wanted a robot that could keep track of where its data came from, so that
+  researchers can be sure that their experiments are reproducible and that their data is trustworthy.
+  Artie uses containerization and orchestration to ensure that software environments are consistent
+  across different deployments. Additionally, even the single board computers are running custom
+  Linux images built using Yocto, so that the entire software stack is under control: if it worked once,
+  it should work every time; you are running an experiment with Artie, not just getting him to work this one time.
+* Fun to use - we wanted a robot that was enjoyable to work with, both for researchers and for
+  the subjects of experiments. A robot that is engaging and appealing is more likely to elicit
+  natural behaviors from human subjects, which is crucial for developmental robotics research.
 
-Artie is built from the ground up explicitly for the purpose of developmental robotics.
-He's also open source, and as cheap as is feasible (though it turns out, that's still
-pretty expensive).
+Alternatives exist, but they don't meet these criteria. For example, there's:
+  - [Poppy](https://www.generationrobots.com/en/312-poppy-humanoid-robot), which is about $10k USD,
+    and while it's open source and extensible, it's not designed specifically for developmental robotics,
+    with very little biomimicry.
+  - [Nao](https://en.wikipedia.org/wiki/Nao_(robot)), which is about $15k USD, and while it is well-regarded
+    and used extensively, its hardware is not extensible or modifiable, and it
+    is designed more for human-robot interaction than developmental robotics. Again, very little biomimicry.
+  - [iCub](https://icub.iit.it/products/product-catalog), which is about$250k USD, and while it is
+    designed for developmental robotics and has a high degree of biomimicry, its cost
+    makes it inaccessible to most researchers.
+  - [Berkeley Humanoid Lite](https://lite.berkeley-humanoid.org/), which is about $5k USD, and while it is affordable
+    and open source, it is not designed specifically for developmental robotics, again with very little biomimicry
+    in mind.
+
+Additionally, we did not use ROS (Robot Operating System) as the basis for Artie's software stack.
+While ROS is a great tool for traditional robotics development, we felt it was not well-suited
+for reproducible developmental robotics research. ROS's architecture is not designed
+for containerization and orchestration, which are key to ensuring that experiments
+are reproducible and that software environments are consistent across different deployments.
+Also, while ROS has a huge ecosystem and excellent community support/adoption, it is too general purpose
+for our needs: we wanted a software stack that was specifically designed for developmental robotics and for research.
+Really the only thing that we could have used from ROS was its inter-process communication (IPC) mechanisms.
+I suppose its physics simulator would have been nice, too.

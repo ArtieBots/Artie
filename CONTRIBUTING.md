@@ -21,6 +21,8 @@ The requirements document is unlike your typical engineering requirements docume
 developmental biology and psychology research results that provide a snapshot at different timepoints in human development
 with links to the original research papers. If Artie replicates these results, he meets the requirements of being human.
 
+Of course, we also have more traditional software and hardware requirements for Artie, which are documented TODO.
+
 ## Overall Design Considerations
 
 When contributing to Artie, please keep the following design considerations in mind (these are mostly
@@ -32,7 +34,7 @@ just good software engineering principles):
   decoupled. It is hard to know ahead of time what capabilities a future Artie might need, so modularity is key.
 - **Extensibility**: Ensure that new features and functionalities can be added without major overhauls to the existing system.
 - **Usability**: Prioritize ease of use for both developers and end-users. Clear documentation is important.
-- **Open Source**: The licensing model for Artie is MIT or software, except for Workbench, which requires LGPLv3 due to
+- **Open Source**: The licensing model for Artie is MIT for software, except for Workbench, which requires LGPLv3 due to
   its use of Qt. Any contributions must be compatible with these licenses. Hardware is licensed under CERN-OHL-P. Yocto
   images are licensed as Linux images, with all kinds of licenses for different components,
   see the [Yocto documentation](https://docs.yoctoproject.org/next/overview-manual/development-environment.html#licensing) for details.
@@ -68,7 +70,7 @@ The repository is organized into the following main directories:
 
 These directories contain meta-information about the project.
 
-* `.circleci/`: CircleCI configuration files for continuous integration and deployment.
+* `.circleci/`: CircleCI configuration files for automated testing and building.
 * `build-artifacts/`: Artifacts generated during the build process.
 * `docs/`: Documentation.
 
@@ -80,8 +82,7 @@ These directories contain infrastructure-related code and configurations.
     * `ardk/`: Artie Development Kit (ArDK) code and related resources.
         * `base-image/`: Docker images used in building various Artie components.
         * `firmware/`: Bootloader and libraries that can be used by various Artie MCUs.
-        * `libraries/`: Common libraries used by more than one element of Artie. Dependencies should always
-          be kept to a minimum.
+        * `libraries/`: Common libraries used by more than one element of Artie.
             * `artie-can/`: Application-level (SBC) library and FW library for interacting with the CAN bus.
             * `artie-gpio/`: Application-level (SBC) library for interacting with GPIO pins.
             * `artie-i2c/`: Application-level (SBC) library for interfacing with the I2C bus.
@@ -116,16 +117,17 @@ These directories contain items corresponding to actual Artie bots.
     * `audio-node/`: Source and electromechanical specs for the audio node, which handles audio input and output
       for Artie bots.
     * `controller-node/`: Source and electromechanical specs for the controller node, which serves as the main
-      SBC for an Artie bot. This folder is the one exception to the rule that `artie-common/` contains only items
-      that are common to more than one type of Artie, as the controller node is found on all Artie bots.
-    * `drivers/`: Source and Docker images for the user-space driver applications that more than one
+      SBC for an Artie bot. Every single Artie bot has a controller node.
+    * `drivers/`: Source and Docker images for the user-space driver applications more than one
       type of Artie might use.
     * `electrical-schematics/`: The schematics for the various components that are common to more than
       one type of Artie bot. *TODO* We may find a better place to keep schematics and models.
-    * `firmware/`: Source and Docker images (for building) for the MCUs that more than one type of Artie
+    * `firmware/`: Source and Docker images (for building) for the MCUs more than one type of Artie
       might use.
     * `mechanical-schematics/`: The mechanical drawings/models for the various components that are common
       to more than one type of Artie bot. *TODO* We may find a better place to keep schematics and models.
+    * `vision-node/`: Source and electromechanical specs for the vision node, which handles camera input
+      and vision processing for Artie bots.
 * `artie00/`: Contains items that are specific to only Artie00, an Artie type that simulates a newborn infant.
 
 ## Contribution Guide
