@@ -33,3 +33,7 @@ access the cluster.
 
 You can also use Artie CLI from your development machine, but it will require authentication
 into the Kubernetes cluster (using your Artie Profile if possible).
+
+## Software Design Document
+
+TODO: Write the design document for the CLI, similar to the one for ArtieTool.

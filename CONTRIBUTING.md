@@ -77,48 +77,55 @@ These directories contain meta-information about the project.
 These directories contain infrastructure-related code and configurations.
 
 * `framework/`: Core framework code for Artie.
+    * `ardk/`: Artie Development Kit (ArDK) code and related resources.
+        * `base-image/`: Docker images used in building various Artie components.
+        * `firmware/`: Bootloader and libraries that can be used by various Artie MCUs.
+        * `libraries/`: Common libraries used by more than one element of Artie. Dependencies should always
+          be kept to a minimum.
+            * `artie-can/`: Application-level (SBC) library and FW library for interacting with the CAN bus.
+            * `artie-gpio/`: Application-level (SBC) library for interacting with GPIO pins.
+            * `artie-i2c/`: Application-level (SBC) library for interfacing with the I2C bus.
+            * `artie-service-client/`: All applications running in Docker containers inside the K3S cluster
+              should include this library. It provides means to discover other services, handle retries,
+              and handle timeouts when calling other microservices.
+            * `artie-tooling/`: Library common to tooling components, such as Artie Tool, Artie Workbench,
+              and Artie CLI. Note the distinction between this library and `artie-util`, which is for
+              actual Artie software, not for Artie tools.
+            * `artie-util/`: Non-specific software common to Artie application components, such as logging.
+        * `services/`: Microservices that are expected to be found in all Artie deployments.
+            * `artie-api-server/`: Code and Dockerfile for Artie API server, which currently serves as the single input/output
+              gateway for the Artie Kubernetes cluster.
+            * `artie-pubsub-broker/`: Code and Dockerfile for the Pub/Sub messaging broker.
+            * `artie-rpc-broker/`: Code and Dockerfile for the RPC messaging broker.
+            * `telemetry/`: Code and Dockerfiles for the telemetry microservices.
     * `artietool/`: Artie Tool code and related resources.
       See the [Artie Tool contributing guide](./docs/contributing/artie-tool-contributions.md) for more information.
     * `cli/`: Artie CLI code and related resources.
       See the [Artie CLI contributing guide](./docs/contributing/artie-cli-contributions.md) for more information.
     * `daemons/`: Daemons that run as part of the Kubernetes cluster, but do not run on Artie SBCs.
-    * `firmware/`: **TODO** This should not exist. I think the build directories are getting created by artie-tool.
-    * `libraries/`: Common libraries used by more than one element of Artie. Dependencies should always
-      be kept to a minimum.
-        * `artie-gpio/`: Application-level (SBC) library for interacting with GPIO pins.
-        * `artie-i2c/`: Application-level (SBC) library for interfacing with the I2C bus.
-        * `artie-service-client/`: All applications running in Docker containers inside the K3S cluster
-          should include this library. **TODO** We need to probably remove this library - right now
-          it needs to know about all the different possible microservices, which means that we can't
-          swap in/out microservices. Need to think.
-        * `artie-tooling/`: Library common to tooling components, such as Artie Tool, Artie Workbench,
-          and Artie CLI. Note the distinction between this library and `artie-util`, which is for
-          actual Artie software, not for Artie tools.
-        * `artie-util/`: Non-specific software common to Artie application components, such as logging.
-        * `base-image/`: Docker images used in building various Artie components. **TODO** This should
-          be moved to artie-common.
-        * `telemetry/`: Telemetry code and Docker files. **TODO** This should be moved to artie-common,
-          since they are components, not libraries. Or we could move this folder to 'misc-micro-services'.
-          Either way, these items are not libraries.
-    * `misc-micro-services/`: Miscellaneous microservices.
-        * `artie-api-server/`: Code for Artie API server, which currently serves as the single input/output
-          gateway for the Artie Kubernetes cluster. **TODO** This should get moved to artie-common, as this
-          is a component that is common to all Arties.
     * `workbench/`: Code for Artie Workbench.
 
 **Artie Proper**
 
 These directories contain items corresponding to actual Artie bots.
 
-* `artie-common/`: Contains items pertaining to more than one type of physical Artie robot.
+* `artie-common/`: Contains items that have to do with the physical Artie robots and which are not
+  specific to any one type of Artie bot. These items are not necessarily found on all Arties, but
+  instead serve as a common location for a sort of Artie ecosystem that can be picked and chosen from
+  when building a specific Artie type.
+    * `audio-node/`: Source and electromechanical specs for the audio node, which handles audio input and output
+      for Artie bots.
+    * `controller-node/`: Source and electromechanical specs for the controller node, which serves as the main
+      SBC for an Artie bot. This folder is the one exception to the rule that `artie-common/` contains only items
+      that are common to more than one type of Artie, as the controller node is found on all Artie bots.
     * `drivers/`: Source and Docker images for the user-space driver applications that more than one
       type of Artie might use.
     * `electrical-schematics/`: The schematics for the various components that are common to more than
-      one type of Artie bot.
+      one type of Artie bot. *TODO* We may find a better place to keep schematics and models.
     * `firmware/`: Source and Docker images (for building) for the MCUs that more than one type of Artie
       might use.
     * `mechanical-schematics/`: The mechanical drawings/models for the various components that are common
-      to more than one type of Artie bot.
+      to more than one type of Artie bot. *TODO* We may find a better place to keep schematics and models.
 * `artie00/`: Contains items that are specific to only Artie00, an Artie type that simulates a newborn infant.
 
 ## Contribution Guide

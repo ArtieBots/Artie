@@ -4,3 +4,5 @@ This folder contains the code for the Workbench application, which is what users
 interact with to control Artie, set up experiments, collect results, monitor statuses, etc.
 It shares its code with ArtieTool, but provides a graphical user interface as opposed to ArtieTool's
 much less friendly command line interface.
+
+TODO: Write the design document for Workbench, similar to the one for ArtieTool.

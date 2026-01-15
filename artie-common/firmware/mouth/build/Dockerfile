@@ -3,11 +3,12 @@ FROM ${ARTIE_BASE_IMG} AS BASE_IMG
 
 RUN mkdir -p /pico/src/graphics/lcd
 
-COPY ./eyebrows/src /pico/src
-COPY ./mouth/CMakeLists.txt /pico/src/CMakeLists.txt
-COPY ./libraries/leds /pico/src/leds
-COPY ./libraries/errors /pico/src/errors
-COPY ./libraries/cmds /pico/src/cmds
+# Build context is the repo root
+COPY ./artie-common/firmware/eyebrows/src /pico/src
+COPY ./artie-common/firmware/mouth/CMakeLists.txt /pico/src/CMakeLists.txt
+COPY ./framework/ardk/firmware/libraries/leds /pico/src/leds
+COPY ./framework/ardk/firmware/libraries/errors /pico/src/errors
+COPY ./framework/ardk/firmware/libraries/cmds /pico/src/cmds
 WORKDIR /pico/src/build
 
 ARG BUILD_TYPE=Debug
