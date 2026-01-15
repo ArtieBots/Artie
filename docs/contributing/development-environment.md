@@ -87,7 +87,7 @@ I think that's good enough to cause Docker to start the registry every time the 
 
 Anyway, you will want to make sure you:
 
-1. Update your /etc/hosts file (or equivalent on Windows: TODO) to include the name of your registry:
+1. Update your /etc/hosts file (or equivalent on Windows: "C:\Windows\System32\drivers\etc\hosts") to include the name of your registry:
    e.g., `10.0.0.251  artiehub`
 1. Update your Docker config JSON with `"insecure-registries": ["artiehub:5000]`
 1. Make sure to pass `--insecure` with any Artie Tool command that makes use of the Docker registry.
