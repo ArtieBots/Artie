@@ -125,7 +125,9 @@ steps:
 - *dockerfile-dpath*: The directory where we will find the Dockerfile.
 - *dockerfile*: (Optional, default 'Dockerfile') The name of the Dockerfile, which should be found at `dockerfile-dpath`.
 - *build-context*: (Optional, default '.') The build context to use when building, which should be *relative* to the `dockerfile-dpath`.
-- *dependency-files*: (Optional) A list of `dependency` items which should evaluate to files we will copy into the build context before running the Dockerfile. OR a list of hard-coded string values, which are the file paths. Can be files or directories, despite the name.
+- *dependency-files*: (Optional) A list of `dependency` items which should evaluate to files we will copy
+  into the build context (in a directory called 'tmp' inside the build context, to be precise) before running the Dockerfile.
+  OR a list of hard-coded string values, which are the file paths. Can be files or directories, despite the name.
 - *build-args*: (Optional) A list of `build-arg` items, which are either key:value pairs passed via --build-arg to the
                 Docker build command, or are `dependency` items produced by dependency tasks, and follow this specification:
     * *name*: The name of the artifact that this build-arg depends on.

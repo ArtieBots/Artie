@@ -18,7 +18,7 @@ steps:
     img-base-name: artie-base
     buildx: true
     platform: linux/amd64
-    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/libraries/base-image"
+    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/base-image"
     dockerfile: Dockerfile
     build-context: "."
     dependency-files:
@@ -33,7 +33,7 @@ steps:
     img-base-name: artie-base
     buildx: true
     platform: linux/arm64
-    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/libraries/base-image"
+    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/base-image"
     dockerfile: Dockerfile
     build-context: "."
     dependency-files:
