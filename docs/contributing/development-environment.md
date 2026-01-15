@@ -1,18 +1,21 @@
 # Setting up a Development Environment
 
+[Back to Overall Architecture](./overall-architecture.md) | [Forward to Electronic Design](./electronic-design.md)
+
 This document provides instructions for setting up a development environment for contributing to the Artie project.
 These instructions closely mirror those used by an end-user to set up and administer an Artie, but with
 a few additional steps that are useful for development.
 
-Hence, first follow the instructions in the [Artie Out of the Box (Edge Deployment)](../out-of-the-box/edge.md) guide.
+Hence, first follow the instructions found in
+[the Building Artie Guide](../building/building-artie-main.md#setting-up-your-development-computer)
 
-Once you have followed those instructions and have a working Artie deployment, you can set up your development
+Once you have followed those instructions, you can set up your development
 environment by following these additional steps.
 
 ## Set Up a Local Docker Registry
 
 If you develop software for Artie, you will need to build Docker images and push them to a Docker registry
-with astounding size and frequency. Using something like DockerHub is not typically feasible for fast iteration,
+with astonishing size and frequency. Using something like DockerHub is not typically feasible for fast iteration,
 as you will hit rate limiting unless you are paying for a plan.
 
 There are myriad ways to set up a local registry, but they are almost all way too complicated and time consuming,
@@ -23,7 +26,9 @@ If you cannot be sure there is no man in the middle, then you should follow one 
 or official guides out there for setting up a Docker registry.
 
 If however, you are on your own local network in your own home, you can probably get away with going
-the insecure route. To do it, follow these steps:
+the insecure route. *To be clear, this is insecure*. Don't do it if you cannot guarantee the security of your network.
+
+To do it, follow these steps:
 
 1. Procure a Raspberry Pi or similar.
 1. Procure a big ol' SSD.
@@ -85,13 +90,12 @@ the insecure route. To do it, follow these steps:
 
 I think that's good enough to cause Docker to start the registry every time the machine boots up, but I don't remember.
 
-Anyway, you will want to make sure you:
+Anyway, you will want to make sure you do the following on your *development machine*:
 
 1. Update your /etc/hosts file (or equivalent on Windows: "C:\Windows\System32\drivers\etc\hosts") to include the name of your registry:
    e.g., `10.0.0.251  artiehub`
-1. Update your Docker config JSON with `"insecure-registries": ["artiehub:5000]`
+1. Update your Docker config JSON with `"insecure-registries": ["artiehub:5000"]`
 1. Make sure to pass `--insecure` with any Artie Tool command that makes use of the Docker registry.
-
 
 ## Working with Artie Tool
 
@@ -140,13 +144,13 @@ define new build tasks.
 Of note:
 
 * Firmware images are built inside Docker containers for easy reproducibility and to keep dependencies
-to a minimum. After building the Docker image that contains the target FW image, the Docker image is
-run as a container and another process takes the FW binary from the running container and puts it
-in the artifact directory.
+  to a minimum. After building the Docker image that contains the target FW image, the Docker image is
+  run as a container and another process takes the FW binary from the running container and puts it
+  in the artifact directory.
 * Docker images are built, often as manifest lists, and pushed to your development registry.
 * Yocto images are not built by default, because they are a massive undertaking that requires
-an enormous number of installed dependencies, disk space, and time.
-See [the Yocto document](./yocto-image-contributions.md).
+  an enormous number of installed dependencies, disk space, and time.
+  See [the Yocto document](./yocto-image-contributions.md).
 
 ### Artie Tool: Release
 
@@ -204,7 +208,7 @@ Each Artie instance is managed by an Artie Profile - a JSON file stored to the u
 hard drive. This JSON file is managed entirely by Artie Tool and Artie Workbench and in practice,
 a user/developer should never need to know it even exists or where to find it. The stuff
 it contains and the Python code managing it can be found in
-`framework\libraries\artie-tooling\src\artie_tooling\artie_profile.py`
+`framework/ardk/libraries/artie-tooling/src/artie_tooling/artie_profile.py`
 
 Installing an Artie is easily done through the Workbench application, and end users and developers
 alike should use that route whenever possible.
@@ -235,3 +239,5 @@ The `get` subcommand of Artie Tool is useful mostly programatically.
 ### Artie Tool: Clean
 
 The `clean` subcommand of Artie Tool cleans up all the build artifacts.
+
+[Back to Overall Architecture](./overall-architecture.md) | [Forward to Electronic Design](./electronic-design.md)

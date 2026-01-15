@@ -1,5 +1,7 @@
 # Artie CLI Contribution Guide
 
+[Back to Library Contributions](./library-contributions.md) | [Forward to Artie Tool Contributions](./artie-tool-contributions.md)
+
 This document provides guidelines and best practices for
 contributing code to Artie CLI.
 
@@ -52,3 +54,5 @@ This is by design. It is meant to be run from within the cluster, and should
 therefore not have any idea about Kubernetes, just like a driver application
 has no notion of Kubernetes. Artie CLI exercises the public *microservice*
 API of each component.
+
+[Back to Library Contributions](./library-contributions.md) | [Forward to Artie Tool Contributions](./artie-tool-contributions.md)

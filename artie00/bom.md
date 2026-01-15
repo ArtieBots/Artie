@@ -1,8 +1,9 @@
-# Bill of Materials
+# Bill of Materials for Artie00
 
 Some parts just can't be built :disappointed:
 
-Here's the list of things you have to buy. I try to keep this as up-to-date as possible.
+Here's the list of things you have to buy for Artie00. Locate the release you are building in this file.
+The first release is Artie Aardvark.
 
 ## Artie Aardvark
 

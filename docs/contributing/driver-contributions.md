@@ -1,5 +1,7 @@
 # Driver Contribution Guide
 
+[Back to Yocto Contributions](./yocto-image-contributions.md) | [Forward to Library Contributions](./library-contributions.md)
+
 This document provides guidelines and best practices for contributing drivers to the Artie project.
 
 ## Overview of Drivers
@@ -81,4 +83,6 @@ case it lives in that Artie's directory.
 Drivers are microservices and can therefore be written in any language
 so long as they are available on their buses, however they are typically
 written in Python and make use of some of the libraries found
-in `framework/libraries/`.
+in `framework/ardk/libraries/`.
+
+[Back to Yocto Contributions](./yocto-image-contributions.md) | [Forward to Library Contributions](./library-contributions.md)
