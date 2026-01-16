@@ -15,7 +15,7 @@ on the Controller Node.
 from artie_i2c import i2c
 from artie_util import boardconfig_controller as board
 from artie_util import artie_logging as alog
-from artie_util import rpycserver
+from artie_service_client import rpycserver
 from artie_util import util
 from typing import Dict
 from . import fw

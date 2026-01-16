@@ -13,7 +13,7 @@ setup(
     ],
     extras_require={
         "remote": [
-            "rpyc==5.3.1",
+            "rpyc==6.0.1",
         ],
     },
     packages=["artiecli", "artiecli.modules"],

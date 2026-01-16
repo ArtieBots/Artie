@@ -8,6 +8,6 @@ setup(
     package_dir={"artie_service_client": "src/artie_service_client"},
     install_requires=[
         "artie-util",
-        "rpyc==5.3.1",
+        "rpyc==6.0.1",
     ]
 )

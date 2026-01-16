@@ -663,7 +663,7 @@ class QWizardPageStyle(enum.StrEnum):
     color: {BasePalette.LIGHT};
 }}
 
-/* QWizarPage central icon label */
+/* QWizardPage central icon label */
 QLabel[{QWizardPageStyle.wizard_page_property()}=true]#icon_label {{
     font-size: 48px;
     color: {BasePalette.GRAY};
