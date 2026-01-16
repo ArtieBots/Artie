@@ -1,8 +1,8 @@
 """
 This module contains mappings from hostnames to IP addresses/Kubernetes Services, etc.
 """
-from . import constants
-from . import util
+from artie_util import constants
+from artie_util import util
 import enum
 import os
 

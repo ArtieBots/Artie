@@ -1,7 +1,7 @@
 # Remote Procedure Calls over CAN Bus in Artie
 
 This document describes the API for RPCs in the C programming language
-for use with [RCPACP](./CANProtocol.md#remote-procedure-call-artie-can-protocol-rpcacp).
+for use with [RPCACP](./CANProtocol.md#remote-procedure-call-artie-can-protocol-rpcacp).
 
 The API allows:
 

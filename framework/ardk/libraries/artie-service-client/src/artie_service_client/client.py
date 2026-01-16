@@ -3,9 +3,9 @@ The public interface for the various services is exposed through this module.
 """
 from artie_util import artie_logging as alog
 from artie_util import constants
-from artie_util import dns
 from artie_util import util
 from rpyc.utils import factory
+from . import dns
 import datetime
 import enum
 
