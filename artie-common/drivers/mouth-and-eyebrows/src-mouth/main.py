@@ -15,7 +15,8 @@ on the Controller Node.
 from artie_i2c import i2c
 from artie_util import boardconfig_controller as board
 from artie_util import artie_logging as alog
-from artie_service_client import rpycserver
+from artie_service_client import artie_service
+from artie_service_client import interfaces
 from artie_util import util
 from typing import Dict
 from . import fw
@@ -28,8 +29,14 @@ import rpyc
 SERVICE_NAME = "mouth-driver"
 
 @rpyc.service
-class DriverServer(rpycserver.Service):
-    def __init__(self, fw_fpath: str, ipv6=False):
+class DriverServer(
+    interfaces.ServiceInterfaceV1,
+    interfaces.DriverInterfaceV1,
+    interfaces.StatusLEDInterfaceV1,
+    artie_service.ArtieRPCService
+    ):
+    def __init__(self, port: int, fw_fpath: str, ipv6=False):
+        super().__init__(SERVICE_NAME, port)
         self._fw_submodule = fw.FirmwareSubmodule(fw_fpath, ipv6=ipv6)
         self._led_submodule = led.LedSubmodule()
         self._lcd_submodule = lcd.LcdSubmodule()
@@ -42,14 +49,6 @@ class DriverServer(rpycserver.Service):
 
         # Set up the LED
         self.led_heartbeat()
-
-    @rpyc.exposed
-    @alog.function_counter("whoami", alog.MetricSWCodePathAPIOrder.CALLS)
-    def whoami(self) -> str:
-        """
-        Return the name of this service and the version.
-        """
-        return f"artie-mouth-driver:{util.get_git_tag()}"
 
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS)
@@ -223,6 +222,6 @@ if __name__ == "__main__":
         i2c.manually_initialize(i2c_instances=[0], instance_to_address_map={0: [board.I2C_ADDRESS_MOUTH_MCU]})
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
-    server = DriverServer(args.fw_fpath, ipv6=args.ipv6)
+    server = DriverServer(args.port, args.fw_fpath, ipv6=args.ipv6)
     t = util.create_rpc_server(server, keyfpath, certfpath, args.port, ipv6=args.ipv6)
     t.start()

@@ -15,7 +15,8 @@ from artie_i2c import i2c
 from artie_util import artie_logging as alog
 from artie_util import boardconfig_controller as board
 from artie_util import constants
-from artie_service_client import rpycserver
+from artie_service_client import artie_service
+from artie_service_client import interfaces
 from artie_util import util
 from typing import Dict
 import argparse
@@ -27,7 +28,11 @@ import time
 SERVICE_NAME = "reset-driver"
 
 @rpyc.service
-class ResetMcuDriver(rpycserver.Service):
+class ResetMcuDriver(
+    interfaces.ServiceInterfaceV1,
+    interfaces.DriverInterfaceV1,
+    artie_service.ArtieRPCService
+    ):
     """
     This class is a Singleton service. Each time a client
     connects to our server, the one instance of this Service object
@@ -36,8 +41,8 @@ class ResetMcuDriver(rpycserver.Service):
     As such, this whole class (except for the initialization code)
     should be reentrant.
     """
-    def __init__(self, fw_fpath: str) -> None:
-        super().__init__()
+    def __init__(self, port: int, fw_fpath: str) -> None:
+        super().__init__(SERVICE_NAME, port)
         self._fw_fpath = fw_fpath
         self._reset_pin = board.RESET_RESET
         self._mcu_status = constants.SubmoduleStatuses.UNKNOWN
@@ -92,14 +97,6 @@ class ResetMcuDriver(rpycserver.Service):
 
     def on_disconnect(self, conn):
         pass
-
-    @rpyc.exposed
-    @alog.function_counter("whoami", alog.MetricSWCodePathAPIOrder.CALLS)
-    def whoami(self) -> str:
-        """
-        Return the name of this service and the version.
-        """
-        return f"artie-reset-driver:{util.get_git_tag()}"
 
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS)
@@ -161,6 +158,6 @@ if __name__ == "__main__":
         i2c.manually_initialize(i2c_instances=[0], instance_to_address_map={0: [board.I2C_ADDRESS_RESET_MCU]})
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
-    server = ResetMcuDriver(args.fw_fpath)
+    server = ResetMcuDriver(args.port, args.fw_fpath)
     t = util.create_rpc_server(server, keyfpath, certfpath, args.port, ipv6=args.ipv6)
     t.start()
