@@ -1,7 +1,7 @@
 from . import artie_logging as alog
 from . import constants
-from rpyc.utils.server import ThreadPoolServer
 from rpyc.utils.authenticators import SSLAuthenticator
+from rpyc.utils.server import ThreadPoolServer
 import getpass
 import os
 import platform
@@ -72,8 +72,9 @@ def create_rpc_server(server, keyfpath: str, certfpath: str, port: int, ipv6=Fal
         port=port,
         reuse_addr=False,
         authenticator=authenticator,
-        registrar=None,  # Do not use a registrar - we make use of Kubernetes Services instead
-        protocol_config=protocol
+        registrar=server.registrar,
+        protocol_config=protocol,
+        auto_register=False,  # We handle registration ourselves
     )
     return t
 

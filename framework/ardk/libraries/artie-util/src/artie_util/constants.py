@@ -3,6 +3,9 @@ import enum
 class ArtieEnvVariables(enum.StrEnum):
     """
     Various env-mapped configuration keys.
+
+    These come from either the environment variables set in Kubernetes (by means of the Helm Chart),
+    or from the Docker run command line.
     """
     ARTIE_ID = "ARTIE_ID"
     ARTIE_RUN_MODE = "ARTIE_RUN_MODE"
@@ -10,6 +13,8 @@ class ArtieEnvVariables(enum.StrEnum):
     LOG_COLLECTOR_HOSTNAME = "LOG_COLLECTOR_HOSTNAME"
     LOG_COLLECTOR_PORT = "LOG_COLLECTOR_PORT"
     METRICS_SERVER_PORT = "METRICS_SERVER_PORT"
+    RPC_REGISTRY_HOST = "RPC_REGISTRY_HOST"
+    RPC_REGISTRY_PORT = "RPC_REGISTRY_PORT"
 
 class ArtieRunModes(enum.StrEnum):
     """
@@ -28,4 +33,13 @@ class SubmoduleStatuses(enum.StrEnum):
     WORKING = "working"
     DEGRADED = "degraded"
     NOT_WORKING = "not working"
+    UNKNOWN = "unknown"
+
+class StatusLEDStates(enum.StrEnum):
+    """
+    The different status LED states.
+    """
+    ON = "on"
+    OFF = "off"
+    HEARTBEAT = "heartbeat"
     UNKNOWN = "unknown"

@@ -15,8 +15,11 @@ has access to CAN on the Controller Node.
 """
 from artie_i2c import i2c
 from artie_util import artie_logging as alog
+from artie_util import constants
 from artie_util import util
-from artie_service_client import rpycserver
+from artie_service_client import artie_service
+from artie_service_client import interfaces
+from rpyc.utils.registry import TCPRegistryClient
 from typing import Dict, List
 from . import ebcommon
 from . import fw
@@ -25,14 +28,20 @@ from . import led
 from . import metrics
 from . import servo
 import argparse
+import os
 import rpyc
 
 SERVICE_NAME = "eyebrows-service"
 
-
 @rpyc.service
-class DriverServer(rpycserver.Service):
-    def __init__(self, fw_fpath: str, ipv6=False):
+class DriverServer(
+    interfaces.ServiceInterfaceV1,
+    interfaces.DriverInterfaceV1,
+    interfaces.StatusLEDInterfaceV1,
+    artie_service.ArtieRPCService
+    ):
+    def __init__(self, port: int, fw_fpath: str, ipv6=False):
+        super().__init__(SERVICE_NAME, port)
         self._servo_submodule = servo.ServoSubmodule()
         self._led_submodule = led.LedSubmodule()
         self._lcd_submodule = lcd.LcdSubmodule()
@@ -44,14 +53,6 @@ class DriverServer(rpycserver.Service):
         # Initialize
         self._led_submodule.initialize()
         self._lcd_submodule.initialize()
-
-    @rpyc.exposed
-    @alog.function_counter("whoami", alog.MetricSWCodePathAPIOrder.CALLS)
-    def whoami(self) -> str:
-        """
-        Return the name of this service and the version.
-        """
-        return f"artie-eyebrow-driver:{util.get_git_tag()}"
 
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS)
@@ -263,6 +264,6 @@ if __name__ == "__main__":
         i2c.manually_initialize(i2c_instances=[0], instance_to_address_map={0: [ebcommon.MCU_ADDRESS_MAP['left'], ebcommon.MCU_ADDRESS_MAP['right']]})
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
-    server = DriverServer(args.fw_fpath, ipv6=args.ipv6)
+    server = DriverServer(args.port, args.fw_fpath, ipv6=args.ipv6)
     t = util.create_rpc_server(server, keyfpath, certfpath, args.port, ipv6=args.ipv6)
     t.start()

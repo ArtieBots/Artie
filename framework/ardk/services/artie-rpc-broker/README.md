@@ -10,8 +10,28 @@ that routes requests from clients to the appropriate service handlers, decouplin
 
 ## Requirements
 
-- **Service discovery**: Services can be discovered at runtime based on their capabilities. Each service
-  registers a list of interface names with this broker, and each interface name corresponds to a documented
-  interface in [the interface specifications folder](../../../../docs/specifications/service-interfaces/README.md)
+- **Service discovery**: Services can be discovered at runtime based on their capabilities.
+  All Artie RPC services are derived from the `ArtieRPCService` class found in
+  [artie_service_client/artie_service.py](../../libraries/artie-service-client/src/artie_service_client/artie_service.py)
+  and are further inherited from mixins defined in [artie_service_client/interfaces](../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py). The `ArtieRPCService` class provides methods
+  to register with the Artie RPC Broker. Clients can then query the broker, either by service name
+  or by interface signature (e.g., "I am looking for a service that is an 'led-driver' and an 'accelerometer-driver').
 
 ## Architecture
+
+Please note the following IPC convention: in Artie, we use RPC to *do* something or to *get* something
+if it can be retrieved *synchronously*. If you are going to be doing something in a loop, like reading
+a sensor value from some driver again and again, it probably shouldn't be an RPC call. Instead,
+a single RPC call might start the sensor read, and then the driver will post the values to a pub/sub topic
+that you can read from.
+
+TODO: Here are some notes to compile into a fully-fleshed out document later:
+
+* We have an RPC Broker that runs as a service
+* The RPC broker's hostname and port are mapped into every service container by the base Helm Chart as
+  environment variables.
+* Every RPC service is derived from ArtieRPCService, which handles registering with the broker
+  by means of RPyC's registry code.
+* Each RPC service has a service name, which is the human readable name, such as "MouthDriver",
+  but it also has a fully-qualified name, which lists all its interfaces as well, and conforms
+  to the following format: `<service-name>:<interface1-name>:<interface2-name>`

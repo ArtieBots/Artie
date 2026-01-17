@@ -7,7 +7,7 @@ setup(
     python_requires=">=3.10",
     license="MIT",
     install_requires=[
-        "urllib3<2.0.0",
+        "urllib3<2.0.0",  # Kubernetes 28.1.0, which requires 1.24.2<=urllib3<=2.0
         "artie-tooling>=0.0.1",
         "requests>=2.28.0",
     ],
