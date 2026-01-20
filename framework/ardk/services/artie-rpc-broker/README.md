@@ -35,3 +35,4 @@ TODO: Here are some notes to compile into a fully-fleshed out document later:
 * Each RPC service has a service name, which is the human readable name, such as "MouthDriver",
   but it also has a fully-qualified name, which lists all its interfaces as well, and conforms
   to the following format: `<service-name>:<interface1-name>:<interface2-name>`
+* Interface names MUST end in '-interface-vX', where X is the version number, starting with 1.

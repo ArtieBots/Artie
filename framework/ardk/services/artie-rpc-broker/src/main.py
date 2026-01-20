@@ -9,7 +9,9 @@ from artie_service_client import interfaces
 from artie_util import artie_logging as alog
 from artie_util import util
 from rpyc.utils.registry import TCPRegistryServer
+from . import service
 import argparse
+import re
 import rpyc
 import time
 
@@ -43,26 +45,155 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         This method returns a list of (host, port) tuples for services
         that match the query.
         """
-        ##### TODO #######
-        name = name.upper()
-        self.logger.debug(f"querying for {name!r}")
+        # self.services is a dict of the form {service_name: {service.Service: timestamp}}
+        # where service_name is the simple name of the service (not the fully-qualified name)
+        # We need to parse the `name` argument to determine what the client is querying for
+        fully_qualified_pattern = re.compile(r"^(?P<name>[a-zA-Z0-9\-_]+)(?P<interfaces>(:[a-zA-Z0-9\-_]+)+)$")
+        interface_list_pattern = re.compile(r"^([a-zA-Z0-9\-_]+)(,[a-zA-Z0-9\-_]+)+$")
+        single_interface_pattern = re.compile(r"^[a-zA-Z0-9\-_]+-v[0-9]+$")
+        match_fully_qualified = fully_qualified_pattern.match(name)
+        match_interface_list = interface_list_pattern.match(name)
+        match_single_interface = single_interface_pattern.match(name)
+        if match_fully_qualified:
+            # Querying by fully-qualified name
+            alog.debug(f"Querying by fully-qualified name: {name!r}")
+            return self._query_by_fully_qualified_name(name.upper())
+        elif match_interface_list:
+            # Querying by list of interfaces
+            alog.debug(f"Querying by list of interfaces: {name!r}")
+            interface_names = [iface.strip().upper() for iface in name.split(",")]
+            return self._query_by_interface_list(interface_names)
+        elif match_single_interface:
+            # Querying by single interface
+            alog.debug(f"Querying by single interface: {name!r}")
+            return self._query_by_interface(name.upper())
+        else:
+            # Querying by simple service name
+            alog.debug(f"Querying by service name: {name!r}")
+            return self._query_by_simple_name(name.upper())
+
+    def cmd_list(self, host: str, filter_host: tuple[str]|None) -> tuple[str]|None:
+        """
+        This method is called when a client wants to list all
+        registered services.
+
+        The `filter_host` argument can be used to filter services
+        by a specific host, and is a tuple of exactly one item, which must be
+        the name of a host.
+
+        Returns a list of fully-qualified service names (or `None`, if we do not allow listing).
+        """
+        self.logger.debug("Querying for services list:")
+
+        if not self.allow_listing:
+            self.logger.debug("Listing is disabled")
+            return None
+
+        services = []
+        if filter_host[0]:
+            for name in self.services.keys():
+                known_hosts = [s.host for s in self.services[name].keys()]
+                if filter_host[0] in known_hosts:
+                    services.append(self.services[name][filter_host[0]].fully_qualified_name)
+            services = tuple(services)
+        else:
+            services = []
+            for name in self.services.keys():
+                for s in self.services[name].keys():
+                    services.append(s.fully_qualified_name)
+            services = tuple(services)
+
+        self.logger.debug(f"Replying with {services}")
+
+        return services
+
+    def cmd_register(self, host: str, names: list[str], port: int) -> str:
+        """
+        Registers the given host and port under the given service names,
+        which should be a list of fully-qualified names.
+        """
+        self.logger.debug(f"Registering {host}:{port} as {', '.join(names)}")
+
+        for name in names:
+            s = service.Service(name, host, port)
+            self._add_service(s.simple_name, s)
+
+        return "OK"
+
+    def cmd_unregister(self, host: str, port: int) -> str:
+        """
+        Unregisters the given host and port from all services.
+        """
+        self.logger.debug(f"Unregistering {host}:{port}")
+
+        remove = []
+        for name in self.services.keys():
+            for s in self.services[name].keys():
+                if s.host == host and s.port == port:
+                    remove.append((name, s))
+
+        # Remove after iterating to avoid modifying the dict while iterating
+        for name, s in remove:
+            self._remove_service(name, s)
+
+        return "OK"
+
+    def _add_service(self, name: str, s: service.Service) -> None:
+        """Updates the service's keep-alive time stamp"""
         if name not in self.services:
-            self.logger.debug("no such service")
+            self.services[name] = {}
+
+        self.services[name][s] = time.time()
+
+    def _query_by_interface_list(self, interface_names: list[str]) -> tuple[tuple[str, int]]:
+        """
+        """
+        servers = []
+        for name in self.services.keys():
+            for s in self.services[name].keys():
+                if all(iface in s.interface_names for iface in interface_names):
+                    servers.append((s.host, s.port))
+
+        self.logger.debug(f"Replying with {servers!r}")
+        return tuple(servers)
+
+    def _query_by_interface(self, interface_name: str) -> tuple[tuple[str, int]]:
+        """
+        """
+        return self._query_by_interface_list([interface_name])
+
+    def _query_by_simple_name(self, name: str) -> tuple[tuple[str, int], ...]:
+        """
+        """
+        if name not in self.services:
+            self.logger.debug("No such service")
             return ()
 
         oldest = time.time() - self.pruning_timeout
-        all_servers = sorted(self.services[name].items(), key=lambda x: x[1])
+        all_servers = sorted(self.services[name].items(), key=lambda x: x.port)
         servers = []
-        for addrinfo, t in all_servers:
+        for s, t in all_servers:
             if t < oldest:
-                self.logger.debug(f"discarding stale {addrinfo[0]}:{addrinfo[1]}")
-                self._remove_service(name, addrinfo)
+                self.logger.debug(f"Discarding stale {s.host}:{s.port}")
+                self._remove_service(name, s)
             else:
-                servers.append(addrinfo)
+                servers.append((s.host, s.port))
 
-        self.logger.debug(f"replying with {servers!r}")
+        self.logger.debug(f"Replying with {servers!r}")
         return tuple(servers)
-        #################################
+
+    def _query_by_fully_qualified_name(self, name: str) -> tuple[tuple[str, int], ...]:
+        """
+        """
+        # Get the simple name and query using it
+        simple_name = name.split(":")[0]
+        return self._query_by_simple_name(simple_name)
+
+    def _remove_service(self, name: str, s: service.Service) -> None:
+        """Removes a single server of the given service."""
+        self.services[name].pop(s, None)
+        if not self.services[name]:
+            del self.services[name]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

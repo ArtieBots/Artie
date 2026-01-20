@@ -25,12 +25,29 @@ class ServiceConnection:
     so that clients that make use of this object do not need to worry
     about any of that.
     """
-    def __init__(self, service: Service, n_retries=3, artie_id=None, timeout_s=None, ipv6=False) -> None:
+    def __init__(self, service_lookup: str|list[str], n_retries=3, artie_id=None, timeout_s=None, ipv6=False) -> None:
+        """
+        Initialize the ServiceConnection object.
+
+        Args:
+            service_lookup: The fully-qualified name of the service to connect to,
+                            a simple name of the service to connect to, a single
+                            interface name, or a list of interface names.
+                            If anything other than a fully-qualified name is given,
+                            the first matching service will be used. If there is more than
+                            one service that matches, the exact service that is chosen
+                            is undefined.
+            n_retries: The number of times to retry a failed RPC call.
+            artie_id: The Artie ID of the target Artie to connect to. TODO
+            timeout_s: The maximum number of seconds to wait for the service to come online. If None, wait indefinitely.
+            ipv6: Whether to use IPv6 when connecting to the service
+
+        """
         self.n_retries = n_retries
         self.artie_id = artie_id
         self.timeout_s = timeout_s
         self.ipv6 = ipv6
-        self.service = service
+        self.service = service  # TODO: change to using service_lookup
         self.connection = self._initialize_connection(service)
 
     def __getattr__(self, attr):
