@@ -7,15 +7,10 @@ from artie_util import util
 from rpyc.utils import factory
 from . import dns
 import datetime
-import enum
+import rpyc
 
 # A cache to store services that we have determined to be online
 online_cache = set()
-
-class Service(enum.Enum):
-    RESET_SERVICE = "reset-service"
-    EYEBROWS_SERVICE = "eyebrows-service"
-    MOUTH_SERVICE = "mouth-service"
 
 class ServiceConnection:
     """
@@ -25,7 +20,7 @@ class ServiceConnection:
     so that clients that make use of this object do not need to worry
     about any of that.
     """
-    def __init__(self, service_lookup: str|list[str], n_retries=3, artie_id=None, timeout_s=None, ipv6=False) -> None:
+    def __init__(self, service_lookup: str|list[str], n_retries=3, timeout_s=None, ipv6=False) -> None:
         """
         Initialize the ServiceConnection object.
 
@@ -38,17 +33,15 @@ class ServiceConnection:
                             one service that matches, the exact service that is chosen
                             is undefined.
             n_retries: The number of times to retry a failed RPC call.
-            artie_id: The Artie ID of the target Artie to connect to. TODO
             timeout_s: The maximum number of seconds to wait for the service to come online. If None, wait indefinitely.
             ipv6: Whether to use IPv6 when connecting to the service
 
         """
         self.n_retries = n_retries
-        self.artie_id = artie_id
         self.timeout_s = timeout_s
         self.ipv6 = ipv6
-        self.service = service  # TODO: change to using service_lookup
-        self.connection = self._initialize_connection(service)
+        self.service = service_lookup
+        self.connection = self._initialize_connection(service_lookup)
 
     def __getattr__(self, attr):
         orig_attr = self.connection.root.__getattribute__(attr)
@@ -76,20 +69,9 @@ class ServiceConnection:
                 alog.exception(f"Exception when trying to run a function on a service connection (service: {self.service}): ", e, stack_trace=True)
                 alog.update_counter(1, "connection", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times we encounter an error when trying to connect to an Artie service.")
 
-    def _initialize_connection(self, service: Service):
-        match service:
-            case Service.RESET_SERVICE:
-                dns_lookup = dns.Lookups.RESET_DRIVER
-            case Service.EYEBROWS_SERVICE:
-                dns_lookup = dns.Lookups.EYEBROWS_DRIVER
-            case Service.MOUTH_SERVICE:
-                dns_lookup = dns.Lookups.MOUTH_DRIVER
-            case _:
-                raise ValueError(f"Given an invalid Service for ServiceConnection: {service}")
-
-        # DNS
-        block_until_online(dns_lookup, timeout_s=self.timeout_s, ipv6=self.ipv6, artie_id=self.artie_id)
-        host, port = dns.lookup(dns_lookup, artie_id=self.artie_id)
+    def _initialize_connection(self, service: str|list[str]) -> rpyc.Connection:
+        block_until_online(dns_lookup, timeout_s=self.timeout_s, ipv6=self.ipv6)
+        host, port = dns.lookup(dns_lookup)
 
         for _ in range(self.n_retries):
             try:
@@ -118,7 +100,7 @@ def _try_connect(host: str, port: int, ipv6=False) -> bool:
             connection.close()
     return False
 
-def block_until_online(service: dns.Lookups, timeout_s=30, ipv6=False, artie_id=None):
+def block_until_online(service: dns.Lookups, timeout_s=30, ipv6=False):
     """
     Blocks until the given service is online.
     """
@@ -130,7 +112,7 @@ def block_until_online(service: dns.Lookups, timeout_s=30, ipv6=False, artie_id=
     alog.info(f"Waiting for {service} to come online...")
 
     # Lookup the service in the DNS
-    host, port = dns.lookup(service, artie_id=artie_id)
+    host, port = dns.lookup(service)
 
     # Keep trying to connect forever if no timeout, or until timeout if we have one
     ts = datetime.datetime.now().timestamp()
@@ -148,7 +130,8 @@ def block_until_online(service: dns.Lookups, timeout_s=30, ipv6=False, artie_id=
     else:
         raise TimeoutError(f"Timeout while waiting for {service} to come online.")
 
-def reset(addr: int, ipv6=False, n_retries=3, timeout_s=None, artie_id=None) -> bool:
+# TODO: Why is this here?
+def reset(addr: int, ipv6=False, n_retries=3, timeout_s=None) -> bool:
     """
     Attempt to reset a device at target address. See the appropriate board
     config file for valid reset addresses.
@@ -161,5 +144,5 @@ def reset(addr: int, ipv6=False, n_retries=3, timeout_s=None, artie_id=None) -> 
         alog.info("Mocking a DNS lookup and RPC call for reset.")
         return True
 
-    connection = ServiceConnection(Service.RESET_SERVICE, n_retries=n_retries, timeout_s=timeout_s, artie_id=artie_id, ipv6=ipv6)
+    connection = ServiceConnection(Service.RESET_SERVICE, n_retries=n_retries, timeout_s=timeout_s, ipv6=ipv6)
     return connection.reset_target(addr)
