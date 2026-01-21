@@ -38,3 +38,4 @@ TODO: Here are some notes to compile into a fully-fleshed out document later:
 * Interface names MUST end in '-interface-vX', where X is the version number, starting with 1.
 * Need to figure out how to have multiple Arties in the same Kubernetes network. Right now
   I think the idea is we just append the Artie ID to each service name.
+*
