@@ -6,6 +6,7 @@ discovering services in the Artie cluster that are making use of RPC.
 """
 from artie_service_client import artie_service
 from artie_service_client import interfaces
+from artie_service_client import dns
 from artie_util import artie_logging as alog
 from artie_util import util
 from rpyc.utils.registry import TCPRegistryServer
@@ -48,29 +49,20 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         # self.services is a dict of the form {service_name: {service.Service: timestamp}}
         # where service_name is the simple name of the service (not the fully-qualified name)
         # We need to parse the `name` argument to determine what the client is querying for
-        fully_qualified_pattern = re.compile(r"^(?P<name>[a-zA-Z0-9\-_]+)(?P<interfaces>(:[a-zA-Z0-9\-_]+)+)$")
-        interface_list_pattern = re.compile(r"^([a-zA-Z0-9\-_]+)(,[a-zA-Z0-9\-_]+)+$")
-        single_interface_pattern = re.compile(r"^[a-zA-Z0-9\-_]+-v[0-9]+$")
-        match_fully_qualified = fully_qualified_pattern.match(name)
-        match_interface_list = interface_list_pattern.match(name)
-        match_single_interface = single_interface_pattern.match(name)
-        if match_fully_qualified:
-            # Querying by fully-qualified name
-            alog.debug(f"Querying by fully-qualified name: {name!r}")
-            return self._query_by_fully_qualified_name(name.upper())
-        elif match_interface_list:
-            # Querying by list of interfaces
-            alog.debug(f"Querying by list of interfaces: {name!r}")
-            interface_names = [iface.strip().upper() for iface in name.split(",")]
-            return self._query_by_interface_list(interface_names)
-        elif match_single_interface:
-            # Querying by single interface
-            alog.debug(f"Querying by single interface: {name!r}")
-            return self._query_by_interface(name.upper())
-        else:
-            # Querying by simple service name
-            alog.debug(f"Querying by service name: {name!r}")
-            return self._query_by_simple_name(name.upper())
+        match dns.ServiceQuery.from_string(name).query_type:
+            case dns.ServiceQueryType.FULLY_QUALIFIED_NAME:
+                alog.debug(f"Querying by fully-qualified name: {name!r}")
+                return self._query_by_fully_qualified_name(name.upper())
+            case dns.ServiceQueryType.INTERFACE_LIST:
+                alog.debug(f"Querying by list of interfaces: {name!r}")
+                interface_names = [iface.strip().upper() for iface in name.split(",")]
+                return self._query_by_interface_list(interface_names)
+            case dns.ServiceQueryType.SINGLE_INTERFACE:
+                alog.debug(f"Querying by single interface: {name!r}")
+                return self._query_by_interface(name.upper())
+            case dns.ServiceQueryType.SIMPLE_NAME:
+                alog.debug(f"Querying by service name: {name!r}")
+                return self._query_by_simple_name(name.upper())
 
     def cmd_list(self, host: str, filter_host: tuple[str]|None) -> tuple[str]|None:
         """
