@@ -10,8 +10,10 @@ from artie_service_client import dns
 from artie_util import artie_logging as alog
 from artie_util import util
 from rpyc.utils.registry import TCPRegistryServer
+from . import cachemonitor
 from . import service
 import argparse
+import functools
 import os
 import re
 import rpyc
@@ -25,16 +27,59 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
     responsible for registering and discovering services in the
     Artie cluster that are making use of RPC.
     """
-    def __init__(self, host: str, port: int, broker_cache_path: str):
+    def __init__(self, host: str, port: int, broker_cache_dpath: str):
         super().__init__(host, port, allow_listing=True)
 
         alog.info(f"{SERVICE_NAME} initialized on port {port}.")
 
-        self._broker_cache_path = broker_cache_path
+        self._broker_cache_dpath = broker_cache_dpath
+        self._broker_cache_fpath = os.path.join(broker_cache_dpath, "broker-cache.txt")
+
+        # Create the broker cache file if it does not exist
+        os.makedirs(broker_cache_dpath, exist_ok=True)
+        if not os.path.exists(self._broker_cache_fpath):
+            with open(self._broker_cache_fpath, "w") as f:
+                f.write("")
+
+        # Start the cache monitor
+        self._cache_monitor = cachemonitor.CacheMonitor(broker_cache_dpath)
+        self._cache_monitor.start()
 
         # self.services is a dict of the form {service_name: {service.ServiceRegistration: timestamp}}
         # where service_name is the simple name of the service (not the fully-qualified name)
 
+    def read_cache(func):
+        """
+        Load the cache from the cache file before executing the decorated method.
+        """
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # Check if the cache is valid
+            if not self._cache_monitor.cache_valid:
+                self.logger.info("Cache is invalid, reloading from cache file.")
+                self._read_cache_from_file()
+                self._cache_monitor.cache_valid = True
+
+            # Execute the decorated method
+            return func(self, *args, **kwargs)
+        return wrapper
+
+    def write_cache(func):
+        """
+        Write the cache to the cache file after executing the decorated method.
+        """
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            # Execute the decorated method
+            result = func(self, *args, **kwargs)
+
+            # Write the cache to the cache file
+            self._write_cache_to_file()
+
+            return result
+        return wrapper
+
+    @read_cache
     def cmd_query(self, host: str, name: str):
         """
         Overridden method for querying the registry.
@@ -56,19 +101,16 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         # We need to parse the `name` argument to determine what the client is querying for
         match dns.ServiceQuery.from_string(name).query_type:
             case dns.ServiceQueryType.FULLY_QUALIFIED_NAME:
-                alog.debug(f"Querying by fully-qualified name: {name!r}")
                 return self._query_by_fully_qualified_name(name.upper())
             case dns.ServiceQueryType.INTERFACE_LIST:
-                alog.debug(f"Querying by list of interfaces: {name!r}")
                 interface_names = [iface.strip().upper() for iface in name.split(",")]
                 return self._query_by_interface_list(interface_names)
             case dns.ServiceQueryType.SINGLE_INTERFACE:
-                alog.debug(f"Querying by single interface: {name!r}")
                 return self._query_by_interface(name.upper())
             case dns.ServiceQueryType.SIMPLE_NAME:
-                alog.debug(f"Querying by service name: {name!r}")
                 return self._query_by_simple_name(name.upper())
 
+    @read_cache
     def cmd_list(self, host: str, filter_host: tuple[str]|None) -> tuple[str]|None:
         """
         This method is called when a client wants to list all
@@ -104,6 +146,8 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
         return services
 
+    @read_cache
+    @write_cache
     def cmd_register(self, host: str, names: list[str], port: int) -> str:
         """
         Registers the given host and port under the given service names,
@@ -117,6 +161,8 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
         return "OK"
 
+    @read_cache
+    @write_cache
     def cmd_unregister(self, host: str, port: int) -> str:
         """
         Unregisters the given host and port from all services.
@@ -186,11 +232,37 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         simple_name = name.split(":")[0]
         return self._query_by_simple_name(simple_name)
 
+    def _read_cache_from_file(self) -> None:
+        """Reads the cache from the cache file."""
+        if not os.path.exists(self._broker_cache_fpath):
+            self.logger.error(f"Cache file {self._broker_cache_fpath} does not exist.")
+            return
+
+        self.services.clear()
+        with open(self._broker_cache_fpath, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    s = service.ServiceRegistration.from_cache_line(line)
+                    self._add_service(s.simple_name, s)
+                except Exception as e:
+                    self.logger.error(f"Error parsing cache line '{line}': {e}")
+
     def _remove_service(self, name: str, s: service.ServiceRegistration) -> None:
         """Removes a single server of the given service."""
         self.services[name].pop(s, None)
         if not self.services[name]:
             del self.services[name]
+
+    def _write_cache_to_file(self) -> None:
+        """Writes the cache to the cache file."""
+        with open(self._broker_cache_fpath, "w") as f:
+            for name in self.services.keys():
+                for s in self.services[name].keys():
+                    f.write(s.to_cache_line() + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

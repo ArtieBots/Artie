@@ -25,9 +25,6 @@ IN_CLOSE_WRITE = 0x00000008
 IN_NONBLOCK = 0x00000800
 IN_CLOEXEC = 0x00080000
 
-cache_valid = False
-"""Whether the cache is valid or not. This variable is modified by the CacheMonitor class and read by the ArtieRPCBrokerServer class."""
-
 class CacheMonitor(threading.Thread):
     """
     This class implements a cache monitor for the Artie RPC Broker service.
@@ -42,6 +39,17 @@ class CacheMonitor(threading.Thread):
         self._stop_event = threading.Event()
         self._inotify_fd = None
         self._watch_fd = None
+        self._cache_valid = False
+
+    @property
+    def cache_valid(self) -> bool:
+        """Indicates whether the cache is valid."""
+        return self._cache_valid
+
+    @cache_valid.setter
+    def cache_valid(self, value: bool):
+        """Sets the cache valid flag."""
+        self._cache_valid = value
 
     def run(self):
         """
@@ -75,8 +83,6 @@ class CacheMonitor(threading.Thread):
                 alog.error(f"Error closing inotify fd: {e}")
 
     def _execute_monitor(self):
-        global cache_valid
-
         # Initialize inotify
         self._inotify_fd = libc.inotify_init1(IN_NONBLOCK | IN_CLOEXEC)
         if self._inotify_fd < 0:
@@ -126,7 +132,7 @@ class CacheMonitor(threading.Thread):
                     # Check if the broker-cache.txt file was modified
                     if name == self._broker_cache_fname and (mask & (IN_MODIFY | IN_CLOSE_WRITE)):
                         alog.info("Cache file changed, invalidating cache")
-                        cache_valid = False
+                        self._cache_valid = False
                 else:
                     # Event on the directory itself
                     pass
