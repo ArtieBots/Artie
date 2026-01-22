@@ -12,11 +12,12 @@ from artie_util import util
 from rpyc.utils.registry import TCPRegistryServer
 from . import service
 import argparse
+import os
 import re
 import rpyc
 import time
 
-SERVICE_NAME = "artie-rpc-broker-service"
+SERVICE_NAME = "rpc-broker-service"
 
 class ArtieRPCBrokerServer(TCPRegistryServer):
     """
@@ -24,9 +25,15 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
     responsible for registering and discovering services in the
     Artie cluster that are making use of RPC.
     """
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, broker_cache_path: str):
         super().__init__(host, port, allow_listing=True)
+
         alog.info(f"{SERVICE_NAME} initialized on port {port}.")
+
+        self._broker_cache_path = broker_cache_path
+
+        # self.services is a dict of the form {service_name: {service.ServiceRegistration: timestamp}}
+        # where service_name is the simple name of the service (not the fully-qualified name)
 
     def cmd_query(self, host: str, name: str):
         """
@@ -46,8 +53,6 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         This method returns a list of (host, port) tuples for services
         that match the query.
         """
-        # self.services is a dict of the form {service_name: {service.Service: timestamp}}
-        # where service_name is the simple name of the service (not the fully-qualified name)
         # We need to parse the `name` argument to determine what the client is querying for
         match dns.ServiceQuery.from_string(name).query_type:
             case dns.ServiceQueryType.FULLY_QUALIFIED_NAME:
@@ -107,7 +112,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         self.logger.debug(f"Registering {host}:{port} as {', '.join(names)}")
 
         for name in names:
-            s = service.Service(name, host, port)
+            s = service.ServiceRegistration(name, host, port)
             self._add_service(s.simple_name, s)
 
         return "OK"
@@ -130,7 +135,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
         return "OK"
 
-    def _add_service(self, name: str, s: service.Service) -> None:
+    def _add_service(self, name: str, s: service.ServiceRegistration) -> None:
         """Updates the service's keep-alive time stamp"""
         if name not in self.services:
             self.services[name] = {}
@@ -181,7 +186,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         simple_name = name.split(":")[0]
         return self._query_by_simple_name(simple_name)
 
-    def _remove_service(self, name: str, s: service.Service) -> None:
+    def _remove_service(self, name: str, s: service.ServiceRegistration) -> None:
         """Removes a single server of the given service."""
         self.services[name].pop(s, None)
         if not self.services[name]:
@@ -190,13 +195,14 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
-    parser.add_argument("-p", "--port", type=int, default=18862, help="The port to bind for the RPC server.")
+    parser.add_argument("-p", "--port", type=int, default=18864, help="The port to bind for the RPC server.")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="The host to bind for the RPC server.")
+    parser.add_argument("--broker-cache-path", type=str, default=os.getenv("BROKER_CACHE_PATH", "/broker-cache"), help="Path to the broker cache directory.")
     args = parser.parse_args()
 
     # Set up logging
     alog.init(SERVICE_NAME, args)
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
-    server = ArtieRPCBrokerServer(args.host, args.port)
+    server = ArtieRPCBrokerServer(args.host, args.port, args.broker_cache_path)
     server.start()

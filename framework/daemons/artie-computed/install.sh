@@ -7,12 +7,16 @@ Help()
    echo
    echo "Syntax: install.sh [-h] [--help|--host-ip|--token|--no-docker]"
    echo "Arguments:"
-   echo "--host-ip       Required. The IP address of the Artie Admind machine."
-   echo "--token         Required. The token that you were given after installing the Artie Admin daemon. Can also be found on that machine at /var/lib/rancher/k3s/server/node-token"
+   echo "--host-ip            Required. The IP address of the Artie Admind machine."
+   echo "--token              Required. The token that you were given after installing the Artie Admin daemon. Can also be found on that machine at /var/lib/rancher/k3s/server/node-token"
    echo
    echo "Options:"
-   echo "--no-docker     Do not install Docker. This is useful if you already have a Docker configuration set up."
-   echo "-h | --help     Print this Help."
+   echo "--no-docker          Do not install Docker. This is useful if you already have a Docker configuration set up."
+   echo "--use-nfs            Use NFS for K3S persistent volumes. If you already have NFS installed, it will use the existing configuration, adding a new folder specified by --volume-path."
+   echo "--volume-path        Specify a custom path for K3S persistent volumes. Only needed if using NFS or a custom CSI driver that requires this. (Default is /artie/nfs/k3s-storage)."
+   echo "--remote-volume-path Specify a custom remote path for K3S persistent volumes when using NFS. Only needed if using NFS or a custom CSI driver that requires this. (Default is /artie/nfs/k3s-storage)."
+   echo "--no-kerberos        Do not configure Kerberos for NFS. Only use this if your environment does not require Kerberos (you do not need encrypted traffic) or if you have already configured Kerberos manually."
+   echo "-h | --help          Print this Help."
    echo
 }
 
@@ -27,11 +31,13 @@ while getopts "$optspec" optchar; do
          case "${OPTARG}" in
             host-ip)
                val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
-               URL="https://$val:6443"
+               URL="https://artie-admin:6443"
+               echo "artie-admin    $val" | sudo tee -a /etc/hosts
                ;;
             host-ip=*)
                val=${OPTARG#*=}
-               URL="https://$val:6443"
+               URL="https://artie-admin:6443"
+               echo "artie-admin    $val" | sudo tee -a /etc/hosts
                ;;
             token)
                val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
@@ -43,6 +49,21 @@ while getopts "$optspec" optchar; do
                ;;
             no-docker)
                NO_DOCKER=1
+               ;;
+            use-nfs)
+               USE_NFS=1
+               ;;
+            volume-path)
+               val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+               sudo mkdir -p "$val"
+               VOLUME_PATH="$val"
+               ;;
+            remote-volume-path)
+               val="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+               REMOTE_VOLUME_PATH="$val"
+               ;;
+            no-kerberos)
+               NO_KERBEROS=1
                ;;
             help)
                Help
@@ -76,6 +97,37 @@ if [[ -z "$URL" ]]; then
    exit 1
 fi
 
+# Set default volume path if not set
+if [[ -z "${VOLUME_PATH:-}" ]]; then
+   VOLUME_PATH="/artie/nfs/k3s-storage"
+fi
+
+# Set the default remote volume path if not set
+if [[ -z "${REMOTE_VOLUME_PATH:-}" ]]; then
+   REMOTE_VOLUME_PATH="/artie/nfs/k3s-storage"
+fi
+
+# Update the package list
+sudo apt-get update -y
+
+# If using NFS, set it up (or ensure it is already set up)
+if [[ "$USE_NFS" == 1 ]]; then
+   echo "Configuring NFS for K3S persistent volumes..."
+
+   sudo apt-get install -y nfs-common
+   sudo mkdir -p "$VOLUME_PATH"
+   echo "artie-admin:$REMOTE_VOLUME_PATH $VOLUME_PATH nfs rsize=8192,wsize=8192,timeo=14,intr" | sudo tee -a /etc/fstab
+   sudo mount -a
+
+   # Enable Kerberos to be compliant with Artie's security model (no unencrypted traffic over the network)
+   if [[ "$NO_KERBEROS" != 1 ]]; then
+      # TODO
+      echo "Configuring Kerberos for NFS..."
+      echo "This is not implemented yet. Please configure Kerberos manually."
+      exit 1
+   fi
+fi
+
 # Install docker
 if [[ "$NO_DOCKER" != 1 ]]; then
    curl -fsSL https://get.docker.com -o get-docker.sh
@@ -102,3 +154,9 @@ sudo systemctl daemon-reload
 sudo systemctl restart k3s-agent.service
 sudo systemctl start artie-computed.service
 sudo systemctl enable artie-computed.service
+
+# Label the node appropriately
+kubectl label node "$(hostname)" artie/node-role=compute --kubeconfig /etc/rancher/k3s/k3s.yaml
+if [[ "$USE_NFS" == 1 ]]; then
+   kubectl label node "$(hostname)" artie/storage=nfs --kubeconfig /etc/rancher/k3s/k3s.yaml
+fi

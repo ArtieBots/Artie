@@ -22,8 +22,8 @@ _single_interface_pattern = re.compile(r"^[a-zA-Z0-9\-_]+-v[0-9]+$")
 
 # Cached registry client
 _registry_client = TCPRegistryClient(
-    os.environ.get(constants.ArtieEnvVariables.RPC_REGISTRY_HOST),
-    int(os.environ.get(constants.ArtieEnvVariables.RPC_REGISTRY_PORT)),
+    os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME),
+    int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT)),
 )
 
 @enum.unique

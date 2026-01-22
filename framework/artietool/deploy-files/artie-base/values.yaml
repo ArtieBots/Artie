@@ -3,8 +3,8 @@ replicaCount: 1
 
 # Labels. Make sure these match those in artie-tooling/kubespec.py
 labels:
-  app.kubernetes.io/name: artie
   helm.sh/chart: '{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}'
+  app.kubernetes.io/name: artie
   app.kubernetes.io/managed-by: "{{ .Release.Service }}"
   app.kubernetes.io/instance: "{{ .Release.Name }}"
   app.kubernetes.io/version: "{{ .Chart.AppVersion }}"
@@ -20,14 +20,24 @@ namespace: artie
 # minReadySeconds: The default minimum number of seconds a pod should run without crashing for it to be considered working.
 minReadySeconds: 10
 
-# driverUpdateStrategy: The default update strategy for drivers is to take down the current running driver, then start the new one. It is important not to have more than one copy running at the same time.
+# driverUpdateStrategy: The default update strategy for drivers is to take down the current running driver, then start the new one.
+# It is important not to have more than one copy running at the same time.
 driverUpdateStrategy:
   type: RollingUpdate
   rollingUpdate:
     maxSurge: 0
     maxUnavailable: 1
 
-# telemetryUpdateStrategy: The default update strategy for telemetry deployments. For these, it is important to always have at least one running, so don't remove the old one until the new one is in place.
+# brokerUpdateStrategy: The default update strategy for the brokers.
+# For this, it is important to always have at least one running, so don't remove the old one until the new one is in place.
+brokerUpdateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 0
+
+# telemetryUpdateStrategy: The default update strategy for telemetry deployments.
+# For these, it is important to always have at least one running, so don't remove the old one until the new one is in place.
 telemetryUpdateStrategy:
   type: RollingUpdate
   rollingUpdate:
@@ -37,11 +47,17 @@ telemetryUpdateStrategy:
 # driverPriorityClass: The priority class for drivers.
 driverPriorityClass: driver-priority-level
 
+# brokerPriorityClass: The priority class for the brokers.
+brokerPriorityClass: broker-priority-level
+
 # telemetryPriorityClass: The priority class for telemetry deployments.
 telemetryPriorityClass: telemetry-priority-level
 
 # driverRestartPolicy: The restart policy for drivers.
 driverRestartPolicy: Always
+
+# brokerRestartPolicy: The restart policy for the brokers.
+brokerRestartPolicy: Always
 
 # telemetryRestartPolicy: The restart policy for telemetry deployments.
 telemetryRestartPolicy: Always
@@ -54,6 +70,8 @@ constantKeys:
   physicalBotNodeTaint: artie/physical-bot-node
 
 # baseEnvironment: Common env variables for most of the containers. Make sure these match those in artie-util/constants.py
+# These can be found in artie-util/constants.py as DEFAULT_ENV_VARS
+# and should be kept up to date with that file.
 baseEnvironment:
   - name: ARTIE_RUN_MODE
     value: production
@@ -67,24 +85,38 @@ baseEnvironment:
     value: "{{ .Values.ports.logCollector }}"
   - name: METRICS_SERVER_PORT
     value: "{{ .Values.ports.metricsCollector }}"
+  - name: RPC_BROKER_HOSTNAME
+    value: "{{ .Values.rpcBrokerHostName }}-{{ .Values.artieId }}"
+  - name: RPC_BROKER_PORT
+    value: "{{ .Values.ports.rpcBroker }}"
+
+# Minimum size of the broker cache PVC
+brokerCacheMinimumSize: 10Gi
 
 # controllerNodeName: The name of the controller node in the Artie bot. Defined in artie-tooling/kubespec.py
 controllerNodeName: "controller-node"
 
 # logCollectorHostName: The hostname of the log collector service.
+# Make sure this matches those found in all the Docker compose files for testing.
 logCollectorHostName: "log-collector"
 
 # ports: The various ports we need
+# Make sure these match those found in all the Docker compose files for testing.
 ports:
   resetDriver: 18861
   mouthDriver: 18862
   eyebrowsDriver: 18863
   logCollector: 5170
   metricsCollector: 8090
+  rpcBroker: 18864
   artieApiServer: 8782
 
 # repository: The repository we use for the images.
 repository: maxfieldstrange
+
+# rpcBrokerHostName: The hostname of the RPC broker service.
+# Make sure this matches those found in all the Docker compose files for testing.
+rpcBrokerHostName: "rpc-broker-service"
 
 # --------------- Stuff the user is expected to override --------------------
 

@@ -2,8 +2,6 @@
 This module contains K8S specification keys, utilities, and
 procedurally-generated structures used throughout Artie Tooling.
 
-Please see accompanying documentation for more details.
-
 Note that this module should NOT depend on actual kubernetes libraries.
 """
 from artie_tooling import hw_config
@@ -15,12 +13,14 @@ class TaintEffects(enum.StrEnum):
     """
     Possible effects of node taints.
     """
-    NO_SCHEDULE = "NoSchedule"
-    """Kubernetes will not schedule the pod onto that node."""
-    PREFER_NO_SCHEDULE = "PreferNoSchedule"  # Kubernetes will try to not schedule the pod onto the node
-    """Kubernetes will try to not schedule the pod onto the node."""
     NO_EXECUTE = "NoExecute"
     """The pod will be evicted from the node (if it is already running on the node), and will not be scheduled onto the node (if it is not yet running on the node)."""
+
+    NO_SCHEDULE = "NoSchedule"
+    """Kubernetes will not schedule the pod onto that node."""
+
+    PREFER_NO_SCHEDULE = "PreferNoSchedule"  # Kubernetes will try to not schedule the pod onto the node
+    """Kubernetes will try to not schedule the pod onto the node."""
 
 class ArtieK8sKeys(enum.StrEnum):
     """
@@ -28,56 +28,75 @@ class ArtieK8sKeys(enum.StrEnum):
     """
     ARTIE_ID = "artie/artie-id"
     """Label assigned to all Artie K8s objects to identify the Artie robot instance."""
+
+    CONTROLLER_NODE_TAINT = "artie/controller-node"
+    """Taint assigned to controller nodes to prevent scheduling of non-controller workloads."""
+
     NODE_ROLE = "artie/node-role"
     """Label assigned to nodes to identify their role in the Artie cluster."""
 
     PHYSICAL_BOT_NODE_TAINT = "artie/physical-bot-node"
     """Taint assigned to physical bot nodes to prevent scheduling of non-bot workloads."""
-    CONTROLLER_NODE_TAINT = "artie/controller-node"
-    """Taint assigned to controller nodes to prevent scheduling of non-controller workloads."""
+
+    STORAGE = "artie/storage"
+    """Label assigned to nodes to identify their storage type for persistent volumes when applicable (e.g., 'nfs')."""
 
 class ArtieK8sValues(enum.StrEnum):
     """
     An enum of known values for labels/annotations, etc.
     """
+    COMPONENT_HW_CONFIG = "hw-config"
+    """Value for app.kubernetes.io/component indicating this is the HW configuration mapping."""
+
+    COMPONENT_CERT_SECRET = "artie-api-server-cert"
+    """Value for app.kubernetes.io/component indicating this is the Artie API server certificate secret."""
+
+    COMPONENT_NAMESPACE = "namespace"
+    """Value for app.kubernetes.io/component indicating this is the Artie namespace."""
+
     DEFAULT_NAMESPACE = "artie"
     """The default Kubernetes namespace where Artie components are deployed. This can be overridden by the user."""
-
-    NAME = "artie"
-    """The name assigned to Artie K8s objects."""
-
-    MANAGED_BY_ARTIE_TOOLING = "artie-tooling"
-    """Value for app.kubernetes.io/managed-by indicating management by Artie Tooling."""
-    MANAGED_BY_HELM = "Helm"
-    """Value for app.kubernetes.io/managed-by indicating management by Helm."""
-
-    CONTROLLER_NODE_ID = "controller-node"
-    """Value for artie/node-role indicating a controller node. This is also the prefix for the controller node's name, suffixed by the Artie ID (lowercase)."""
 
     INSTANCE_INFRA = "artie-infrastructure"
     """Value for app.kubernetes.io/instance indicating infrastructure components."""
 
+    MANAGED_BY_ARTIE_TOOLING = "artie-tooling"
+    """Value for app.kubernetes.io/managed-by indicating management by Artie Tooling."""
+
+    MANAGED_BY_HELM = "Helm"
+    """Value for app.kubernetes.io/managed-by indicating management by Helm."""
+
+    NAME = "artie"
+    """The name assigned to Artie K8s objects."""
+
+    NODE_ROLE_ADMIN = "admin"
+    """The standard name for the admin node role. This indicates this node is the K8S admin node."""
+
+    NODE_ROLE_COMPUTE = "compute"
+    """The standard name for the compute node role. This indicates this node is a compute node."""
+
+    NODE_ROLE_CONTROLLER = "controller-node"
+    """The standard name for the controller node role."""
+
     PART_OF = "artie"
     """Value for app.kubernetes.io/part-of indicating part of the Artie ecosystem."""
 
-    COMPONENT_HW_CONFIG = "hw-config"
-    """Value for app.kubernetes.io/component indicating this is the HW configuration mapping."""
-    COMPONENT_CERT_SECRET = "artie-api-server-cert"
-    """Value for app.kubernetes.io/component indicating this is the Artie API server certificate secret."""
-    COMPONENT_NAMESPACE = "namespace"
-    """Value for app.kubernetes.io/component indicating this is the Artie namespace."""
+    STORAGE_LOCAL = "local"
+    """Value for artie/storage indicating local storage type."""
 
+    STORAGE_NFS = "nfs"
+    """Value for artie/storage indicating NFS storage type."""
 
 class ArtieK8sDefaultLabels(enum.StrEnum):
     """
     An enum of default labels applied to all Artie K8s objects.
     """
-    NAME = "app.kubernetes.io/name"
-    MANAGED_BY = "app.kubernetes.io/managed-by"
-    INSTANCE = "app.kubernetes.io/instance"
-    VERSION = "app.kubernetes.io/version"
     COMPONENT = "app.kubernetes.io/component"
+    INSTANCE = "app.kubernetes.io/instance"
+    MANAGED_BY = "app.kubernetes.io/managed-by"
+    NAME = "app.kubernetes.io/name"
     PART_OF = "app.kubernetes.io/part-of"
+    VERSION = "app.kubernetes.io/version"
 
 @dataclasses.dataclass
 class K8sObjectMeta:
@@ -286,7 +305,7 @@ def generate_node_taints(node_name: str) -> dict[str, str]:
     }
 
     # Controller node gets an additional taint
-    if node_name == ArtieK8sValues.CONTROLLER_NODE_ID:
+    if node_name == ArtieK8sValues.NODE_ROLE_CONTROLLER:
         node_taints[ArtieK8sKeys.CONTROLLER_NODE_TAINT] = ("true", TaintEffects.NO_SCHEDULE)
 
     return node_taints

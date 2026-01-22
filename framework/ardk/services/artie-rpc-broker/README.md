@@ -38,4 +38,20 @@ TODO: Here are some notes to compile into a fully-fleshed out document later:
 * Interface names MUST end in '-interface-vX', where X is the version number, starting with 1.
 * Need to figure out how to have multiple Arties in the same Kubernetes network. Right now
   I think the idea is we just append the Artie ID to each service name.
-*
+* The RPC broker can scale horizontally - i.e., there can be multiple
+  RPC broker pods running behind a single K8S Service object.
+  This means that whenever a service asks for a DNS lookup from the
+  broker service, we don't know which broker pod will handle that request.
+  This being the case, each broker pod must have the same DNS information.
+  We handle this by means of an externally-mounted persistent volume.
+  The base Helm Chart assumes a persistent volume with the name
+  "broker-cache-pv" exists and will attempt to match that PV to a
+  PVC (persistent volume claim) for the RPC Broker Service.
+  During Artie installation, we ensure that such a persistent volume
+  exists, by creating the PV specification based on user arguments,
+  which allow the user to either use a local PV, an NFS PV, or
+  a custom one. If a custom one is used, the user will need to
+  add their own CSI driver to the Kubernetes cluster.
+  The registry server contains a thread that is constantly monitoring the SHA of
+  the shared cache file. Whenever it changes, we invalidate the SHA, thereby
+  causing us to reload its contents.
