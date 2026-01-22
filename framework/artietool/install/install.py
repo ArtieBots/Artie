@@ -80,7 +80,7 @@ def _initialize_controller_node(args, sbc_config: hw_config.SBC, artie_name: str
 
     Returns: (success, controller node CA bundle, API server certificate)
     """
-    node_name = f"{kubespec.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
+    node_name = f"{kubespec.ArtieK8sValues.NODE_ROLE_CONTROLLER}-{artie_name}".lower()
 
     common.info(f"Initializing SBC: {sbc_config.name} (node: {node_name})...")
 
@@ -227,7 +227,7 @@ def install(args):
 
     # Assert that there is at least a controller node
     if artie_config.controller_node is None:
-        common.error(f"No {kubespec.ArtieK8sValues.CONTROLLER_NODE_ID} found in this Artie configuration. Cannot proceed with installation.")
+        common.error(f"No {kubespec.ArtieK8sValues.NODE_ROLE_CONTROLLER} found in this Artie configuration. Cannot proceed with installation.")
         retcode = 1
         return retcode
 
@@ -264,8 +264,8 @@ def install(args):
 
     # Initialize the controller node
     initialized_nodes = []
-    controller_node = next((sbc for sbc in artie_config.sbcs if sbc.name == kubespec.ArtieK8sValues.CONTROLLER_NODE_ID), None)
-    controller_node_name = f"{kubespec.ArtieK8sValues.CONTROLLER_NODE_ID}-{artie_name}".lower()
+    controller_node = next((sbc for sbc in artie_config.sbcs if sbc.name == kubespec.ArtieK8sValues.NODE_ROLE_CONTROLLER), None)
+    controller_node_name = f"{kubespec.ArtieK8sValues.NODE_ROLE_CONTROLLER}-{artie_name}".lower()
     if controller_node is None:
         common.error(f"No {controller_node_name} found in this Artie configuration. Cannot proceed with installation.")
         retcode = 1

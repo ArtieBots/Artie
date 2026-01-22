@@ -3,7 +3,7 @@ This module contains the code for a `Service` datastructure.
 """
 from artie_util import artie_logging as alog
 
-class Service:
+class ServiceRegistration:
     """
     This class represents a service that can be registered
     with the Artie RPC Broker.
@@ -19,7 +19,7 @@ class Service:
 
     def __eq__(self, value):
         return (
-            isinstance(value, Service) and
+            isinstance(value, ServiceRegistration) and
             self.fully_qualified_name == value.fully_qualified_name and
             self.host == value.host and
             self.port == value.port

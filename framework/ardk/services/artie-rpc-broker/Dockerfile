@@ -11,7 +11,8 @@ ENV LOGLEVEL=info
 ENV ARTIE_RUN_MODE=production
 ARG GIT_TAG=unversioned
 ENV ARTIE_GIT_TAG=${GIT_TAG}
+ENV BROKER_CACHE_PATH=/broker-cache
 
 # Default command is to run the application
 WORKDIR /src
-CMD [ "/bin/bash", "-c", "python main.py --port ${PORT} --loglevel ${LOGLEVEL}" ]
+CMD [ "/bin/bash", "-c", "python main.py --port ${PORT} --loglevel ${LOGLEVEL} --broker-cache-path ${BROKER_CACHE_PATH}" ]

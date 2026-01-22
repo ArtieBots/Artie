@@ -4,8 +4,12 @@ class ArtieEnvVariables(enum.StrEnum):
     """
     Various env-mapped configuration keys.
 
-    These come from either the environment variables set in Kubernetes (by means of the Helm Chart),
-    or from the Docker run command line.
+    These come from either the environment variables set in Kubernetes
+    (by means of the Helm Chart - see framework/artietool/deploy-files/artie-base/values.yaml),
+    or from the Docker run command line (for testing).
+
+    If you update these, make sure to also update the Helm Chart values
+    in framework/artietool/deploy-files/artie-base/values.yaml under baseEnvironment.
     """
     ARTIE_ID = "ARTIE_ID"
     ARTIE_RUN_MODE = "ARTIE_RUN_MODE"
@@ -13,8 +17,8 @@ class ArtieEnvVariables(enum.StrEnum):
     LOG_COLLECTOR_HOSTNAME = "LOG_COLLECTOR_HOSTNAME"
     LOG_COLLECTOR_PORT = "LOG_COLLECTOR_PORT"
     METRICS_SERVER_PORT = "METRICS_SERVER_PORT"
-    RPC_REGISTRY_HOST = "RPC_REGISTRY_HOST"
-    RPC_REGISTRY_PORT = "RPC_REGISTRY_PORT"
+    RPC_BROKER_HOSTNAME = "RPC_BROKER_HOSTNAME"
+    RPC_BROKER_PORT = "RPC_BROKER_PORT"
 
 class ArtieRunModes(enum.StrEnum):
     """
