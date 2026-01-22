@@ -56,6 +56,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS)
+    @interfaces.interface_method(interfaces.DriverInterfaceV1)
     def status(self) -> Dict[str, str]:
         """
         Return the status of this service's submodules.
@@ -66,6 +67,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("self_check", alog.MetricSWCodePathAPIOrder.CALLS)
+    @interfaces.interface_method(interfaces.DriverInterfaceV1)
     def self_check(self):
         """
         Run a self diagnostics check and set our submodule statuses appropriately.
@@ -78,6 +80,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("led_on", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_on(self, side: str) -> bool:
         """
         RPC method to turn led on.
@@ -94,6 +97,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("led_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_off(self, side: str) -> bool:
         """
         RPC method to turn led off.
@@ -110,6 +114,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("led_heartbeat", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_heartbeat(self, side: str) -> bool:
         """
         RPC method to turn the led to heartbeat mode.
@@ -126,6 +131,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("led_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_get(self, side: str) -> str:
         """
         RPC method to get the state of the given LED.
