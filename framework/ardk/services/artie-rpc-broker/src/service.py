@@ -27,3 +27,17 @@ class ServiceRegistration:
 
     def __hash__(self):
         return hash((self.fully_qualified_name, self.host, self.port))
+
+    @staticmethod
+    def from_cache_line(line: str) -> 'ServiceRegistration':
+        """Creates a ServiceRegistration from a line in the cache file."""
+        parts = line.strip().split(",")
+        if len(parts) != 3:
+            alog.error(f"Invalid cache line: {line}")
+            raise ValueError(f"Invalid cache line: {line}")
+        fully_qualified_name, host, port_str = parts
+        return ServiceRegistration(fully_qualified_name, host, int(port_str))
+
+    def to_cache_line(self) -> str:
+        """Converts the service registration to a line for the cache file."""
+        return f"{self.fully_qualified_name},{self.host},{self.port}"
