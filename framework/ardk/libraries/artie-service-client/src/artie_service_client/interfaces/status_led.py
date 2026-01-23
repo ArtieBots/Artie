@@ -7,7 +7,8 @@ class StatusLEDInterfaceV1:
     `StatusLEDInterfaceV1` is a mixin to be used by all RPC services that
     control at least one status LED.
     """
-    def __interface_name__(self) -> str:
+    @staticmethod
+    def __interface_name__() -> str:
         """Return the name of this interface. All interfaces must implement this method."""
         return "status-led-interface-v1"
 

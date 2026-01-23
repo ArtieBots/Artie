@@ -42,6 +42,7 @@ class FirmwareSubmodule:
             alog.error(f"Given a FW file path of {self._fw_fpath}, but it doesn't exist.")
             return False
 
+        # No CAN bus in test mode
         if util.in_test_mode():
             alog.test("Mocking MCU FW load.", tests=['mouth-driver-unit-tests:init-mcu'])
 
@@ -50,12 +51,27 @@ class FirmwareSubmodule:
         pass
 
         # Reset the MCU to start running the new FW
-        worked = asc.reset(board.MCU_RESET_ADDR_MOUTH, ipv6=self._ipv6)
+        worked = self.reset()
         time.sleep(0.1)  # Give it a moment to come back online
 
         # Sanity check that the MCU is present on the I2C bus
         worked &= self._check_mcu()
         self._set_status(worked)
+        return worked
+
+    def reset(self) -> bool:
+        """
+        Attempt to reset the MCU. Return True if we succeed, False if we fail.
+        """
+        alog.info(f"Reseting {board.MCU_RESET_ADDR_MOUTH}")
+
+        # No CAN bus in test mode
+        if util.in_test_mode():
+            alog.info("Mocking a CAN call for reset.")
+            return True
+
+        # TODO: Use CAN to reset the MCU
+        worked = True
         return worked
 
     def _check_mcu(self) -> bool:
@@ -64,6 +80,7 @@ class FirmwareSubmodule:
         Log the results and return `False` if not found or `True`
         if it is.
         """
+        # TODO: Update to use CAN
         i2cinstance = i2c.check_for_address(board.I2C_ADDRESS_MOUTH_MCU)
         if i2cinstance is None:
             alog.error("Cannot find mouth on the I2C bus. Mouth will not be available.")

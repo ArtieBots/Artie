@@ -10,7 +10,8 @@ class ServiceInterfaceV1:
     """
     `ServiceInterfaceV1` is a mixin to be used by all RPC services in Artie.
     """
-    def __interface_name__(self) -> str:
+    @staticmethod
+    def __interface_name__() -> str:
         """Return the name of this interface. All interfaces must implement this method."""
         return "service-interface-v1"
 
