@@ -7,7 +7,8 @@ class DriverInterfaceV1:
     """
     `DriverInterfaceV1` is a mixin to be used by all RPC driver services in Artie.
     """
-    def __interface_name__(self) -> str:
+    @staticmethod
+    def __interface_name__() -> str:
         """Return the name of this interface. All interfaces must implement this method."""
         return "driver-interface-v1"
 

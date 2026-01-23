@@ -301,7 +301,7 @@ class MetricHWPhylum(_MetricEnumMixin, enum.Enum):
 class MetricSWPhylum(_MetricEnumMixin, enum.Enum):
     """sw.X: SW branch of metrics taxonomy comes in several phyla."""
     _parent = MetricKingdom.SOFTWARE
-    
+
     CODE_PATHS = "code_paths", _parent
     """Metrics related to code paths, such as function call counts and latencies."""
 
@@ -382,7 +382,7 @@ class MetricHWSensorClass(_MetricEnumMixin, enum.Enum):
 class MetricSWCodePathsClass(_MetricEnumMixin, enum.Enum):
     """sw.code_paths.X: Code-path-related metrics classes."""
     _parent = MetricSWPhylum.CODE_PATHS
-    
+
     API = "api", _parent
     """API-related metrics."""
 

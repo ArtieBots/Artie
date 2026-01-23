@@ -8,6 +8,7 @@ import os
 import rpyc
 from artie_util import artie_logging as alog
 from artie_util import constants
+from artie_util import util
 from rpyc.utils.registry import TCPRegistryClient
 
 class ArtieRPCService(rpyc.Service):
@@ -25,7 +26,7 @@ class ArtieRPCService(rpyc.Service):
 
         # Args
         self.port = port
-        self.registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME), int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT)))
+        self.registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864)))
 
         # Fully-qualified service name, including interface names
         self.fully_qualified_name = self.get_fully_qualified_name()
