@@ -32,6 +32,7 @@ SERVICE_NAME = "mouth-driver"
 class DriverServer(
     interfaces.ServiceInterfaceV1,
     interfaces.DriverInterfaceV1,
+    interfaces.MCUInterfaceV1,
     interfaces.StatusLEDInterfaceV1,
     artie_service.ArtieRPCService
     ):
@@ -185,8 +186,9 @@ class DriverServer(
         return self._lcd_submodule.talk()
 
     @rpyc.exposed
-    @alog.function_counter("firmware_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
-    def firmware_load(self):
+    @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_fw_load(self):
         """
         RPC method to (re)load the FW on the mouth MCU.
         This will also reinitialize the LED and LCD.
@@ -205,6 +207,80 @@ class DriverServer(
         self.led_heartbeat()
 
         return worked
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_list(self) -> list[str]:
+        """
+        Return a list of MCU IDs that this service is responsible for.
+        """
+        return [fw.MOUTH_MCU_NAME]
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_reset(self, mcu_id=fw.MOUTH_MCU_NAME) -> bool:
+        """
+        Reset the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to reset.
+
+        *Returns*: `True` if the reset was successful, `False` otherwise.
+        """
+        if mcu_id != fw.MOUTH_MCU_NAME:
+            raise ValueError(f"Invalid MCU ID: {mcu_id}")
+
+        return self._fw_submodule.reset()
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_self_check", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_self_check(self, mcu_id=fw.MOUTH_MCU_NAME):
+        """
+        Run a self diagnostics check and set our submodule statuses appropriately.
+        """
+        if mcu_id != fw.MOUTH_MCU_NAME:
+            raise ValueError(f"Invalid MCU ID: {mcu_id}")
+
+        self._fw_submodule.self_check()
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_status(self, mcu_id=fw.MOUTH_MCU_NAME) -> str:
+        """
+        Return the status of the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to get status for.
+
+        *Returns*: A string representing the status of the MCU. This string
+        should be one of the enum values of `artie_util.constants.SubmoduleStatuses`.
+        """
+        if mcu_id != fw.MOUTH_MCU_NAME:
+            raise ValueError(f"Invalid MCU ID: {mcu_id}")
+
+        status = self._fw_submodule.status()
+        return status["FW"]
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_version", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_version(self, mcu_id=fw.MOUTH_MCU_NAME) -> str:
+        """
+        Return the firmware version information for the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to get version information for.
+
+        *Returns*: A string representing the firmware version of the MCU.
+        """
+        if mcu_id != fw.MOUTH_MCU_NAME:
+            raise ValueError(f"Invalid MCU ID: {mcu_id}")
+
+        return self._fw_submodule.version()
 
 
 if __name__ == "__main__":

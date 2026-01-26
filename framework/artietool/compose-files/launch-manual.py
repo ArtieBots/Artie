@@ -24,7 +24,7 @@ def get_dependency_names(fpath: str) -> List[str]:
         docker_compose = yaml.safe_load(f)
 
     dependencies = []
-    exp = re.compile("\$\{.+\}")
+    exp = re.compile(r"\$\{.+\}")
     services = [k for k in docker_compose['services'].keys()]
     for service in services:
         service_def = docker_compose['services'][service]
@@ -78,6 +78,8 @@ def determine_image_dependencies(fpath: str) -> List[str]:
                 docker_images.append((depname, retrieve_latest_docker_image("artie-metrics-collector")))
             case "ARTIE_API_SERVER_TEST_IMAGE":
                 docker_images.append((depname, retrieve_latest_docker_image("artie-api-server")))
+            case "RPC_BROKER_TEST_IMAGE":
+                docker_images.append((depname, retrieve_latest_docker_image("artie-rpc-broker")))
             case _:
                 print(f"Unrecognized value for a dependant image. Program me! {depname}")
                 exit(1)

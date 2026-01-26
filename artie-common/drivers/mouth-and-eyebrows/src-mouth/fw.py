@@ -10,6 +10,9 @@ from artie_util import util
 import os
 import time
 
+# TODO: Decide on proper MCU naming conventions
+MOUTH_MCU_NAME = "mouth"
+
 class FirmwareSubmodule:
     def __init__(self, fw_fpath: str, ipv6=False) -> None:
         self._fw_fpath = fw_fpath
@@ -67,12 +70,25 @@ class FirmwareSubmodule:
 
         # No CAN bus in test mode
         if util.in_test_mode():
-            alog.info("Mocking a CAN call for reset.")
+            alog.test("Mocking a CAN call for reset.", tests=['*-integration-tests:*'])
             return True
 
         # TODO: Use CAN to reset the MCU
         worked = True
         return worked
+
+    def version(self) -> str:
+        """
+        Return the firmware version string of the MCU.
+        """
+        # No CAN bus in test mode
+        if util.in_test_mode():
+            alog.test("Mocking a CAN call for version.", tests=[])  # TODO: Add test for this method
+            return "MOUTH_MCU_FW_V1.0.0-MOCK"
+
+        # TODO: Use CAN to get the version string
+        version_str = "unknown"
+        return version_str
 
     def _check_mcu(self) -> bool:
         """
