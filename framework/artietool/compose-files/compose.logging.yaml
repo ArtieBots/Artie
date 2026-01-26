@@ -4,16 +4,23 @@ networks:
     external: true
 
 services:
-  reset-driver:
-    command: python main.py /conf/mcu-fw.elf --port 18861 --loglevel info
-    container_name: logging-itest-reset-driver
+  log-collector:
+    container_name: logging-itest-log-collector
+    image: ${LOG_COLLECTOR_TEST_IMAGE}
+    expose:
+      - 5170
+    networks:
+      - logging-itest
+
+  artie-rpc-broker:
+    container_name: logging-itest-rpc-broker
+    image: ${RPC_BROKER_TEST_IMAGE}
     depends_on:
       - log-collector
     expose:
-      - 18861
+      - 18864
     networks:
       - logging-itest
-    image: ${RESET_TEST_IMAGE}
     environment:
       - ARTIE_RUN_MODE=integration
       - LOG_COLLECTOR_HOSTNAME=log-collector
@@ -24,8 +31,8 @@ services:
     command: python -m src.main /conf/mcu-fw.elf --port 18863 --loglevel info
     container_name: logging-itest-eyebrows-driver
     depends_on:
-      - reset-driver
       - log-collector
+      - artie-rpc-broker
     image: ${EYEBROWS_TEST_IMAGE}
     expose:
       - 18863
@@ -36,22 +43,16 @@ services:
       - LOG_COLLECTOR_HOSTNAME=log-collector
       - LOG_COLLECTOR_PORT=5170
       - METRICS_SERVER_PORT=8090
-
-  log-collector:
-    container_name: logging-itest-log-collector
-    image: ${LOG_COLLECTOR_TEST_IMAGE}
-    expose:
-      - 5170
-    networks:
-      - logging-itest
+      - RPC_BROKER_HOSTNAME=artie-rpc-broker
+      - RPC_BROKER_PORT=18864
 
   artie-api-server:
     container_name: logging-itest-api-server
     image: ${ARTIE_API_SERVER_TEST_IMAGE}
     depends_on:
       - eyebrows-driver
-      - reset-driver
       - log-collector
+      - artie-rpc-broker
     expose:
       - 8782
     networks:
@@ -62,3 +63,5 @@ services:
       - LOG_COLLECTOR_PORT=5170
       - METRICS_SERVER_PORT=8090
       - PORT=8782
+      - RPC_BROKER_HOSTNAME=artie-rpc-broker
+      - RPC_BROKER_PORT=18864

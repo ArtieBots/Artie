@@ -103,7 +103,6 @@ logCollectorHostName: "log-collector"
 # ports: The various ports we need
 # Make sure these match those found in all the Docker compose files for testing.
 ports:
-  resetDriver: 18861
   mouthDriver: 18862
   eyebrowsDriver: 18863
   logCollector: 5170

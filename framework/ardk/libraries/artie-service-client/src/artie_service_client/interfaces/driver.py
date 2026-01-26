@@ -1,8 +1,6 @@
 """
 This module contains the code for the `DriverInterface` mixin.
 """
-from typing import Dict
-
 class DriverInterfaceV1:
     """
     `DriverInterfaceV1` is a mixin to be used by all RPC driver services in Artie.
@@ -12,7 +10,7 @@ class DriverInterfaceV1:
         """Return the name of this interface. All interfaces must implement this method."""
         return "driver-interface-v1"
 
-    def status(self) -> Dict[str, str]:
+    def status(self) -> dict[str, str]:
         """
         Return the status of this service's submodules.
 

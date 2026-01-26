@@ -1,5 +1,7 @@
 # API for Eyebrow Module
 
+TODO: Update this document to use the general interface documents.
+
 Eyebrows states are given as a tuple of three items per eyebrow: L/M/H x3.
 
 For example:
@@ -34,7 +36,7 @@ Change the eyebrow display to show the given state.
         ```json
         {
             "artie-id": "The Artie ID.",
-            "eyebrow-side": "left or right",
+            "which": "left or right",
             "vertices": ["H/M/L", "H/M/L", "H/M/L"] OR "test" OR "clear" or "error"
         }
         ```
@@ -57,28 +59,10 @@ Erase the contents on an eyebrow LCD.
         * `artie-id`: The Artie ID.
     * *Payload*: None
 
-## Update Eyebrow LED State
+## Status LED Interface
 
-* *POST*: `/eyebrows/led/<which>` where `<which>` is `left` or `right`.
-    * *Parameters*:
-        * `artie-id`: The Artie ID.
-        * `state`: One of `on`, `off`, or `heartbeat`
-    * *Payload*: None
-
-## Get Eyebrow LED State
-
-* *GET*: `/eyebrows/led/<which>` where `<which>` is `left` or `right`.
-    * *Parameters*:
-        * `artie-id`: The Artie ID.
-* *Response 200*:
-    * *Payload (JSON)*:
-        ```json
-        {
-            "artie-id": "The Artie ID.",
-            "eyebrow-side": "left or right",
-            "state": "on, off, or heartbeat"
-        }
-        ```
+The eyebrows driver implements the [status LED interface](./api-interface-statusled.md),
+where `<which>` can be either of `left` or `right`.
 
 ## Update Eyeball Servo Positions
 
@@ -106,19 +90,14 @@ which will typically be the value that it was last set to (or its starting value
         ```json
         {
             "artie-id": "The Artie ID.",
-            "eyebrow-side": "left or right",
+            "which": "left or right",
             "degrees": "floating point value between 0 (left) and 180 (right)"
         }
         ```
 
-## Reload Eyebrow Firmware
+## MCU Stuff: TODO
 
-Reload both eyebrow MCU firmwares (you cannot target them individually).
-
-* *POST*: `/eyebrows/fw`
-    * *Parameters*:
-        * `artie-id`: The Artie ID.
-    * *Payload*: None
+TODO: MCU interface
 
 ## Get Status
 

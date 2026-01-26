@@ -15,16 +15,16 @@ import time
 class FirmwareSubmodule:
     def __init__(self, fw_fpath: str, ipv6=False) -> None:
         self._fw_fpath = fw_fpath
-        self._left_status = constants.SubmoduleStatuses.UNKNOWN
-        self._right_status = constants.SubmoduleStatuses.UNKNOWN
+        self.left_status = constants.SubmoduleStatuses.UNKNOWN
+        self.right_status = constants.SubmoduleStatuses.UNKNOWN
         self.firmware_status = constants.SubmoduleStatuses.UNKNOWN
         self._ipv6 = ipv6
 
     def _set_mcu_status(self, mcu: str, status):
         if mcu == 'left':
-            self._left_status = status
+            self.left_status = status
         else:
-            self._right_status = status
+            self.right_status = status
 
     def _check_mcu(self, mcu: str) -> bool:
         """
@@ -42,13 +42,20 @@ class FirmwareSubmodule:
             self._set_mcu_status(mcu, constants.SubmoduleStatuses.WORKING)
             return True
 
-    def self_check(self):
+    def self_check_all(self):
         alog.test("Checking FW subsystem...", tests=['eyebrows-driver-unit-tests:self-check'])
-        self._check_mcu('left')
-        self._check_mcu('right')
-        if self._left_status == constants.SubmoduleStatuses.WORKING and self._right_status == constants.SubmoduleStatuses.WORKING:
+        self._check_mcu("left")
+        self._check_mcu("right")
+
+    def self_check(self, mcu_id: str):
+        """
+        Run a self diagnostics check on the given MCU ID and set our submodule statuses appropriately.
+        """
+        alog.info(f"Checking FW subsystem for {mcu_id}...")
+        self._check_mcu(mcu_id)
+        if self.left_status == constants.SubmoduleStatuses.WORKING and self.right_status == constants.SubmoduleStatuses.WORKING:
             self.firmware_status = constants.SubmoduleStatuses.WORKING
-        elif self._left_status == constants.SubmoduleStatuses.NOT_WORKING and self._right_status == constants.SubmoduleStatuses.NOT_WORKING:
+        elif self.left_status == constants.SubmoduleStatuses.NOT_WORKING and self.right_status == constants.SubmoduleStatuses.NOT_WORKING:
             self.firmware_status = constants.SubmoduleStatuses.NOT_WORKING
         else:
             self.firmware_status = constants.SubmoduleStatuses.DEGRADED
@@ -84,17 +91,29 @@ class FirmwareSubmodule:
         worked &= self._check_mcu("right")
         return worked
 
-    def reset(self) -> bool:
+    def reset(self, mcu_id: str) -> bool:
         """
-        Attempt to reset the MCUs. Return True if we succeed, False if we fail.
+        Attempt to reset the given MCU. Return True if we succeed, False if we fail.
         """
-        alog.info(f"Reseting {board.MCU_RESET_ADDR_RL_EYEBROWS}")
+        alog.info(f"Reseting {mcu_id} MCU.")
 
         # No CAN bus in test mode
         if util.in_test_mode():
-            alog.info("Mocking a CAN call for reset.")
+            alog.test("Mocking a CAN call for reset.", tests=['*-integration-tests:*'])
             return True
 
         # TODO: Use CAN to reset the MCUs
         worked = True
         return worked
+
+    def version(self, mcu_id: str) -> str:
+        """
+        Return the firmware version information for the given MCU ID.
+        """
+        # In test mode, return a mock version
+        if util.in_test_mode():
+            alog.test("Mocking MCU FW version.", tests=[])  # TODO: Need to add test for this method
+            return "1.2.3-mock"
+
+        # TODO: Use CAN to get the version info
+        return "unknown"

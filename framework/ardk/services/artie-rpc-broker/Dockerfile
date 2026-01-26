@@ -14,5 +14,5 @@ ENV ARTIE_GIT_TAG=${GIT_TAG}
 ENV BROKER_CACHE_PATH=/broker-cache
 
 # Default command is to run the application
-WORKDIR /src
-CMD [ "/bin/bash", "-c", "python main.py --port ${PORT} --loglevel ${LOGLEVEL} --broker-cache-path ${BROKER_CACHE_PATH}" ]
+WORKDIR /
+CMD [ "/bin/bash", "-c", "python -m src.main --port ${PORT} --loglevel ${LOGLEVEL} --broker-cache-path ${BROKER_CACHE_PATH}" ]

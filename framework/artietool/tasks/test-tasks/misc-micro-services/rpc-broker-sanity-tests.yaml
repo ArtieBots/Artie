@@ -1,0 +1,16 @@
+name: rpc-broker-sanity-tests
+labels:
+  - docker-image
+  - sanity
+dependencies:
+  - artie-rpc-broker: docker-image
+type: test
+steps:
+  - job: single-container-sanity-suite
+    steps:
+      - test-name: start-rpc-broker
+        docker-image-under-test:
+          dependency:
+            name: docker-image
+            producing-task: artie-rpc-broker
+        cmd-to-run-in-dut: "python -m src.main --loglevel info --help"

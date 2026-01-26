@@ -1,4 +1,5 @@
 from .driver import *
+from .mcu import *
 from .service import *
 from .status_led import *
 

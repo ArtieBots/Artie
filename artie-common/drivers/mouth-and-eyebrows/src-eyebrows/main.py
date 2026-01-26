@@ -37,6 +37,7 @@ SERVICE_NAME = "eyebrows-service"
 class DriverServer(
     interfaces.ServiceInterfaceV1,
     interfaces.DriverInterfaceV1,
+    interfaces.MCUInterfaceV1,
     interfaces.StatusLEDInterfaceV1,
     artie_service.ArtieRPCService
     ):
@@ -73,7 +74,7 @@ class DriverServer(
         Run a self diagnostics check and set our submodule statuses appropriately.
         """
         alog.info("Running self check...")
-        self._fw_submodule.self_check()
+        self._fw_submodule.self_check_all()
         self._led_submodule.self_check()
         self._lcd_submodule.self_check()
         self._servo_submodule.self_check()
@@ -198,15 +199,15 @@ class DriverServer(
         return self._lcd_submodule.get(side)
 
     @rpyc.exposed
-    @alog.function_counter("firmware_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
-    def firmware_load(self) -> bool:
+    @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_fw_load(self, mcu_id: str) -> bool:
         """
-        RPC method to (re)load the FW on both MCUs. This will also
-        reinitialize the LCDs and LEDs.
+        Load firmware onto the given MCU ID.
 
-        Returns
-        -------
-        bool: True if we do not detect an error. False otherwise.
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to load firmware onto.
+        *Returns*: `True` if the firmware load was successful, `False` otherwise.
         """
         alog.info("Reloading FW...")
         worked = self._fw_submodule.initialize_mcus()
@@ -216,6 +217,69 @@ class DriverServer(
         worked &= self._lcd_submodule.initialize()
 
         return worked
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_list(self) -> List[str]:
+        """
+        Return a list of MCU IDs that this service is responsible for.
+        """
+        return list(ebcommon.MCU_ADDRESS_MAP.keys())
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_reset(self, mcu_id):
+        """
+        Reset the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to reset.
+        """
+        return self._fw_submodule.reset(mcu_id)
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_self_check", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_self_check(self, mcu_id: str):
+        """
+        Run a self diagnostics check on the given MCU and set our submodule statuses appropriately.
+        """
+        return self._fw_submodule.self_check(mcu_id)
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_status(self, mcu_id: str) -> str:
+        """
+        Return the status of the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to get status for.
+        *Returns*: A string representing the status of the MCU. This string
+        should be one of the enum values of `artie_util.constants.SubmoduleStatuses`.
+        """
+        if mcu_id == "left":
+            return self._fw_submodule.left_status
+        elif mcu_id == "right":
+            return self._fw_submodule.right_status
+        else:
+            alog.error(f"Requested status for invalid MCU ID {mcu_id}.")
+            return constants.SubmoduleStatuses.UNKNOWN
+
+    @rpyc.exposed
+    @alog.function_counter("mcu_version", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @interfaces.interface_method(interfaces.MCUInterfaceV1)
+    def mcu_version(self, mcu_id: str) -> str:
+        """
+        Return the firmware version information for the given MCU ID.
+
+        * *Parameters*:
+            * `mcu_id`: The ID of the MCU to get version information for.
+        *Returns*: A string representing the firmware version of the MCU.
+        """
+        return self._fw_submodule.version(mcu_id)
 
     @rpyc.exposed
     @alog.function_counter("servo_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.SERVO})

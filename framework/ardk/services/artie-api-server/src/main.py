@@ -1,6 +1,5 @@
 from artie_util import artie_logging as alog
 from artie_util import util
-from drivers import reset_api
 from drivers import mouth_api
 from drivers import eyebrows_api
 from telemetry import logs_api
@@ -22,7 +21,6 @@ util.generate_self_signed_cert(certfpath, keyfpath, days=None, force=True)
 
 # Initialization
 app = flask.Flask(__name__)
-app.register_blueprint(reset_api.reset_api)
 app.register_blueprint(mouth_api.mouth_api)
 app.register_blueprint(eyebrows_api.eyebrows_api)
 app.register_blueprint(logs_api.logs_api)
