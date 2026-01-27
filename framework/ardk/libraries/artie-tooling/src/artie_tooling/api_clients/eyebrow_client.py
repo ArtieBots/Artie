@@ -176,7 +176,7 @@ class EyebrowClient(api_client.APIClient):
             degrees=response.json().get('degrees')
         )
 
-    def firmware_load(self) -> errors.HTTPError|None:
+    def mcu_fw_load(self) -> errors.HTTPError|None:
         response = self.post(f"/eyebrows/fw", params={'artie-id': self.artie.artie_name})
         if response.status_code != 200:
             return errors.HTTPError(response.status_code, f"Error reloading eyebrow FW: {response.content.decode('utf-8')}")
