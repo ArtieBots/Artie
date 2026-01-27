@@ -106,7 +106,7 @@ def print_compose_command(deps: List[Tuple[str, str]], fpath: str, network_name:
             s += f'$Env:{env_var}="{value}"' + os.linesep
         else:
             s += f"export {env_var}={value}" + os.linesep
-    s += f"docker network create {network_name} || echo 'Network {network_name} already exists.'" + os.linesep
+    s += f"docker network create {network_name}" + os.linesep
     s += f"docker compose -f {fpath} up --abort-on-container-exit --always-recreate-deps --attach-dependencies --force-recreate --remove-orphans --renew-anon-volumes"
     print(s)
     print("")

@@ -157,6 +157,9 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         Registers the given host and port under the given service names,
         which should be a list of fully-qualified names.
         """
+        if issubclass(type(names), str):
+            names = [names]
+
         alog.debug(f"Registering {host}:{port} as {', '.join(names)}")
 
         for name in names:
