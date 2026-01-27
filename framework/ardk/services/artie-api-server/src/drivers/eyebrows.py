@@ -113,15 +113,14 @@ def get_led(which: str, artie_id: str) -> Tuple[None|int, LEDStates|str]:
     except Exception as e:
         return 500, f"Error trying to get the {which} eyebrow LED state: {e}"
 
-def reload_firmware(artie_id: str) -> Tuple[int|None, str|None]:
+def reload_firmware(which: str, artie_id: str) -> Tuple[int|None, str|None]:
     """
-    Reloads the eyebrow MCU firmware (for both MCUs) and returns a tuple of the form
+    Reloads the eyebrow MCU firmware and returns a tuple of the form
     (errorcode|None, errmsg|None)
     """
     try:
         connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
-        worked = connection.mcu_fw_load("left")
-        worked &= connection.mcu_fw_load("right")
+        worked = connection.mcu_fw_load(which)
         if not worked:
             return 500, f"Error trying to reload FW."
     except TimeoutError as e:

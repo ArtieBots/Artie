@@ -453,13 +453,13 @@ def get_eyebrows_servo(which: str):
             "degrees": f"{errmsg_or_degrees}"
         }
 
-@eyebrows_api.route("/fw", methods=["POST"])
+@eyebrows_api.route("/fw/<which>", methods=["POST"])
 @alog.function_counter("reload_eyebrows_firmware", alog.MetricSWCodePathAPIOrder.CALLS)
-def reload_eyebrows_firmware():
+def reload_eyebrows_firmware(which: str):
     """
-    Reload both eyebrow MCU firmwares (you cannot target them individually).
+    Reload eyebrow MCU firmware.
 
-    * *POST*: `/eyebrows/fw`
+    * *POST*: `/eyebrows/fw/<which>` where `<which>` is `left` or `right`.
         * *Parameters*:
             * `artie-id`: The Artie ID.
         * *Payload*: None
@@ -471,17 +471,25 @@ def reload_eyebrows_firmware():
             "error": "Missing artie-id parameter."
         }
         return errbody, 400
+    elif which not in ('left', 'right'):
+        errbody = {
+            "artie-id": r.args['artie-id'],
+            "error": "Need either 'left' or 'right'"
+        }
+        return errbody, 404
 
-    err, errmsg = eyebrows.reload_firmware(artie_id=r.args['artie-id'])
+    err, errmsg = eyebrows.reload_firmware(which, artie_id=r.args['artie-id'])
     if err:
         errbody = {
             "artie-id": r.args['artie-id'],
+            "eyebrow-side": which,
             "error": f"{errmsg}"
         }
         return errbody, err
     else:
         return {
-            "artie-id": r.args['artie-id']
+            "artie-id": r.args['artie-id'],
+            "eyebrow-side": which
         }
 
 @eyebrows_api.route("/status", methods=["GET"])
