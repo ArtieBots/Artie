@@ -162,9 +162,9 @@ def _check_servo_range(arg):
 #########################################################################################
 ################################# FW Subsystem ##########################################
 #########################################################################################
-def _cmd_firmware_load(args):
+def _cmd_mcu_fw_load(args):
     client = _connect_client(args)
-    common.format_print_result(client.firmware_load(), "eyebrows", "FW", args.artie_id)
+    common.format_print_result(client.mcu_fw_load(), "eyebrows", "FW", args.artie_id)
 
 #########################################################################################
 ################################# Status Commands #######################################
@@ -208,7 +208,7 @@ def _fill_fw_subparser(parser: argparse.ArgumentParser, parent: argparse.Argumen
 
     # Load command
     p = subparsers.add_parser("load", help="(Re)load the firmware. Targets both sides at once.", parents=[option_parser])
-    p.set_defaults(cmd=_cmd_firmware_load)
+    p.set_defaults(cmd=_cmd_mcu_fw_load)
 
 def _fill_servo_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(title="servo", description="The Servo subsystem")
