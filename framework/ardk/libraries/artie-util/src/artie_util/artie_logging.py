@@ -593,6 +593,7 @@ class MetricSWResourceUsageApplicationOrder(_MetricEnumMixin, enum.Enum):
     UPTIME = "uptime", _parent
     """Application uptime metrics."""
 
+
 ################################ Metric Families #######################################
 
 class MetricSWCodePathAPICallFamily(enum.StrEnum):

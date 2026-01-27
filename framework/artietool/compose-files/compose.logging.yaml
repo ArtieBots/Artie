@@ -13,6 +13,7 @@ services:
       - logging-itest
 
   artie-rpc-broker:
+    command: python -m src.main --port 18864 --loglevel debug
     container_name: logging-itest-rpc-broker
     image: ${RPC_BROKER_TEST_IMAGE}
     depends_on:

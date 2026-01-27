@@ -5,6 +5,7 @@ networks:
 
 services:
   artie-rpc-broker:
+    command: python -m src.main --port 18864 --loglevel debug
     container_name: telemetry-itest-rpc-broker
     image: ${RPC_BROKER_TEST_IMAGE}
     expose:

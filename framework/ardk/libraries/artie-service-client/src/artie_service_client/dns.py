@@ -64,6 +64,9 @@ class ServiceQuery:
     def __hash__(self):
         return hash((self.query_type, tuple(self.data) if isinstance(self.data, list) else self.data))
 
+    def __str__(self):
+        return f"{self.data}"
+
     @staticmethod
     def from_string(query: str) -> 'ServiceQuery':
         """
