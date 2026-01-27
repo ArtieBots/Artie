@@ -83,7 +83,8 @@ class FirmwareSubmodule:
         pass
 
         # Reset the eyebrows
-        worked &= self.reset()
+        worked &= self.reset("left")
+        worked &= self.reset("right")
         time.sleep(0.1)  # Give it a moment to come back online
 
         # Sanity check that both MCUs are present on the I2C bus

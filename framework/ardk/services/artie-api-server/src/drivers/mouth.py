@@ -124,7 +124,7 @@ def reload_firmware(artie_id: str) -> Tuple[int|None, str|None]:
     """
     try:
         connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
-        worked = connection.firmware_load()
+        worked = connection.mcu_fw_load()
         if not worked:
             return 500, f"Error trying to reload the mouth FW. The FW subsystem is not working."
     except TimeoutError as e:

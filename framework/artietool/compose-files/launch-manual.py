@@ -66,8 +66,6 @@ def determine_image_dependencies(fpath: str) -> List[str]:
     docker_images = []
     for depname in depnames:
         match depname:
-            case "RESET_TEST_IMAGE":
-                docker_images.append((depname, retrieve_latest_docker_image("artie-reset-driver")))
             case "EYEBROWS_TEST_IMAGE":
                 docker_images.append((depname, retrieve_latest_docker_image("artie-eyebrow-driver")))
             case "MOUTH_TEST_IMAGE":

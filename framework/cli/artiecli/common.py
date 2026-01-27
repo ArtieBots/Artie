@@ -27,6 +27,11 @@ class _ConnectionWrapper:
             orig_attr = self._connection.root.__getattribute__(attr)
         except AttributeError:
             print(f"Cannot access {attr}")
+            raise
+        except Exception as e:
+            print(f"Error accessing {attr}: {e}")
+            raise
+
         if callable(orig_attr):
             def hooked(*args, **kwargs):
                 result = orig_attr(*args, **kwargs)
