@@ -164,7 +164,8 @@ def _check_servo_range(arg):
 #########################################################################################
 def _cmd_mcu_fw_load(args):
     client = _connect_client(args)
-    common.format_print_result(client.mcu_fw_load(), "eyebrows", "FW", args.artie_id)
+    common.format_print_result(client.mcu_fw_load("left"), "eyebrows", "FW", args.artie_id)
+    common.format_print_result(client.mcu_fw_load("right"), "eyebrows", "FW", args.artie_id)
 
 #########################################################################################
 ################################# Status Commands #######################################

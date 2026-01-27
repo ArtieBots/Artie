@@ -188,7 +188,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
-    def mcu_fw_load(self):
+    def mcu_fw_load(self, mcu_id=fw.MOUTH_MCU_NAME) -> bool:
         """
         RPC method to (re)load the FW on the mouth MCU.
         This will also reinitialize the LED and LCD.
