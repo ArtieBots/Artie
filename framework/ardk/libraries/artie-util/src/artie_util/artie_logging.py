@@ -252,6 +252,9 @@ class KnownMetricAttributes(enum.StrEnum):
     FUNCTION_NAME = "function-name"
     """The name of the function being measured."""
 
+    INTERFACE_NAME = "interface-name"
+    """The name of the interface being measured."""
+
 class _MetricEnumMixin:
     """
     When mixed in with an Enum, this class takes care of the __new__ method

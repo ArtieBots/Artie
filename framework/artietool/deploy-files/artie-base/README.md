@@ -7,7 +7,6 @@ It includes the minimum set of resources needed for any Artie instance to functi
 
 ### Deployments & Services
 
-- **driver-reset**: Reset driver for microcontroller resets
 - **driver-mouth**: Mouth actuator driver
 - **driver-eyebrows**: Eyebrows actuator driver
 - **artie-api-server**: Main API server for Artie control

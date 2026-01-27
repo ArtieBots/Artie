@@ -29,7 +29,5 @@ scrape_configs:
 
   - job_name: artie-eyebrows-driver
 
-  - job_name: artie-reset-driver
-
   # This job is for the Artie data collector service, which exposes a bunch of stuff from the various buses
   - job_name: artie-data-collector
