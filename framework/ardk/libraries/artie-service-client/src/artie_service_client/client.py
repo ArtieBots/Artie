@@ -57,8 +57,10 @@ class ServiceConnection:
             return orig_attr
 
     def __del__(self):
-        if hasattr(self, 'connection'):
+        try:
             self.connection.close()
+        except Exception as e:
+            alog.exception(f"Exception when trying to close service connection (service: {self.service}): ", e, stack_trace=True)
 
     def _retry_n_times(self, f, args, kwargs):
         for _ in range(self.n_retries):
