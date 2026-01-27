@@ -83,15 +83,35 @@ def determine_image_dependencies(fpath: str) -> List[str]:
                 exit(1)
     return docker_images
 
-def print_compose_command(deps: List[Tuple[str, str]], fpath: str):
+def determine_network_name(fpath: str) -> str:
+    """
+    Return the network name from the compose file.
+    """
+    with open(fpath, 'r') as f:
+        docker_compose = yaml.safe_load(f)
+
+    if 'networks' in docker_compose:
+        networks = docker_compose['networks']
+        if len(networks) > 1:
+            print("Multiple networks found in compose file. Program me to handle this case.")
+            exit(4)
+        return list(networks.keys())[0]
+    else:
+        return "default"
+
+def print_compose_command(deps: List[Tuple[str, str]], fpath: str, network_name: str):
     s = ""
     for env_var, value in deps:
         if os.name == 'nt':
             s += f'$Env:{env_var}="{value}"' + os.linesep
         else:
-            s += f"export {env_var}={value}"
-    s += f"docker compose -f {fpath} up --abort-on-container-exit --attach --always-recreate-deps --attach-dependencies --force-recreate --remove-orphans --renew-anon-volumes"
+            s += f"export {env_var}={value}" + os.linesep
+    s += f"docker network create {network_name} || echo 'Network {network_name} already exists.'" + os.linesep
+    s += f"docker compose -f {fpath} up --abort-on-container-exit --always-recreate-deps --attach-dependencies --force-recreate --remove-orphans --renew-anon-volumes"
     print(s)
+    print("")
+    print("Don't forget to tear down the network when you're done:")
+    print(f"docker network rm {network_name}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -104,4 +124,5 @@ if __name__ == "__main__":
         exit(-1)
 
     image_dependencies = determine_image_dependencies(args.compose_file)
-    print_compose_command(image_dependencies, args.compose_file)
+    network_name = determine_network_name(args.compose_file)
+    print_compose_command(image_dependencies, args.compose_file, network_name)

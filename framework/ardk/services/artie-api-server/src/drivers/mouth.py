@@ -18,12 +18,14 @@ class LEDStates(enum.StrEnum):
     OFF = "off"
     HEARTBEAT = "heartbeat"
 
+MOUTH_SERVICE_NAME = "mouth-driver"
+
 def display(display_value: MouthValues, artie_id: str) -> Tuple[int|None, str|None]:
     """
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         if display_value == MouthValues.TALKING:
             worked = connection.lcd_talk()
         else:
@@ -41,7 +43,7 @@ def get_display(artie_id: str) -> Tuple[None|int, MouthValues|str]:
     Returns a tuple of the form (None, LCD value) or (err code, errmsg).
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         val = str(connection.lcd_get())
         return None, val
     except TimeoutError as e:
@@ -54,7 +56,7 @@ def test(artie_id: str) -> Tuple[int|None, str|None]:
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         worked = connection.lcd_test()
         if not worked:
             return 500, f"Error trying to test the mouth LCD display. The display is not working."
@@ -69,7 +71,7 @@ def clear(artie_id: str) -> Tuple[int|None, str|None]:
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         worked = connection.lcd_off()
         if not worked:
             return 500, f"Error trying to clear the mouth LCD display. The display is not working."
@@ -86,7 +88,7 @@ def led(state: LEDStates, artie_id: str) -> Tuple[int|None, str|None]:
     """
     try:
         worked = True
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         match state:
             case LEDStates.ON:
                 worked = connection.led_on()
@@ -109,7 +111,7 @@ def get_led(artie_id: str) -> Tuple[None|int, LEDStates|str]:
     Returns a tuple of the form (None, LED value) or (err code, errmsg).
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         val = LEDStates(connection.led_get())
         return None, val
     except TimeoutError as e:
@@ -123,7 +125,7 @@ def reload_firmware(artie_id: str) -> Tuple[int|None, str|None]:
     (errorcode|None, errmsg|None)
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         worked = connection.mcu_fw_load()
         if not worked:
             return 500, f"Error trying to reload the mouth FW. The FW subsystem is not working."
@@ -139,7 +141,7 @@ def get_status(artie_id: str) -> Tuple[None|int, str|Dict[str, str]]:
     (None|errorcode, status|errmsg)
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         status = connection.status()
         status = {k: status[k] for k in status}
         return None, status
@@ -154,7 +156,7 @@ def self_test(artie_id: str) -> Tuple[None|int, None|str]:
     (None|errorcode, None|errmsg)
     """
     try:
-        connection = asc.ServiceConnection(asc.Service.MOUTH_SERVICE, artie_id=artie_id)
+        connection = asc.ServiceConnection(MOUTH_SERVICE_NAME, artie_id=artie_id)
         connection.self_check()
     except TimeoutError as e:
         return 504, f"Timed out trying to do the mouth self test: {e}"

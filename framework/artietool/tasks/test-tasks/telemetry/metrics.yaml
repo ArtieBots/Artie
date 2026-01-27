@@ -4,7 +4,6 @@ labels:
   - integration
 dependencies:
   - driver-eyebrows: docker-image
-  - driver-reset: docker-image
   - metrics-collector: docker-image
   - artie-cli: docker-image
   - artie-api-server: docker-image
@@ -14,10 +13,6 @@ steps:
   - job: docker-compose-test-suite
     compose-fname: compose.metrics.yaml
     compose-docker-image-variables:
-      - RESET_TEST_IMAGE:
-          dependency:
-            name: docker-image
-            producing-task: driver-reset
       - EYEBROWS_TEST_IMAGE:
           dependency:
             name: docker-image
@@ -39,8 +34,8 @@ steps:
         name: docker-image
         producing-task: artie-cli
     steps:
-      - test-name: init-mcu
-        cmd-to-run-in-cli: "artie-cli help"
+      - test-name: led-on
+        cmd-to-run-in-cli: "artie-cli eyebrows led on --side left --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "Test Passed"
             where: metrics-itest-metrics-collector

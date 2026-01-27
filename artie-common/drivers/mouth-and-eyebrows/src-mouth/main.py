@@ -52,7 +52,7 @@ class DriverServer(
         self.led_heartbeat()
 
     @rpyc.exposed
-    @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS)
+    @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DriverInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.DriverInterfaceV1)
     def status(self) -> Dict[str, str]:
         """
@@ -63,7 +63,7 @@ class DriverServer(
         return {k: str(v) for k, v in status.items()}
 
     @rpyc.exposed
-    @alog.function_counter("self_check", alog.MetricSWCodePathAPIOrder.CALLS)
+    @alog.function_counter("self_check", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DriverInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.DriverInterfaceV1)
     def self_check(self):
         """
@@ -75,7 +75,7 @@ class DriverServer(
         self._lcd_submodule.self_check()
 
     @rpyc.exposed
-    @alog.function_counter("led_on", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @alog.function_counter("led_on", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_on(self) -> bool:
         """
@@ -88,7 +88,7 @@ class DriverServer(
         return self._led_submodule.on()
 
     @rpyc.exposed
-    @alog.function_counter("led_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @alog.function_counter("led_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_off(self) -> bool:
         """
@@ -102,7 +102,7 @@ class DriverServer(
         return self._led_submodule.off()
 
     @rpyc.exposed
-    @alog.function_counter("led_heartbeat", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @alog.function_counter("led_heartbeat", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_heartbeat(self) -> bool:
         """
@@ -116,7 +116,7 @@ class DriverServer(
         return self._led_submodule.heartbeat()
 
     @rpyc.exposed
-    @alog.function_counter("led_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED})
+    @alog.function_counter("led_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
     def led_get(self) -> str:
         """
@@ -186,7 +186,7 @@ class DriverServer(
         return self._lcd_submodule.talk()
 
     @rpyc.exposed
-    @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_fw_load(self, mcu_id=fw.MOUTH_MCU_NAME) -> bool:
         """
@@ -209,7 +209,7 @@ class DriverServer(
         return worked
 
     @rpyc.exposed
-    @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_list(self) -> list[str]:
         """
@@ -218,7 +218,7 @@ class DriverServer(
         return [fw.MOUTH_MCU_NAME]
 
     @rpyc.exposed
-    @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_reset(self, mcu_id=fw.MOUTH_MCU_NAME) -> bool:
         """
@@ -235,7 +235,7 @@ class DriverServer(
         return self._fw_submodule.reset()
 
     @rpyc.exposed
-    @alog.function_counter("mcu_self_check", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_self_check", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_self_check(self, mcu_id=fw.MOUTH_MCU_NAME):
         """
@@ -247,7 +247,7 @@ class DriverServer(
         self._fw_submodule.self_check()
 
     @rpyc.exposed
-    @alog.function_counter("mcu_status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_status(self, mcu_id=fw.MOUTH_MCU_NAME) -> str:
         """
@@ -266,7 +266,7 @@ class DriverServer(
         return status["FW"]
 
     @rpyc.exposed
-    @alog.function_counter("mcu_version", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE})
+    @alog.function_counter("mcu_version", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
     def mcu_version(self, mcu_id=fw.MOUTH_MCU_NAME) -> str:
         """
