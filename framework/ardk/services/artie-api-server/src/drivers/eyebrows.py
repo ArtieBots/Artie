@@ -16,7 +16,7 @@ def display(display_value: List[str], which: str, artie_id: str) -> Tuple[int|No
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         worked = connection.lcd_draw(which, display_value)
         if not worked:
             return 500, f"Error trying to display something on {which} eyebrows LCD: LCD not working."
@@ -31,7 +31,7 @@ def get_display(which: str, artie_id: str) -> Tuple[None|int, List[str]|str]:
     Returns a tuple of the form (None, LCD value) or (err code, errmsg).
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         val = connection.lcd_get(which)
         if issubclass(val, str) and val in ("clear", "test"):
             return None, val
@@ -50,7 +50,7 @@ def test(which: str, artie_id: str) -> Tuple[int|None, str|None]:
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         worked = connection.lcd_test(which)
         if not worked:
             return 500, f"Error trying to test {which} eyebrows LCD: LCD not working."
@@ -65,7 +65,7 @@ def clear(which: str, artie_id: str) -> Tuple[int|None, str|None]:
     Returns a tuple of the form (error code|None, errmsg|None).
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         worked = connection.lcd_off(which)
         if not worked:
             return 500, f"Error trying to clear {which} eyebrows LCD: LCD not working."
@@ -82,7 +82,7 @@ def led(which: str, state: LEDStates, artie_id: str) -> Tuple[int|None, str|None
     """
     try:
         worked = True
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         match state:
             case LEDStates.ON:
                 worked = connection.led_on(which)
@@ -105,7 +105,7 @@ def get_led(which: str, artie_id: str) -> Tuple[None|int, LEDStates|str]:
     Returns a tuple of the form (None, LED value) or (err code, errmsg).
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         val = LEDStates(connection.led_get(which))
         return None, val
     except TimeoutError as e:
@@ -119,7 +119,7 @@ def reload_firmware(which: str, artie_id: str) -> Tuple[int|None, str|None]:
     (errorcode|None, errmsg|None)
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         worked = connection.mcu_fw_load(which)
         if not worked:
             return 500, f"Error trying to reload FW."
@@ -135,7 +135,7 @@ def set_servo(which: str, degrees: float, artie_id: str) -> Tuple[int|None, str|
     (errorcode|None, errmsg|degrees)
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         worked = connection.servo_go(which, degrees)
         if not worked:
             return 500, f"Error trying to set {which} servo: Servo not working."
@@ -151,7 +151,7 @@ def get_servo(which: str, artie_id: str) -> Tuple[int|None, str|float]:
     (errcode|None, errmsg|degrees)
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         val = float(connection.servo_get(which))
         if val < 0.0:
             return 500, f"Error trying to get {which} servo value."
@@ -168,7 +168,7 @@ def get_status(artie_id: str) -> Tuple[None|int, str|Dict[str, str]]:
     (None|errorcode, status|errmsg)
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         d = connection.status()
         status = {k: d[k] for k in d}
         return None, status
@@ -183,7 +183,7 @@ def self_test(artie_id: str) -> Tuple[None|int, None|str]:
     (None|errorcode, None|errmsg)
     """
     try:
-        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME, artie_id=artie_id)
+        connection = asc.ServiceConnection(EYEBROWS_SERVICE_NAME)
         connection.self_check()
     except TimeoutError as e:
         return 504, f"Timed out trying to do the eyebrows self test: {e}"
