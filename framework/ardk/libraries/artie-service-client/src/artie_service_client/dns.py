@@ -56,6 +56,14 @@ class ServiceQuery:
     data: str | list[str]
     """The data associated with the service query. This is either a string or a list of strings, depending on the query type."""
 
+    def __eq__(self, value):
+        if not isinstance(value, ServiceQuery):
+            return False
+        return self.query_type == value.query_type and self.data == value.data
+
+    def __hash__(self):
+        return hash((self.query_type, tuple(self.data) if isinstance(self.data, list) else self.data))
+
     @staticmethod
     def from_string(query: str) -> 'ServiceQuery':
         """
