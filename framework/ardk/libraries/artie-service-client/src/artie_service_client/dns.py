@@ -76,14 +76,14 @@ class ServiceQuery:
         either a string or a list of strings, depending on the type.
         """
         if _fully_qualified_pattern.match(query):
-            return ServiceQuery(ServiceQueryType.FULLY_QUALIFIED_NAME, query.upper())
+            return ServiceQuery(ServiceQueryType.FULLY_QUALIFIED_NAME, query)
         elif _interface_list_pattern.match(query):
-            interface_names = [iface.strip().upper() for iface in query.split(",")]
+            interface_names = [iface.strip() for iface in query.split(",")]
             return ServiceQuery(ServiceQueryType.INTERFACE_LIST, interface_names)
         elif _single_interface_pattern.match(query):
-            return ServiceQuery(ServiceQueryType.SINGLE_INTERFACE, query.upper())
+            return ServiceQuery(ServiceQueryType.SINGLE_INTERFACE, query)
         else:
-            return ServiceQuery(ServiceQueryType.SIMPLE_NAME, query.upper())
+            return ServiceQuery(ServiceQueryType.SIMPLE_NAME, query)
 
 def lookup(item: str|ServiceQuery) -> tuple[str, int]:
     """
@@ -129,7 +129,7 @@ def list_services(filter_host: str|None = None, filter_name: str|None = None, fi
 
     filtered_names = []
     for fully_qualified_name in names:
-        if filter_name and not fully_qualified_name.upper().startswith(filter_name.upper()):
+        if filter_name and not fully_qualified_name.startswith(filter_name):
             continue
 
         if filter_interfaces:
@@ -138,9 +138,9 @@ def list_services(filter_host: str|None = None, filter_name: str|None = None, fi
                 continue
 
             interfaces_part = match.group("interfaces")
-            service_interfaces = [iface.strip().upper() for iface in interfaces_part.split(":") if iface.strip()]
+            service_interfaces = [iface.strip() for iface in interfaces_part.split(":") if iface.strip()]
 
-            if not all(req_iface.upper() in service_interfaces for req_iface in filter_interfaces):
+            if not all(req_iface in service_interfaces for req_iface in filter_interfaces):
                 continue
 
         filtered_names.append(fully_qualified_name)
