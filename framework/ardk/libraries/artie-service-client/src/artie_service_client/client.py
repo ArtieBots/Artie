@@ -44,6 +44,9 @@ class ServiceConnection:
         self.connection = self._initialize_connection(self.service)
 
     def __getattr__(self, attr):
+        if attr == "connection":
+            return self.__dict__["connection"]
+
         orig_attr = self.connection.root.__getattribute__(attr)
         if callable(orig_attr):
             def hooked(*args, **kwargs):
@@ -71,16 +74,22 @@ class ServiceConnection:
                 alog.exception(f"Exception when trying to run a function on a service connection (service: {self.service}): ", e, stack_trace=True)
                 alog.update_counter(1, "connection", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times we encounter an error when trying to connect to an Artie service.")
 
+        raise ConnectionError(f"Could not complete RPC call to service {self.service} after {self.n_retries} retries.")
+
     def _initialize_connection(self, service: dns.ServiceQuery) -> rpyc.Connection:
+        alog.debug(f"Initializing connection to service: {service}")
         block_until_online(service, timeout_s=self.timeout_s, ipv6=self.ipv6)
         host, port = dns.lookup(service)
 
+        alog.debug(f"Trying to connect to {service} at {host}:{port}...")
         for _ in range(self.n_retries):
             try:
                 return factory.ssl_connect(host, port, ipv6=self.ipv6)
             except Exception as e:
                 alog.exception(f"Exception when trying to connect to {host}:{port}: ", e, stack_trace=True)
                 alog.update_counter(1, "connection", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times we encounter an error when trying to connect to an Artie service.")
+
+        raise ConnectionError(f"Could not connect to service {service} at {host}:{port} after {self.n_retries} retries.")
 
 def _try_connect(host: str, port: int, ipv6=False) -> bool:
     """
@@ -115,8 +124,10 @@ def block_until_online(service: dns.ServiceQuery, timeout_s=30, ipv6=False):
 
     # Lookup the service in the DNS
     host, port = dns.lookup(service)
+    alog.info(f"Resolved {service} to {host}:{port}")
 
     # Keep trying to connect forever if no timeout, or until timeout if we have one
+    alog.info(f"Trying to connect to {service} at {host}:{port}...")
     ts = datetime.datetime.now().timestamp()
     success = False
     if timeout_s is None:
@@ -127,6 +138,7 @@ def block_until_online(service: dns.ServiceQuery, timeout_s=30, ipv6=False):
             success = _try_connect(host, port, ipv6=ipv6)
 
     # Add to cache or raise an error
+    alog.info(f"Connected to {service} at {host}:{port}. Adding to cache.")
     if success:
         online_cache.add(service)
     else:
