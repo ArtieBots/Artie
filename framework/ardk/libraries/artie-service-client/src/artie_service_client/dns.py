@@ -1,6 +1,7 @@
 """
 This module contains mappings from hostnames to IP addresses/Kubernetes Services, etc.
 """
+from artie_util import artie_logging as alog
 from artie_util import constants
 from artie_util import util
 from rpyc.utils.registry import TCPRegistryClient
@@ -94,10 +95,13 @@ def lookup(item: str|ServiceQuery) -> tuple[str, int]:
     else:
         query = item
 
+    alog.debug(f"Looking up service for query: {query}")
     host_and_port_list = _registry_client.discover(query)
     if not host_and_port_list:
+        alog.error(f"Service not found for query: {item!r}")
         raise KeyError(f"Service not found for query: {item!r}")
 
+    alog.debug(f"Found service for query {query}: {host_and_port_list[0]}")
     return host_and_port_list[0]  # Return the first result
 
 def list_services(filter_host: str|None = None, filter_name: str|None = None, filter_interfaces: list[str]|None = None) -> tuple[str]|None:
