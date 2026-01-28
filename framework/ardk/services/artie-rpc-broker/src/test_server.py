@@ -10,7 +10,7 @@ import os
 import socket
 import time
 
-SERVICE_NAME = "test-rpc-service"
+SERVICE_NAME = "mock-rpc-service"
 
 class TestRPCService(
     interfaces.ServiceInterfaceV1,
