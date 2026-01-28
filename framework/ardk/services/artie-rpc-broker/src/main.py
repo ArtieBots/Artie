@@ -166,7 +166,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         alog.debug(f"Registering {host}:{port} as {', '.join(names)}")
         for name in names:
             s = service.ServiceRegistration(name, host, port)
-            self._add_service(s.simple_name, s)
+            self._add_service(s.fully_qualified_name, s)
 
         return "OK"
 
@@ -287,7 +287,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
                 try:
                     s = service.ServiceRegistration.from_cache_line(line)
-                    self._add_service(s.simple_name, s)
+                    self._add_service(s.fully_qualified_name, s)
                 except Exception as e:
                     alog.error(f"Error parsing cache line '{line}': {e}")
 
