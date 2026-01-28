@@ -11,14 +11,9 @@ import os
 import re
 
 # Cached environment variables
-if util.in_test_mode() or util.mode() == constants.ArtieRunModes.INTEGRATION_TESTING:
-    ARTIE_ID = None
-    RPC_BROKER_HOSTNAME = "localhost"
-    RPC_BROKER_PORT = 18864
-else:
-    ARTIE_ID = os.getenv(constants.ArtieEnvVariables.ARTIE_ID, None)
-    RPC_BROKER_HOSTNAME = os.getenv(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost")
-    RPC_BROKER_PORT = int(os.getenv(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864))
+ARTIE_ID = os.getenv(constants.ArtieEnvVariables.ARTIE_ID, None)
+RPC_BROKER_HOSTNAME = os.getenv(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost")
+RPC_BROKER_PORT = int(os.getenv(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864))
 
 # Cached regex patterns for service query types
 _fully_qualified_pattern = re.compile(r"^(?P<name>[a-zA-Z0-9\-_]+)(?P<interfaces>(:[a-zA-Z0-9\-_]+)+)$")
