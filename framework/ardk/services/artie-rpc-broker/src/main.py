@@ -107,7 +107,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         # We need to parse the `name` argument to determine what the client is querying for
         match dns.ServiceQuery.from_string(name).query_type:
             case dns.ServiceQueryType.FULLY_QUALIFIED_NAME:
-                return self._query_by_fully_qualified_name()
+                return self._query_by_fully_qualified_name(name)
             case dns.ServiceQueryType.INTERFACE_LIST:
                 interface_names = [iface.strip() for iface in name.split(",")]
                 return self._query_by_interface_list(interface_names)
