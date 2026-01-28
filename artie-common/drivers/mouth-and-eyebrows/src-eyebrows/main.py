@@ -316,7 +316,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fw_fpath", metavar="fw-fpath", type=str, help="The path to the FW file. It must be an .elf file.")
     parser.add_argument("--ipv6", action='store_true', help="Use IPv6 if given, otherwise IPv4.")
-    parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
+    parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
     parser.add_argument("-p", "--port", type=int, default=18863, help="The port to bind for the RPC server.")
     args = parser.parse_args()
 

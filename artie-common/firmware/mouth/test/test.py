@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("test", choices=tests, help="Test to run.")
     parser.add_argument("--draw-val", default="smile", choices=[item.lower() for item in MOUTH_DRAWING_CHOICES.keys()], help="If lcd-draw test is selected, this is the mouth configuration to draw. Otherwise ignored.")
     parser.add_argument("--fw-image", default=None, type=str, help="Path to .elf file if doing 'fw-load' test.")
-    parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
+    parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
     args = parser.parse_args()
 
     # Set up logging

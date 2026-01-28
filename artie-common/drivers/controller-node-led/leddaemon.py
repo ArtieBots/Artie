@@ -109,7 +109,7 @@ def _serve(address, led):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=('on', 'off', 'heartbeat'), type=str, help="The particular mode of LED operation.")
-    parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
+    parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
     args = parser.parse_args()
 
     # Set up logging
