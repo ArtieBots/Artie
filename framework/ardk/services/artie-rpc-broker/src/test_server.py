@@ -19,7 +19,7 @@ class TestRPCService(
     artie_service.ArtieRPCService
     ):
     def __init__(self, port: int):
-        super().__init__(SERVICE_NAME, port, register_service=False)
+        super().__init__(SERVICE_NAME, port, register_service=True)
 
         # Tests will try to query this service and then access this data on the service object
         # if they successfully find it.
