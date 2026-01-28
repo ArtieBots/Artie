@@ -57,4 +57,4 @@ steps:
         cmd-to-run-in-cli: "artie-cli eyebrows led on --side left --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "Test Passed"
-            where: metrics-itest-metrics-collector
+            where: telemetry-itest-metrics-collector
