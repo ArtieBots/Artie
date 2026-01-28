@@ -16,6 +16,7 @@ that routes requests from clients to the appropriate service handlers, decouplin
   and are further inherited from mixins defined in [artie_service_client/interfaces](../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py). The `ArtieRPCService` class provides methods
   to register with the Artie RPC Broker. Clients can then query the broker, either by service name
   or by interface signature (e.g., "I am looking for a service that is an 'led-driver' and an 'accelerometer-driver').
+- **Latency**: Service lookups must be extremely fast.
 
 ## Architecture
 
@@ -36,8 +37,6 @@ TODO: Here are some notes to compile into a fully-fleshed out document later:
   but it also has a fully-qualified name, which lists all its interfaces as well, and conforms
   to the following format: `<service-name>:<interface1-name>:<interface2-name>`
 * Interface names MUST end in '-interface-vX', where X is the version number, starting with 1.
-* Need to figure out how to have multiple Arties in the same Kubernetes network. Right now
-  I think the idea is we just append the Artie ID to each service name.
 * The RPC broker can scale horizontally - i.e., there can be multiple
   RPC broker pods running behind a single K8S Service object.
   This means that whenever a service asks for a DNS lookup from the
@@ -52,6 +51,5 @@ TODO: Here are some notes to compile into a fully-fleshed out document later:
   which allow the user to either use a local PV, an NFS PV, or
   a custom one. If a custom one is used, the user will need to
   add their own CSI driver to the Kubernetes cluster.
-  The registry server contains a thread that is constantly monitoring the SHA of
-  the shared cache file. Whenever it changes, we invalidate the SHA, thereby
-  causing us to reload its contents.
+  The registry server contains a thread that is constantly monitoring
+  the shared cache file. Whenever it changes, we reload its contents.

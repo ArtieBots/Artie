@@ -3,19 +3,19 @@ Main module for the Artie RPC Broker service.
 
 The Artie RPC Broker is responsible for registering and
 discovering services in the Artie cluster that are making use of RPC.
-
-Note about testing: this service is tested mostly implicitly through
-integration tests of other services that make use of it, as there aren't
-any CLI commands that make use of this service directly (and there shouldn't be -
-it's a critical infrastructural component).
 """
 from artie_service_client import dns
 from artie_util import artie_logging as alog
+from artie_util import constants
+from artie_util import util
 from rpyc.utils.registry import TCPRegistryServer
 from . import cachemonitor
 from . import service
+from . import test_server
 import argparse
+import datetime
 import functools
+import multiprocessing
 import os
 import time
 
@@ -46,7 +46,11 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         self._cache_monitor.start()
 
         # self.services is a dict of the form {service_name: {service.ServiceRegistration: timestamp}}
-        # where service_name is the simple name of the service (not the fully-qualified name)
+        # where service_name is the fully-qualified name of the service.
+
+        # This dict keeps a mapping of simple name to fully-qualified names for quick lookup
+        # on the typical case of querying by simple name.
+        self.name_mapping = {}
 
     def read_cache(func):
         """
@@ -56,7 +60,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         def wrapper(self, *args, **kwargs):
             # Check if the cache is valid
             if not self._cache_monitor.cache_valid:
-                alog.info("Cache is invalid, reloading from cache file.")
+                alog.debug("Cache is invalid, reloading from cache file.")
                 self._read_cache_from_file()
                 self._cache_monitor.cache_valid = True
 
@@ -74,7 +78,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
             result = func(self, *args, **kwargs)
 
             # Write the cache to the cache file
-            alog.info(f"Updating cache file at {self._broker_cache_fpath}.")
+            alog.debug(f"Updating cache file at {self._broker_cache_fpath}.")
             self._write_cache_to_file()
 
             return result
@@ -114,7 +118,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
     @read_cache
     @alog.function_counter("cmd_list", alog.MetricSWCodePathAPIOrder.CALLS)
-    def cmd_list(self, host: str, filter_host: tuple[str]|None) -> tuple[str]|None:
+    def cmd_list(self, host: str, filter_host: tuple[str|None]) -> tuple[str]|None:
         """
         This method is called when a client wants to list all
         registered services.
@@ -123,30 +127,26 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         by a specific host, and is a tuple of exactly one item, which must be
         the name of a host.
 
-        Returns a list of fully-qualified service names (or `None`, if we do not allow listing).
+        Returns a tuple of fully-qualified service names (or `None`, if we do not allow listing).
         """
-        alog.debug("Querying for services list:")
+        alog.debug("Querying for services list")
 
         if not self.allow_listing:
-            alog.debug("Listing is disabled")
+            alog.info("Listing is disabled")
             return None
 
         services = []
         if filter_host[0]:
-            for name in self.services.keys():
-                known_hosts = [s.host for s in self.services[name].keys()]
-                if filter_host[0] in known_hosts:
-                    services.append(self.services[name][filter_host[0]].fully_qualified_name)
+            for fully_qualified_name in self.services.keys():
+                host_to_fqname_map = {s.host: s.fully_qualified_name for s in self.services[fully_qualified_name].keys()}
+                if filter_host[0] in host_to_fqname_map:
+                    services.append(host_to_fqname_map[filter_host[0]])
             services = tuple(services)
         else:
-            services = []
-            for name in self.services.keys():
-                for s in self.services[name].keys():
-                    services.append(s.fully_qualified_name)
+            services = [fully_qualified_name for fully_qualified_name in self.services.keys()]
             services = tuple(services)
 
-        alog.debug(f"Replying with {services}")
-
+        alog.test(f"Found {services}", tests=["rpc-broker-unit-tests:list-services"])
         return services
 
     @read_cache
@@ -155,13 +155,15 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
     def cmd_register(self, host: str, names: list[str], port: int) -> str:
         """
         Registers the given host and port under the given service names,
-        which should be a list of fully-qualified names.
+        which should be a list of a single fully-qualified name.
+
+        This API is overridden from the base RPyC registry, which is why
+        `names` is a list, even though it should only have one item.
         """
         if issubclass(type(names), str):
             names = [names]
 
         alog.debug(f"Registering {host}:{port} as {', '.join(names)}")
-
         for name in names:
             s = service.ServiceRegistration(name, host, port)
             self._add_service(s.simple_name, s)
@@ -178,81 +180,96 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         alog.debug(f"Unregistering {host}:{port}")
 
         remove = []
-        for name in self.services.keys():
-            for s in self.services[name].keys():
+        for fully_qualified_name in self.services.keys():
+            for s in self.services[fully_qualified_name].keys():
                 if s.host == host and s.port == port:
-                    remove.append((name, s))
+                    remove.append((fully_qualified_name, s))
 
         # Remove after iterating to avoid modifying the dict while iterating
         for name, s in remove:
-            alog.info(f"Removing service {name} at {s.host}:{s.port}")
+            alog.test(f"Removing service {name} at {s.host}:{s.port}", tests=["rpc-broker-unit-tests:unregister"])
             self._remove_service(name, s)
 
         return "OK"
 
-    def _add_service(self, name: str, s: service.ServiceRegistration) -> None:
-        """Updates the service's keep-alive time stamp"""
-        if name not in self.services:
-            self.services[name] = {}
+    def _add_service(self, fully_qualified_name: str, s: service.ServiceRegistration) -> None:
+        """Registers the service and updates the service's keep-alive time stamp"""
+        if fully_qualified_name not in self.services:
+            self.services[fully_qualified_name] = {}  # Dict of {service.ServiceRegistration: timestamp}
 
-        self.services[name][s] = time.time()
+        self.services[fully_qualified_name][s] = datetime.datetime.now()
+        if s.simple_name in self.name_mapping:
+            self.name_mapping[s.simple_name].append(fully_qualified_name)
+            self.name_mapping[s.simple_name] = list(set(self.name_mapping[s.simple_name]))
+        else:
+            self.name_mapping[s.simple_name] = [fully_qualified_name]
 
     def _query_by_interface_list(self, interface_names: list[str]) -> tuple[tuple[str, int]]:
         """
+        Query for services that implement all of the given interfaces.
         """
         servers = []
-        for name in self.services.keys():
-            for s in self.services[name].keys():
+        for fully_qualified_name in self.services.keys():
+            for s in self.services[fully_qualified_name].keys():
                 if all(iface in s.interface_names for iface in interface_names):
                     servers.append((s.host, s.port))
 
         if not servers:
-            alog.debug("No such service")
+            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-interface-list-expected-no", "rpc-broker-unit-tests:query-by-interface-list-partial-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
-        alog.debug(f"Replying with {servers!r}")
+        alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-interface-list-expected-yes", "rpc-broker-unit-tests:query-by-interface-list-partial-expected-yes"])
         alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
         return tuple(servers)
 
     def _query_by_interface(self, interface_name: str) -> tuple[tuple[str, int]]:
         """
+        Query for services that implement the given interface.
         """
         return self._query_by_interface_list([interface_name])
 
-    def _query_by_simple_name(self, name: str) -> tuple[tuple[str, int], ...]:
+    def _query_by_simple_name(self, simple_name: str) -> tuple[tuple[str, int], ...]:
         """
+        Query for services by simple name.
         """
-        if name not in self.services:
-            alog.debug("No such service")
+        alog.debug(f"Querying for service by simple name: {simple_name}")
+        if simple_name not in self.name_mapping:
+            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-simple-name-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
-        oldest = time.time() - self.pruning_timeout
-        all_servers = sorted(self.services[name].items(), key=lambda x: x.port)
+        # Get all fully-qualified names for this simple name
+        fully_qualified_names = self.name_mapping[simple_name]
+
+        # Get all servers for all the fully-qualified names
         servers = []
-        for s, t in all_servers:
-            if t < oldest:
-                alog.debug(f"Discarding stale {s.host}:{s.port}")
-                self._remove_service(name, s)
-            else:
-                servers.append((s.host, s.port))
+        for fq_name in fully_qualified_names:
+            servers.extend([(s.host, s.port) for s in self.services[fq_name].keys()])
 
-        if not servers:
-            alog.debug("No such service")
+        if len(servers) == 0:
+            alog.error("No such service: inconsistent state detected.")
+            alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
+            return ()
+        else:
+            alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-simple-name-expected-yes"])
+            alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
+            return tuple(servers)
+
+    def _query_by_fully_qualified_name(self, fq_name: str) -> tuple[tuple[str, int], ...]:
+        """
+        Query for services by fully-qualified name.
+        """
+        alog.debug(f"Querying for service by fully-qualified name: {fq_name}")
+        if fq_name not in self.services:
+            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-fully-qualified-name-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
-        alog.debug(f"Replying with {servers!r}")
+        servers = [(s.host, s.port) for s in self.services[fq_name].keys()]
+        alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-fully-qualified-name-expected-yes"])
         alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
         return tuple(servers)
-
-    def _query_by_fully_qualified_name(self, name: str) -> tuple[tuple[str, int], ...]:
-        """
-        """
-        # Get the simple name and query using it
-        simple_name = name.split(":")[0]
-        return self._query_by_simple_name(simple_name)
 
     def _read_cache_from_file(self) -> None:
         """Reads the cache from the cache file."""
@@ -261,6 +278,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
             return
 
         self.services.clear()
+        self.name_mapping.clear()
         with open(self._broker_cache_fpath, "r") as f:
             for line in f:
                 line = line.strip()
@@ -273,11 +291,16 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
                 except Exception as e:
                     alog.error(f"Error parsing cache line '{line}': {e}")
 
-    def _remove_service(self, name: str, s: service.ServiceRegistration) -> None:
+    def _remove_service(self, fq_name: str, s: service.ServiceRegistration) -> None:
         """Removes a single server of the given service."""
-        self.services[name].pop(s, None)
-        if not self.services[name]:
-            del self.services[name]
+        self.services[fq_name].pop(s, None)
+        if not self.services[fq_name]:
+            del self.services[fq_name]
+
+        if s.simple_name in self.name_mapping:
+            self.name_mapping[s.simple_name] = [name for name in self.name_mapping[s.simple_name] if name != fq_name]
+            if not self.name_mapping[s.simple_name]:
+                del self.name_mapping[s.simple_name]
 
     def _write_cache_to_file(self) -> None:
         """Writes the cache to the cache file."""
@@ -297,6 +320,13 @@ if __name__ == "__main__":
     # Set up logging
     alog.init(SERVICE_NAME, args)
 
-    # Instantiate the single (multi-tenant) server instance and block forever, serving
+    # If we are in unit-testing mode, we need to start up a mock RPCService in addition
+    # to the RPC Broker.
+    if util.mode() == constants.ArtieRunModes.UNIT_TESTING:
+        alog.info("Starting test RPC service for unit-testing mode.")
+        test_process = multiprocessing.Process(target=test_server.start_test_rpc_service, args=(args.port,))
+        test_process.start()
+
+    # Instantiate the single server instance and block forever, serving
     server = ArtieRPCBrokerServer(args.host, args.port, args.broker_cache_path)
     server.start()
