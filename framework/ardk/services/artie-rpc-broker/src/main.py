@@ -288,7 +288,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
+    parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
     parser.add_argument("-p", "--port", type=int, default=18864, help="The port to bind for the RPC server.")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="The host to bind for the RPC server.")
     parser.add_argument("--broker-cache-path", type=str, default=os.getenv("BROKER_CACHE_PATH", "/broker-cache"), help="Path to the broker cache directory.")

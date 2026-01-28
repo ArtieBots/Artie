@@ -10,7 +10,7 @@ import flask
 # Set up logging
 parser = argparse.ArgumentParser()
 parser.add_argument("--ipv6", action='store_true', help="Use IPv6 if given, otherwise IPv4.")
-parser.add_argument("-l", "--loglevel", type=str, default="info", choices=["debug", "info", "warning", "error"], help="The log level.")
+parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
 args, _ = parser.parse_known_args()
 alog.init("artie-api-server", args)
 

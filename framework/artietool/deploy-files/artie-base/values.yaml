@@ -79,6 +79,8 @@ baseEnvironment:
     value: "{{ .Values.artieId }}"
   - name: ARTIE_GIT_TAG
     value: "{{ .Values.imageTag }}"
+  - name: ARTIE_LOG_LEVEL
+    value: INFO
   - name: LOG_COLLECTOR_HOSTNAME
     value: "{{ .Values.logCollectorHostName }}-{{ .Values.artieId }}"
   - name: LOG_COLLECTOR_PORT
