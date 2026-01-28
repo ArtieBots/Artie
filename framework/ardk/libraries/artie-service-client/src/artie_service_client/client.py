@@ -40,8 +40,13 @@ class ServiceConnection:
         self.n_retries = n_retries
         self.timeout_s = timeout_s
         self.ipv6 = ipv6
-        self.service = dns.ServiceQuery.from_string(service_lookup) if isinstance(service_lookup, str) else service_lookup
-        self.connection = self._initialize_connection(self.service)
+        service = dns.ServiceQuery.from_string(service_lookup) if isinstance(service_lookup, str) else service_lookup
+        self.service = service
+        try:
+            self.connection = self._initialize_connection(service)
+        except Exception as e:
+            alog.exception(f"Exception when trying to initialize service connection (service: {service}): ", e, stack_trace=True)
+            raise
 
     def __getattr__(self, attr):
         if attr == "connection":
