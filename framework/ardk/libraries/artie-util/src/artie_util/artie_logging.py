@@ -131,7 +131,7 @@ def init(service_name, args=None):
     if args is not None and hasattr(args, 'loglevel') and args.loglevel is not None:
         loglevel = args.loglevel.upper()
     else:
-        loglevel = "INFO"
+        loglevel = os.environ.get(constants.ArtieEnvVariables.LOG_LEVEL, "INFO").upper()
 
     # Set the service name globally
     global SERVICE_NAME

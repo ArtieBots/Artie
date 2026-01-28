@@ -1,4 +1,4 @@
-ARG ARTIE_BASE_IMG=thisarg/isrequired:latest
+ARG ARTIE_BASE_IMG=artie/ardk-base:latest
 FROM ${ARTIE_BASE_IMG}
 
 # Pip requirements
@@ -16,11 +16,11 @@ COPY ./src-${DRIVER_TYPE} /src
 # Configuration stuff
 ARG RPC_PORT=18862
 ENV PORT=${RPC_PORT}
-ENV LOGLEVEL=info
 ENV ARTIE_RUN_MODE=production
 ARG GIT_TAG=unversioned
 ENV ARTIE_GIT_TAG=${GIT_TAG}
+ENV ARTIE_LOG_LEVEL=INFO
 
 # Default command is to run the application
 WORKDIR /
-CMD [ "/bin/bash", "-c", "python -m src.main ${FW_PATH} --port ${PORT} --loglevel ${LOGLEVEL}" ]
+CMD [ "/bin/bash", "-c", "python -m src.main ${FW_PATH} --port ${PORT}" ]
