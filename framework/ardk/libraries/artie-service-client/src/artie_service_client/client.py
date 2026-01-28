@@ -45,7 +45,11 @@ class ServiceConnection:
 
     def __getattr__(self, attr):
         if attr == "connection":
-            return self.__dict__["connection"]
+            try:
+                return self.__dict__["connection"]
+            except KeyError:
+                alog.warning("Tried to access 'connection' attribute before it was initialized.")
+                return None
 
         orig_attr = self.connection.root.__getattribute__(attr)
         if callable(orig_attr):

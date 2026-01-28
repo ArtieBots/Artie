@@ -5,7 +5,7 @@ networks:
 
 services:
   artie-rpc-broker:
-    command: python -m src.main --port 18864 --loglevel debug
+    command: python -m src.main --port 18864
     container_name: mouth-itest-rpc-broker
     image: ${RPC_BROKER_TEST_IMAGE}
     expose:
@@ -17,9 +17,10 @@ services:
       - LOG_COLLECTOR_HOSTNAME=log-collector
       - LOG_COLLECTOR_PORT=5170
       - METRICS_SERVER_PORT=8090
+      - ARTIE_LOG_LEVEL=DEBUG
 
   mouth-driver:
-    command: python -m src.main /conf/mcu-fw.elf --port 18862 --loglevel info
+    command: python -m src.main /conf/mcu-fw.elf --port 18862
     container_name: mouth-itest-mouth-driver
     depends_on:
       - artie-rpc-broker
@@ -35,6 +36,7 @@ services:
       - METRICS_SERVER_PORT=8090
       - RPC_BROKER_HOSTNAME=artie-rpc-broker
       - RPC_BROKER_PORT=18864
+      - ARTIE_LOG_LEVEL=DEBUG
 
   artie-api-server:
     container_name: mouth-itest-api-server
@@ -54,3 +56,4 @@ services:
       - PORT=8782
       - RPC_BROKER_HOSTNAME=artie-rpc-broker
       - RPC_BROKER_PORT=18864
+      - ARTIE_LOG_LEVEL=DEBUG

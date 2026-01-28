@@ -1,5 +1,5 @@
 # Build context is one folder up (..)
-ARG ARTIE_BASE_IMG=thisarg/isrequired:latest
+ARG ARTIE_BASE_IMG=artie/ardk-base:latest
 FROM ${ARTIE_BASE_IMG}
 
 # Create working directory
