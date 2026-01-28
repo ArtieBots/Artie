@@ -174,11 +174,11 @@ def _fill_led_subparser(parser: argparse.ArgumentParser, parent: argparse.Argume
     p.set_defaults(cmd=_cmd_led_get)
 
 def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
-    subparsers = parser.add_subparsers(title="eyebrows", description="The eyebrow module's subsystems")
+    subparsers = parser.add_subparsers(title="mouth", description="The mouth module's subsystems")
 
-    # Args that are useful for all eyebrow module commands
+    # Args that are useful for all mouth module commands
     option_parser = argparse.ArgumentParser(parents=[parent], add_help=False)
-    #group = option_parser.add_argument_group("Eyebrows Module", "Eyebrows Module Options")
+    #group = option_parser.add_argument_group("Mouth Module", "Mouth Module Options")
 
     # Add all the commands for each subystem
     ## LED
