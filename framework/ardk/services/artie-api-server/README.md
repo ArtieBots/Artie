@@ -20,36 +20,23 @@ As such, here are the requirements:
 
 ## Design
 
-Single point of ingress/egress: TODO: figure out how to enforce Kubernetes networking rules
-to make this happen. Also include autoscaling and load balancing.
-
-Documentation: Provide an interface translation for each service in the framework by default,
-but what about ecosystem drivers/services? Probably the API should be kept with the service/driver's
-code.
-
-The build system will then need to combine all the pieces into the image. Anything not running
-on the actual Artie system we are deployed to will simply return a 404 when accessed.
+Single point of ingress/egress: the default Helm Chart prevents all egress/ingress from/to the cluster
+except for the Artie API Server.
 
 For anything running *inside* the cluster, Artie Service Client should be used directly instead.
+
+An Artie API Server exists for each Artie on a cluster. Arties are namespaced in the K3S cluster
+to separate them, and each one has a deployment of microservices.
 
 ## Common Objects
 
 ### MCU IDs
 
-* `all`: *all* the MCUs.
-* `all-head`: *all* the MCUs in the head.
-* `eyebrows`: *Both* the right and left eyebrow MCU (they cannot be targeted individually).
-* `mouth`: The mouth MCU.
-* `sensors-head`: The MCU responsible for collecting sensor data in the head.
-* `pump-control`: The MCU responsible for pump control.
+MCU IDs must match the names found in the Artie HW file (e.g., [Artie00](../../../../artie00/artie00.yml)).
 
 ### SBC IDs
 
-SBC (single board computer) IDs:
-
-* `all`: *all* the SBCs.
-* `all-head`: *all* the SBCs in the head.
-* `controller`: The controller SBC node.
+SBC IDs must match the names found in the Artie HW file (e.g., [Artie00](../../../../artie00/artie00.yml)).
 
 ### Statuses
 
@@ -67,7 +54,6 @@ These are possible values for the submodule status reports:
     * *Payload (JSON)*:
         ```json
         {
-            "artie-id": "The Artie ID."
         }
         ```
     The payload may include additional information; generally it will include all supplied parameters.
@@ -76,7 +62,6 @@ These are possible values for the submodule status reports:
     * *Payload (JSON)*:
         ```json
         {
-            "artie-id": "The Artie ID.",
             "error": "A description of the error."
         }
         ```
@@ -86,7 +71,6 @@ These are possible values for the submodule status reports:
     * *Payload (JSON)*:
         ```json
         {
-            "artie-id": "The Artie ID."
         }
         ```
     The payload may include additional information; generally it will include all supplied parameters.

@@ -30,22 +30,20 @@ TODO: We have a REST server for ingress/egress to/from the cluster,
 
 * *GET*: `/logs/recent`
     * *Parameters*:
-        * `artie-id`: The Artie ID.
         * `seconds`: Integer value. We get logs from the last this many seconds.
-        * `level`: Only return logs of this level or higher in importance. See [Common Parameters](#common-parameters).
-        * `process`: Only return logs coming from the given process. See [Common Parameters](#common-parameters).
-        * `thread`: Only return logs coming from the given thread. See [Common Parameters](#common-parameters).
-        * `service`: Only return logs coming from the given Artie service. See [Common Parameters](#common-parameters).
+        * `level`: (Optional) Only return logs of this level or higher in importance. See [Common Parameters](#common-parameters).
+        * `process`: (Optional) Only return logs coming from the given process. See [Common Parameters](#common-parameters).
+        * `thread`: (Optional) Only return logs coming from the given thread. See [Common Parameters](#common-parameters).
+        * `service`: (Optional) Only return logs coming from the given Artie service. See [Common Parameters](#common-parameters).
 * *Response 200*:
     * *Payload (JSON)*:
         ```json
         {
-            "artie_id": "The Artie ID",
             "seconds": "Integer. The number of seconds queried",
-            "level": "Log level. See Common Parameters",
-            "process": "The process name. See Common Parameters",
-            "thread": "The thread name. See Common Parameters",
-            "service": "The Artie service. See Common Parameters",
+            "level": "[Optional] Log level. See Common Parameters",
+            "process": "[Optional] The process name. See Common Parameters",
+            "thread": "[Optional] The thread name. See Common Parameters",
+            "service": "[Optional] The Artie service. See Common Parameters",
             "logs": [
                 {
                     "level": "Log level. See Common Parameters",
@@ -54,7 +52,6 @@ TODO: We have a REST server for ingress/egress to/from the cluster,
                     "threadname": "The name of the thread.",
                     "timestamp": "Timestamp in artie logging's date format",
                     "servicename": "The Artie service.",
-                    "artieid": "The artie ID"
                 }
             ]
         }
@@ -66,19 +63,26 @@ Get a list of logs queried by means of a set of parameters.
 
 * *GET*: `/logs/query`
     * *Parameters*:
-        * `artie-id`: The Artie ID.
-        * `limit`: An integer maximum number of logs to receive. If -1, we accept all logs.
-        * `starttime`: Receive logs generated after this time. Format is artie logging's date format. Set to '*' for unset.
-        * `endtime`: Receive logs generated before this time. Format is artie logging's date format. Set to '*' for unset.
-        * `messagecontains`: A Python regular expression that must match any message returned. Can be '*' for unset.
-        * `level`: Only return logs of this level or higher in importance. See [Common Parameters](#common-parameters).
-        * `process`: Only return logs coming from the given process. See [Common Parameters](#common-parameters).
-        * `thread`: Only return logs coming from the given thread. See [Common Parameters](#common-parameters).
-        * `service`: Only return logs coming from the given Artie service. See [Common Parameters](#common-parameters).
+        * `limit`: (Optional) An integer maximum number of logs to receive.
+        * `starttime`: (Optional) Receive logs generated after this time. Format is artie logging's date format.
+        * `endtime`: (Optional) Receive logs generated before this time. Format is artie logging's date format.
+        * `messagecontains`: (Optional) A Python regular expression that must match any message returned.
+        * `level`: (Optional) Only return logs of this level or higher in importance. See [Common Parameters](#common-parameters).
+        * `process`: (Optional) Only return logs coming from the given process. See [Common Parameters](#common-parameters).
+        * `thread`: (Optional) Only return logs coming from the given thread. See [Common Parameters](#common-parameters).
+        * `service`: (Optional) Only return logs coming from the given Artie service. See [Common Parameters](#common-parameters).
 * *Response 200*:
     * *Payload (JSON)*:
         ```json
         {
+            "limit": "[Optional] Integer. The maximum number of logs requested.",
+            "starttime": "[Optional] Start time. See parameters.",
+            "endtime": "[Optional] End time. See parameters.",
+            "messagecontains": "[Optional] The message regex. See parameters.",
+            "level": "[Optional] Log level. See Common Parameters",
+            "process": "[Optional] The process name. See Common Parameters",
+            "thread": "[Optional] The thread name. See Common Parameters",
+            "service": "[Optional] The Artie service. See Common Parameters",
             "logs": [
                 {
                     "level": "Log level. See Common Parameters",
@@ -87,7 +91,6 @@ Get a list of logs queried by means of a set of parameters.
                     "threadname": "The name of the thread.",
                     "timestamp": "Timestamp in artie logging's date format",
                     "servicename": "The Artie service.",
-                    "artieid": "The artie ID"
                 }
             ]
         }
@@ -100,8 +103,7 @@ from this request are valid for inputs as `service` into the parameters
 of other requests in this API.
 
 * *GET*: `/logs/services`
-    * *Parameters*:
-        * `artie-id`: The Artie ID.
+    * *Parameters*: None
 * *Response 200*:
     * *Payload (JSON)*:
         ```json
