@@ -32,6 +32,14 @@ spec:
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           env:
             {{- tpl (toYaml .Values.baseEnvironment) . | nindent 12 }}
+          volumeMounts:
+            - name: artie-api-server-cert-volume
+              mountPath: /etc/artie-api-server/certs
+              readOnly: true
+      volumes:
+        - name: artie-api-server-cert-volume
+          secret:
+            secretName: artie-api-server-cert
 
 ---
 apiVersion: v1

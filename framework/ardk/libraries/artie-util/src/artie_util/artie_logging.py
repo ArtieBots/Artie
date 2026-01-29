@@ -147,12 +147,14 @@ def init(service_name, args=None):
     })
 
     # Check if we are running in test mode
-    test_mode = os.environ.get(constants.ArtieEnvVariables.ARTIE_RUN_MODE, constants.ArtieRunModes.PRODUCTION) in (constants.ArtieRunModes.SANITY_TESTING, constants.ArtieRunModes.UNIT_TESTING)
+    test_mode = os.environ.get(constants.ArtieEnvVariables.ARTIE_RUN_MODE, constants.ArtieRunModes.PRODUCTION) in (constants.ArtieRunModes.SANITY_TESTING, constants.ArtieRunModes.UNIT_TESTING, constants.ArtieRunModes.DEVELOPMENT)
 
     # Set up logging
-    fluent_bit_collector_hostname = os.environ.get(constants.ArtieEnvVariables.LOG_COLLECTOR_HOSTNAME, None)
-    fluent_bit_collector_port = os.environ.get(constants.ArtieEnvVariables.LOG_COLLECTOR_PORT, None)
-    socket_handler = ArtieLogSocketHandler(fluent_bit_collector_hostname, fluent_bit_collector_port)
+    if not test_mode:
+        fluent_bit_collector_hostname = os.environ.get(constants.ArtieEnvVariables.LOG_COLLECTOR_HOSTNAME, None)
+        fluent_bit_collector_port = os.environ.get(constants.ArtieEnvVariables.LOG_COLLECTOR_PORT, None)
+        socket_handler = ArtieLogSocketHandler(fluent_bit_collector_hostname, fluent_bit_collector_port)
+
     stream_handler = logging.StreamHandler()
     handlers = None if test_mode else [socket_handler, stream_handler]
     format = "%(asctime)s %(threadName)s %(levelname)s: %(message)s"

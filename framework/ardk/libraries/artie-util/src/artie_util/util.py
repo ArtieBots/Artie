@@ -4,6 +4,7 @@ from rpyc.utils.authenticators import SSLAuthenticator
 from rpyc.utils.server import ThreadPoolServer
 import getpass
 import os
+import pathlib
 import platform
 import ssl
 import subprocess
@@ -118,6 +119,10 @@ def generate_self_signed_cert(certfpath, keyfpath, days=30, force=False):
         # Nothing to do
         alog.info("Certificate and key already found and `force` is False. Not generating new cert.")
         return
+
+    # Ensure the directories exist
+    pathlib.Path(os.path.dirname(certfpath)).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(os.path.dirname(keyfpath)).mkdir(parents=True, exist_ok=True)
 
     timelimit = "36500" if days is None else str(days)
     cmd = f"openssl req -x509 -newkey rsa:4096 -sha256 -days {timelimit} -nodes -keyout {keyfpath} -out {certfpath}"

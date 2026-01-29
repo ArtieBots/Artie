@@ -1,7 +1,7 @@
 # API for the Service Interface
 
 This API reference is for the general service interface
-(see [interfaces/service.py](../../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py)).
+(see [interfaces/service.py](../../../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py)).
 
 In this documentation, `<service>` is the service making use of this interface,
 for example, 'mouth' or 'eyebrows'.
@@ -13,7 +13,7 @@ for example, 'mouth' or 'eyebrows'.
 Gets the service's human-friendly name and its git hash.
 
 * *GET*: `/<service>/whoami`
-    * *Parameters*: None
+    * *Query Parameters*: None
 * *Response 200*:
     * *Payload (JSON)*:
         ```json

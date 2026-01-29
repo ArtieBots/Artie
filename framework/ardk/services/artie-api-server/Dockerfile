@@ -2,7 +2,7 @@ ARG ARTIE_BASE_IMG=artie/ardk-base:latest
 FROM ${ARTIE_BASE_IMG}
 
 # Pip requirements
-RUN pip install flask==2.3
+RUN pip install flask gunicorn
 
 # Copy in the files
 COPY ./src /app
@@ -23,4 +23,4 @@ ENV ARTIE_LOG_LEVEL=INFO
 
 # Default command is to run the application
 WORKDIR /app
-CMD [ "./run.sh" ]
+CMD [ "/bin/bash", "-c", "gunicorn -w 4 -b 0.0.0.0:${PORT} main:app" ]
