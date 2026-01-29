@@ -29,7 +29,7 @@ TODO: We have a REST server for ingress/egress to/from the cluster,
       appropriately.
 
 * *GET*: `/logs/recent`
-    * *Parameters*:
+    * *Query Parameters*:
         * `seconds`: Integer value. We get logs from the last this many seconds.
         * `level`: (Optional) Only return logs of this level or higher in importance. See [Common Parameters](#common-parameters).
         * `process`: (Optional) Only return logs coming from the given process. See [Common Parameters](#common-parameters).
@@ -62,7 +62,7 @@ TODO: We have a REST server for ingress/egress to/from the cluster,
 Get a list of logs queried by means of a set of parameters.
 
 * *GET*: `/logs/query`
-    * *Parameters*:
+    * *Query Parameters*:
         * `limit`: (Optional) An integer maximum number of logs to receive.
         * `starttime`: (Optional) Receive logs generated after this time. Format is artie logging's date format.
         * `endtime`: (Optional) Receive logs generated before this time. Format is artie logging's date format.
@@ -103,7 +103,7 @@ from this request are valid for inputs as `service` into the parameters
 of other requests in this API.
 
 * *GET*: `/logs/services`
-    * *Parameters*: None
+    * *Query Parameters*: None
 * *Response 200*:
     * *Payload (JSON)*:
         ```json
