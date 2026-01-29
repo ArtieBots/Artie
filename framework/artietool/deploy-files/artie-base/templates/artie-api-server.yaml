@@ -86,3 +86,26 @@ spec:
         target:
           type: Utilization
           averageUtilization: 75
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: artie-api-server-allow-external
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/component: artie-api-server
+    {{- tpl (toYaml .Values.labels) . | nindent 4 }}
+  annotations:
+    description: Allow external ingress to API server
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: artie-api-server
+  policyTypes:
+  - Ingress
+  ingress:
+  - from: []
+    ports:
+    - protocol: TCP
+      port: {{ .Values.ports.artieApiServer }}
