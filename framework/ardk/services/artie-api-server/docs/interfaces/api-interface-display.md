@@ -37,7 +37,7 @@ Set the display to show the given state, first powering it on if necessary.
     * *Payload (JSON)*:
         ```json
         {
-            "display": "determined by service"
+            "display": "base-64-encoded binary whose contents are determined by service"
         }
         ```
 
@@ -51,7 +51,7 @@ Set the display to show the given state, first powering it on if necessary.
         ```json
         {
             "which": "<determined by service>",
-            "display": "current display mode; determined by service, but wll include the following possible values: test, clear, error"
+            "display": "current display mode; will be base64-encoded binary whose contents are determined by service, but wll include the following possible values: test, clear, error"
         }
         ```
 

@@ -4,6 +4,7 @@ API interface for services that make use of displays.
 from artie_util import artie_logging as alog
 from artie_service_client import client as asc
 from flask import request as r
+import base64
 import flask
 
 display_api = flask.Blueprint('display_api', __name__, url_prefix="/<service>/display")
@@ -14,7 +15,7 @@ def list_displays(service: str):
     """
     List all displays available on the given service.
     """
-    # Get the service
+    # Get the service and list displays
     try:
         s = asc.ServiceConnection(service)
         displays = s.display_list()
@@ -22,6 +23,12 @@ def list_displays(service: str):
             "service": service,
             "displays": displays
         }
+    except KeyError as e:
+        errbody = {
+            "service": service,
+            "error": f"Service not found: {e}"
+        }
+        return errbody, 404
     except TimeoutError as e:
         errbody = {
             "service": service,
@@ -35,574 +42,212 @@ def list_displays(service: str):
         }
         return errbody, 500
 
-
-
-
-
-
-
-
-@display_api.route("/lcd/<which>", methods=["POST"])
-@alog.function_counter("set_display", alog.MetricSWCodePathAPIOrder.CALLS)
-def set_display(which: str):
+@display_api.route("/contents", methods=["POST"])
+@alog.function_counter("set_display_contents", alog.MetricSWCodePathAPIOrder.CALLS)
+def set_display_contents(service: str):
     """
-    Change the eyebrow display to show the given state.
-
-    * *POST*: `/eyebrows/lcd/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-        * *Payload (JSON)*:
-            ```json
-            {
-                "vertices": ["H/M/L", "H/M/L", "H/M/L"]
-            }
-            ```
+    Set the contents of a specific display on the given service.
     """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
+    # Check params
+    if 'which' not in r.args:
         errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-
-    # Double check body
-    vertices = r.form.get('vertices', None)
-    if not vertices:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Missing 'vertices' section from request body."
+            "service": service,
+            "error": "Missing 'which' parameter."
         }
         return errbody, 400
 
-    # Double check type of 'vertices'
-    try:
-        len_of_verts = len(vertices)
-    except TypeError:
+    display_id = r.args['which']
+
+    # Get the payload
+    data = r.get_json()
+    if not data or 'display' not in data:
         errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Vertices section in request body is not a list, but should be a list of exactly three strings."
-        }
-        return errbody, 400
-
-    # Check length of 'vertices'
-    if len_of_verts != 3:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"Vertices section in request body should be a list of exactly three strings, but has length {len_of_verts}"
-        }
-        return errbody, 400
-
-    # Check that the type of the subitems is correct
-    for item in vertices:
-        if item not in ("H", "M", "L"):
-            errbody = {
-                "artie-id": r.args['artie-id'],
-                "error": f"Vertices section in request body should be a list of exactly three strings, each of which should be one of 'H', 'L', or 'M'."
-            }
-            return errbody, 400
-
-    # Run the command
-    err, errmsg = eyebrows.display(vertices, which, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"{errmsg}"
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "vertices": r.form['vertices']
-        }
-
-@eyebrows_api.route("/lcd/<which>", methods=["GET"])
-@alog.function_counter("get_eyebrows_display", alog.MetricSWCodePathAPIOrder.CALLS)
-def get_eyebrows_display(which: str):
-    """
-    * *GET*: `/eyebrows/lcd/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-    * *Response 200*:
-        * *Payload (JSON)*:
-            ```json
-            {
-                "artie-id": "The Artie ID.",
-                "eyebrow-side": "left or right",
-                "vertices": ["H/M/L", "H/M/L", "H/M/L"] OR "test" OR "clear"
-            }
-            ```
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-
-    err, display_or_errmsg = eyebrows.get_display(which, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": display_or_errmsg
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "vertices": display_or_errmsg
-        }
-
-@eyebrows_api.route("/lcd/<which>/test", methods=["POST"])
-@alog.function_counter("test_eyebrows_display", alog.MetricSWCodePathAPIOrder.CALLS)
-def test_eyebrows_display(which: str):
-    """
-    Draw a test image on the eyebrow LCD.
-
-    * *POST*: `/eyebrows/lcd/<which>/test` where `<which>` is `left` or `right`
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-        * *Payload*: None
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-
-    err, errmsg = eyebrows.test(which, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": errmsg
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which
-        }
-
-@eyebrows_api.route("/lcd/<which>/off", methods=["POST"])
-@alog.function_counter("clear_eyebrows_display", alog.MetricSWCodePathAPIOrder.CALLS)
-def clear_eyebrows_display(which: str):
-    """
-    Erase the contents on an eyebrow LCD.
-
-    * *POST*: `/eyebrows/lcd/<which>/off` where `<which>` is `left` or `right`
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-        * *Payload*: None
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-
-    err, errmsg = eyebrows.clear(which, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": errmsg
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which
-        }
-
-@eyebrows_api.route("/led/<which>", methods=["POST"])
-@alog.function_counter("set_eyebrows_led", alog.MetricSWCodePathAPIOrder.CALLS)
-def set_eyebrows_led(which: str):
-    """
-    * *POST*: `/eyebrows/led/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-            * `state`: One of `on`, `off`, or `heartbeat`
-        * *Payload*: None
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "state": r.args.get('state', 'Unknown'),
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "state": r.args.get('state', 'Unknown'),
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-    elif 'state' not in r.args:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "state": "Unknown",
-            "error": "Missing state parameter."
-        }
-        return errbody, 400
-
-    err = None
-    match state := r.args['state'].lower():
-        case eyebrows.LEDStates.ON:
-            err, errmsg = eyebrows.led(which, state, artie_id=r.args['artie-id'])
-        case eyebrows.LEDStates.OFF:
-            err, errmsg = eyebrows.led(which, state, artie_id=r.args['artie-id'])
-        case eyebrows.LEDStates.HEARTBEAT:
-            err, errmsg = eyebrows.led(which, state, artie_id=r.args['artie-id'])
-        case _:
-            errbody = {
-                "artie-id": r.args['artie-id'],
-                "state": r.args['state'],
-                "error": "Invalid state value."
-            }
-            return errbody, 400
-
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "state": r.args['state'],
-            "error": f"{errmsg}"
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "state": r.args['state'].lower()
-        }
-
-@eyebrows_api.route("/led/<which>", methods=["GET"])
-@alog.function_counter("get_eyebrows_led", alog.MetricSWCodePathAPIOrder.CALLS)
-def get_eyebrows_led(which: str):
-    """
-    * *GET*: `/eyebrows/led/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-    * *Response 200*:
-        * *Payload (JSON)*:
-            ```json
-            {
-                "artie-id": "The Artie ID.",
-                "eyebrow-side": "left or right",
-                "state": "on, off, or heartbeat"
-            }
-            ```
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-
-    err, state_or_errmsg = eyebrows.get_led(which, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"{state_or_errmsg}"
-        }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "state": r.args['state'].lower()
-        }
-
-@eyebrows_api.route("/servo/<which>", methods=["POST"])
-@alog.function_counter("set_eyebrows_servo", alog.MetricSWCodePathAPIOrder.CALLS)
-def set_eyebrows_servo(which: str):
-    """
-    * *POST*: `/eyebrows/servo/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-            * `degrees`: The position to go to. Should be a degree (float) value within the closed range [0, 180]. 0 degrees is left. 180 degrees is right. 90 degrees is center.
-        * *Payload*: None
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
-        errbody = {
-            "artie-id": "Unknown",
-            "degrees": r.args.get('degrees', 'Unknown'),
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "degrees": r.args.get('degrees', 'Unknown'),
-            "error": "Need either 'left' or 'right'"
-        }
-        return errbody, 404
-    elif 'degrees' not in r.args:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "degrees": "Unknown",
-            "error": "Missing 'degrees' parameter."
+            "service": service,
+            "which": display_id,
+            "error": "Missing 'display' in JSON payload."
         }
         return errbody, 400
 
     try:
-        degrees = float(r.args['degrees'])
-    except TypeError:
+        # Decode base64 content
+        content = base64.b64decode(data['display'])
+    except Exception as e:
         errbody = {
-            "artie-id": r.args['artie-id'],
-            "degrees": r.args['degrees'],
-            "error": "Cannot interpret 'degrees' parameter as a float."
+            "service": service,
+            "which": display_id,
+            "error": f"Error decoding payload: {e}"
         }
         return errbody, 400
 
-    if degrees < 0.0 or degrees > 180.0:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "degrees": r.args['degrees'],
-            "error": "'degrees' must be in the range [0, 180]."
-        }
-        return errbody, 400
-
-    err, errmsg = eyebrows.set_servo(which, degrees, artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "degrees": r.args['degrees'],
-            "error": f"{errmsg}"
-        }
-        return errbody, err
-    else:
+    # Get the service and set display contents
+    try:
+        s = asc.ServiceConnection(service)
+        s.display_set(display_id, content)
         return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "degrees": r.args['degrees']
+            "service": service,
+            "which": display_id,
+            "status": "success"
         }
-
-@eyebrows_api.route("/servo/<which>", methods=["GET"])
-@alog.function_counter("get_eyebrows_servo", alog.MetricSWCodePathAPIOrder.CALLS)
-def get_eyebrows_servo(which: str):
-    """
-    Note: there is no way to get a *true* servo position for the eyeballs
-    (at least in this version of Artie). The servos do not have
-    encoders that can be accessed. Instead, eye position should be
-    inferred by a higher layer that makes use of field of view
-    changes. This GET request simply returns the value that
-    the eyebrow driver *believes* the servo is currently at,
-    which will typically be the value that it was last set to (or its starting value).
-
-    * *GET*: `/eyebrows/servo/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-    * *Response 200*:
-        * *Payload (JSON)*:
-            ```json
-            {
-                "artie-id": "The Artie ID.",
-                "eyebrow-side": "left or right",
-                "degrees": "floating point value between 0 (left) and 180 (right)"
-            }
-            ```
-    """
-    which = which.lower()
-
-    # Double check params
-    if 'artie-id' not in r.args:
+    except KeyError as e:
         errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
-        }
-        return errbody, 400
-    elif which not in ('left', 'right'):
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
+            "service": service,
+            "which": display_id,
+            "error": f"Service or display not found: {e}"
         }
         return errbody, 404
-
-    err, errmsg_or_degrees = eyebrows.get_servo(which, artie_id=r.args['artie-id'])
-    if err:
+    except TimeoutError as e:
         errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"{errmsg_or_degrees}"
+            "service": service,
+            "which": display_id,
+            "error": f"Timed out trying to set display contents: {e}"
         }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "degrees": f"{errmsg_or_degrees}"
-        }
-
-@eyebrows_api.route("/fw/<which>", methods=["POST"])
-@alog.function_counter("reload_eyebrows_firmware", alog.MetricSWCodePathAPIOrder.CALLS)
-def reload_eyebrows_firmware(which: str):
-    """
-    Reload eyebrow MCU firmware.
-
-    * *POST*: `/eyebrows/fw/<which>` where `<which>` is `left` or `right`.
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-        * *Payload*: None
-    """
-    # Double check params
-    if 'artie-id' not in r.args:
+        return errbody, 504
+    except Exception as e:
         errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
+            "service": service,
+            "which": display_id,
+            "error": f"Error trying to set display contents: {e}"
+        }
+        return errbody, 500
+
+
+@display_api.route("/contents", methods=["GET"])
+@alog.function_counter("get_display_contents", alog.MetricSWCodePathAPIOrder.CALLS)
+def get_display_contents(service: str):
+    """
+    Get the contents of a specific display on the given service.
+    """
+    # Check params
+    if 'which' not in r.args:
+        errbody = {
+            "service": service,
+            "error": "Missing 'which' parameter."
         }
         return errbody, 400
-    elif which not in ('left', 'right'):
+
+    display_id = r.args['which']
+
+    # Get the service and get display contents
+    try:
+        s = asc.ServiceConnection(service)
+        content = s.display_get(display_id)
+        return {
+            "service": service,
+            "which": display_id,
+            "content": base64.b64encode(content).decode('utf-8')
+        }
+    except KeyError as e:
         errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": "Need either 'left' or 'right'"
+            "service": service,
+            "which": display_id,
+            "error": f"Service or display not found: {e}"
         }
         return errbody, 404
-
-    err, errmsg = eyebrows.reload_firmware(which, artie_id=r.args['artie-id'])
-    if err:
+    except TimeoutError as e:
         errbody = {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which,
-            "error": f"{errmsg}"
+            "service": service,
+            "which": display_id,
+            "error": f"Timed out trying to get display contents: {e}"
         }
-        return errbody, err
-    else:
-        return {
-            "artie-id": r.args['artie-id'],
-            "eyebrow-side": which
-        }
-
-@eyebrows_api.route("/status", methods=["GET"])
-@alog.function_counter("get_eyebrows_status", alog.MetricSWCodePathAPIOrder.CALLS)
-def get_eyebrows_status():
-    """
-    Get the eyebrows' submodules' statuses.
-
-    * *GET*: `/eyebrows/status`
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-    * *Response 200*:
-        * *Payload (JSON)*:
-            ```json
-            {
-                "artie-id": "The Artie ID.",
-                "submodule-statuses":
-                    {
-                        "FW": "<Status>",
-                        "LED-LEFT": "<Status>",
-                        "LED-RIGHT": "<Status>",
-                        "LCD-LEFT": "<Status>",
-                        "LCD-RIGHT": "<Status>",
-                        "LEFT-SERVO": "<Status>",
-                        "RIGHT-SERVO": "<Status>"
-                    }
-            }
-            ```
-        where `<Status>` is one of the available
-        status values as [found in the top-level API README](../README.md#statuses)
-    """
-    # Double check params
-    if 'artie-id' not in r.args:
+        return errbody, 504
+    except Exception as e:
         errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
+            "service": service,
+            "which": display_id,
+            "error": f"Error trying to get display contents: {e}"
+        }
+        return errbody, 500
+
+@display_api.route("/test", methods=["POST"])
+@alog.function_counter("test_display", alog.MetricSWCodePathAPIOrder.CALLS)
+def test_display(service: str):
+    """
+    Run a test pattern on the specified display.
+    """
+    # Check params
+    if 'which' not in r.args:
+        errbody = {
+            "service": service,
+            "error": "Missing 'which' parameter."
         }
         return errbody, 400
 
-    err, status_or_errmsg = eyebrows.get_status(artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"{status_or_errmsg}"
-        }
-        return errbody, err
-    else:
+    display_id = r.args['which']
+
+    # Get the service and test display
+    try:
+        s = asc.ServiceConnection(service)
+        s.display_test(display_id)
         return {
-            "artie-id": r.args['artie-id'],
-            "submodule-statuses": status_or_errmsg
+            "service": service,
+            "which": display_id,
+            "status": "success"
         }
-
-@eyebrows_api.route("/self-test", methods=["POST"])
-@alog.function_counter("eyebrows_self_test", alog.MetricSWCodePathAPIOrder.CALLS)
-def eyebrows_self_test():
-    """
-    Initiate a self-test.
-
-    * *POST*: `/eyebrows/self-test`
-        * *Parameters*:
-            * `artie-id`: The Artie ID.
-        * *Payload*: None
-    """
-    # Double check params
-    if 'artie-id' not in r.args:
+    except KeyError as e:
         errbody = {
-            "artie-id": "Unknown",
-            "error": "Missing artie-id parameter."
+            "service": service,
+            "which": display_id,
+            "error": f"Service or display not found: {e}"
+        }
+        return errbody, 404
+    except TimeoutError as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Timed out trying to test display: {e}"
+        }
+        return errbody, 504
+    except Exception as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Error trying to test display: {e}"
+        }
+        return errbody, 500
+
+@display_api.route("/off", methods=["POST"])
+@alog.function_counter("clear_display", alog.MetricSWCodePathAPIOrder.CALLS)
+def clear_display(service: str):
+    """
+    Clear the contents of the specified display.
+    """
+    # Check params
+    if 'which' not in r.args:
+        errbody = {
+            "service": service,
+            "error": "Missing 'which' parameter."
         }
         return errbody, 400
 
-    err, errmsg = eyebrows.self_test(artie_id=r.args['artie-id'])
-    if err:
-        errbody = {
-            "artie-id": r.args['artie-id'],
-            "error": f"{errmsg}"
-        }
-        return errbody, err
-    else:
+    display_id = r.args['which']
+
+    # Get the service and clear display
+    try:
+        s = asc.ServiceConnection(service)
+        s.display_clear(display_id)
         return {
-            "artie-id": r.args['artie-id']
+            "service": service,
+            "which": display_id,
+            "status": "success"
         }
+    except KeyError as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Service or display not found: {e}"
+        }
+        return errbody, 404
+    except TimeoutError as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Timed out trying to clear display: {e}"
+        }
+        return errbody, 504
+    except Exception as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Error trying to clear display: {e}"
+        }
+        return errbody, 500
