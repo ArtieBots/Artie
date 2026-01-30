@@ -30,9 +30,14 @@ if __name__ == "__main__":
 
     # Initialization
     app = flask.Flask(__name__)
-    app.register_blueprint(blueprints.api_server_api)
-    app.register_blueprint(blueprints.logs_api)
-    app.register_blueprint(blueprints.metrics_api)
+    app.register_blueprint(blueprints.api_server_api.api_server_api)
+    app.register_blueprint(blueprints.logs_api.logs_api)
+    app.register_blueprint(blueprints.metrics_api.metrics_api)
+    app.register_blueprint(blueprints.api_interface_mcu.mcu_api)
+    app.register_blueprint(blueprints.api_interface_driver.driver_api)
+    app.register_blueprint(blueprints.api_interface_servo.servo_api)
+    app.register_blueprint(blueprints.api_interface_statusled.statusled_api)
+    app.register_blueprint(blueprints.api_interface_service.service_api)
 
     # Run the server
     if args.ipv6:
