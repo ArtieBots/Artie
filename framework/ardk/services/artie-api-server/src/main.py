@@ -1,10 +1,7 @@
 from artie_util import artie_logging as alog
 from artie_util import constants
 from artie_util import util
-from drivers import mouth_api
-from drivers import eyebrows_api
-from telemetry import logs_api
-from telemetry import metrics_api
+import blueprints
 import argparse
 import flask
 import os
@@ -33,10 +30,9 @@ if __name__ == "__main__":
 
     # Initialization
     app = flask.Flask(__name__)
-    app.register_blueprint(mouth_api.mouth_api)
-    app.register_blueprint(eyebrows_api.eyebrows_api)
-    app.register_blueprint(logs_api.logs_api)
-    app.register_blueprint(metrics_api.metrics_api)
+    app.register_blueprint(blueprints.api_server_api)
+    app.register_blueprint(blueprints.logs_api)
+    app.register_blueprint(blueprints.metrics_api)
 
     # Run the server
     if args.ipv6:
