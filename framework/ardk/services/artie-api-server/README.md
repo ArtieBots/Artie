@@ -40,6 +40,17 @@ with the Artie API Server. This provides a good balance of security and ease-of-
 require paying for a CA, but still provides encryption, plus authentication using a shared secret
 that other parties shouldn't be able to get to (as it comes from the physical controller node).
 
+Artie Services' public RPC methods are defined in their respective interfaces, which are the only
+way to interact with them by means of the Artie API Server. These interfaces are documented
+individually; see the [docs/interfaces](./docs/interfaces/) folder in this repo for more information. Because interfaces are
+general, we also document known services that implement them, along with the details of their
+interface implementations, such as the names of MCUs or LEDs they manage. These documents
+can be found in the [docs/services](./docs/services/) folder.
+
+The Artie API Server is implemented in Python using the Flask web framework.
+We make use of blueprints to organize the code into separate modules for each interface.
+Any time a new interface is created, a new blueprint should be created and added too.
+
 ## Common Objects
 
 ### MCU IDs
@@ -86,3 +97,31 @@ These are possible values for the submodule status reports:
         }
         ```
     The payload may include additional information; generally it will include all supplied parameters.
+
+## API Server API
+
+### List Services
+
+List the services that are currently running on this Artie.
+
+* *GET*: `/api_server/list_services`
+    * *Query Parameters*:
+        * *filter_host*: (optional) If provided, only services running on the given host will be listed.
+        * *filter_name*: (optional) If provided, only services with names matching this string will be listed.
+        * *filter_interfaces*: (optional) If provided, should be a comma-separated list of interfaces; only services
+          implementing all of these interfaces will be listed.
+    * *Payload*: None
+* *Response 200*:
+    * *Payload (JSON)*:
+        ```json
+        {
+            "filter_host": "<HOST>",
+            "filter_name": "<NAME>",
+            "filter_interfaces": ["<INTERFACE1>", "<INTERFACE2>"],
+            "services":
+                [
+                    "<SERVICE1>",
+                    "<SERVICE2>",
+                ]
+        }
+        ```
