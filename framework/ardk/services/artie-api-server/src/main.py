@@ -1,11 +1,36 @@
 from artie_util import artie_logging as alog
 from artie_util import constants
 from artie_util import util
-import blueprints
 import argparse
 import flask
 import os
+import blueprints.api_server_api as api_server_api
+import blueprints.logs_api as logs_api
+import blueprints.metrics_api as metrics_api
+import blueprints.api_interface_mcu as api_interface_mcu
+import blueprints.api_interface_driver as api_interface_driver
+import blueprints.api_interface_servo as api_interface_servo
+import blueprints.api_interface_statusled as api_interface_statusled
+import blueprints.api_interface_service as api_interface_service
 
+# Initialization (must be at the top level for gunicorn to see it)
+app = flask.Flask(__name__)
+app.register_blueprint(api_server_api.api_server_api)
+app.register_blueprint(logs_api.logs_api)
+app.register_blueprint(metrics_api.metrics_api)
+app.register_blueprint(api_interface_mcu.mcu_api)
+app.register_blueprint(api_interface_driver.driver_api)
+app.register_blueprint(api_interface_servo.servo_api)
+app.register_blueprint(api_interface_statusled.statusled_api)
+app.register_blueprint(api_interface_service.service_api)
+
+# Generate our self-signed certificate (if not already present)
+# These are used for RPC encryption between the API server and the Artie services.
+certfpath = "/etc/cert.pem"
+keyfpath = "/etc/pkey.pem"
+util.generate_self_signed_cert(certfpath, keyfpath, days=None, force=True)
+
+# For local development/testing
 if __name__ == "__main__":
     # Set up logging
     parser = argparse.ArgumentParser()
@@ -16,28 +41,11 @@ if __name__ == "__main__":
     args, _ = parser.parse_known_args()
     alog.init("artie-api-server", args)
 
-    # Generate our self-signed certificate (if not already present)
-    # These are used for RPC encryption between the API server and the Artie services.
-    certfpath = "/etc/cert.pem"
-    keyfpath = "/etc/pkey.pem"
-    util.generate_self_signed_cert(certfpath, keyfpath, days=None, force=True)
-
     # We also have a cert for the API server itself to use for HTTPS.
     server_certfpath = "/etc/artie-api-server/certs/tls.crt"
     server_keyfpath = "/etc/artie-api-server/certs/tls.key"
     if util.mode() not in (constants.ArtieRunModes.INTEGRATION_TESTING, constants.ArtieRunModes.PRODUCTION):
         util.generate_self_signed_cert(server_certfpath, server_keyfpath, days=None, force=True)
-
-    # Initialization
-    app = flask.Flask(__name__)
-    app.register_blueprint(blueprints.api_server_api.api_server_api)
-    app.register_blueprint(blueprints.logs_api.logs_api)
-    app.register_blueprint(blueprints.metrics_api.metrics_api)
-    app.register_blueprint(blueprints.api_interface_mcu.mcu_api)
-    app.register_blueprint(blueprints.api_interface_driver.driver_api)
-    app.register_blueprint(blueprints.api_interface_servo.servo_api)
-    app.register_blueprint(blueprints.api_interface_statusled.statusled_api)
-    app.register_blueprint(blueprints.api_interface_service.service_api)
 
     # Run the server
     if args.ipv6:

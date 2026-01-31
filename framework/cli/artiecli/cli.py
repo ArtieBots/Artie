@@ -19,7 +19,7 @@ import urllib3
 _artie_cli_dpath = os.path.dirname(os.path.realpath(__file__))
 _module_dpath = os.path.join(_artie_cli_dpath, "modules")
 MODULE_NAMES = [os.path.splitext(fname)[0].replace("_", "-") for fname in os.listdir(_module_dpath) if os.path.splitext(os.path.join(_module_dpath, fname))[-1].lower() == ".py"]
-MODULES = [importlib.import_module("." + name, package='artiecli.modules') for name in MODULE_NAMES]
+MODULES = [importlib.import_module("." + name.replace("-", "_"), package='artiecli.modules') for name in MODULE_NAMES]
 
 def _help(args):
     """
