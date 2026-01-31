@@ -1,5 +1,5 @@
 # TODO: The Controller Node should query the various buses
-#       and populate this file itself. Hand-crafting a HW file should only
+#       and populate this file itself. Hand-crafting a HW manifest should only
 #       be necessary for unusual custom hardware configurations.
 api_version: v1 # Update this if you make changes to this YAML specification that requires changes to hw_config.py
 

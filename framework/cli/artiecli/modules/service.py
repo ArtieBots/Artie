@@ -9,17 +9,9 @@ def _connect_registrar(args) -> TCPRegistryClient:
     registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864)))
     return registrar
 
-#########################################################################################
-################################# List Subsystem ########################################
-#########################################################################################
-
 def _cmd_list(args):
     registrar = _connect_registrar(args)
     common.format_print_result(registrar.list(filter_host=args.host), "service", "list", args.artie_id)
-
-#########################################################################################
-################################# Query Subsystem #######################################
-#########################################################################################
 
 def _cmd_query(args):
     if args.name and args.interfaces:
@@ -34,9 +26,6 @@ def _cmd_query(args):
     registrar = _connect_registrar(args)
     common.format_print_result(registrar.discover(query), "service", "query", args.artie_id)
 
-#########################################################################################
-################################## PARSERS ##############################################
-#########################################################################################
 def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(title="service", description="The service module's subcommands")
 
