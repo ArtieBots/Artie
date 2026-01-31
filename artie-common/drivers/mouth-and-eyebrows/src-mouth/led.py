@@ -45,6 +45,9 @@ class LedSubmodule:
             case 'heartbeat':
                 self.heartbeat()
 
+    def list(self) -> list[str]:
+        return ['mouth']
+
     def on(self) -> bool:
         alog.test("Received request for mouth LED -> ON.", tests=['mouth-driver-unit-tests:led-on'])
         led_on_bytes = CMD_MODULE_ID_LEDS | 0x00

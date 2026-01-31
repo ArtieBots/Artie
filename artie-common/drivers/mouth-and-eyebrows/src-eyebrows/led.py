@@ -19,7 +19,7 @@ class LedSubmodule:
         self.right_led_status = constants.SubmoduleStatuses.UNKNOWN
 
     def _self_check_one_side(self, side: str):
-        prev_state = self._left_led_state if side == 'left' else self._right_led_state
+        prev_state = self._left_led_state if side == 'eyebrow-left' else self._right_led_state
         self.on(side)
         time.sleep(0.1)
         self.off(side)
@@ -33,15 +33,15 @@ class LedSubmodule:
                 self.heartbeat(side)
 
     def _set_status(self, side: str, status: constants.SubmoduleStatuses):
-        if side == 'left':
+        if side == 'eyebrow-left':
             self.left_led_status = status
         else:
             self.right_led_status = status
 
     def self_check(self):
         alog.test("Checking LED subsystem...", tests=['eyebrows-driver-unit-tests:self-check'])
-        self._self_check_one_side('left')
-        self._self_check_one_side('right')
+        self._self_check_one_side('eyebrow-left')
+        self._self_check_one_side('eyebrow-right')
 
     def status(self) -> Dict[str, constants.SubmoduleStatuses]:
         return {
@@ -51,16 +51,19 @@ class LedSubmodule:
 
     def initialize(self) -> bool:
         worked = True
-        worked &= self.heartbeat('left')
-        worked &= self.heartbeat('right')
+        worked &= self.heartbeat('eyebrow-left')
+        worked &= self.heartbeat('eyebrow-right')
         return worked
+
+    def list(self) -> list[str]:
+        return ['eyebrow-left', 'eyebrow-right']
 
     def on(self, side: str) -> bool:
         alog.test(f"Received request for {side} LED -> ON.", tests=['eyebrows-driver-unit-tests:led-on'])
         address = ebcommon.get_address(side)
         led_on_bytes = CMD_MODULE_ID_LEDS | 0x00
         wrote = i2c.write_bytes_to_address(address, led_on_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_led_state = constants.StatusLEDStates.ON
         else:
             self._right_led_state = constants.StatusLEDStates.ON
@@ -72,7 +75,7 @@ class LedSubmodule:
         address = ebcommon.get_address(side)
         led_on_bytes = CMD_MODULE_ID_LEDS | 0x01
         wrote = i2c.write_bytes_to_address(address, led_on_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_led_state = constants.StatusLEDStates.OFF
         else:
             self._right_led_state = constants.StatusLEDStates.OFF
@@ -84,7 +87,7 @@ class LedSubmodule:
         address = ebcommon.get_address(side)
         led_heartbeat_bytes = CMD_MODULE_ID_LEDS | 0x02
         wrote = i2c.write_bytes_to_address(address, led_heartbeat_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_led_state = constants.StatusLEDStates.HEARTBEAT
         else:
             self._right_led_state = constants.StatusLEDStates.HEARTBEAT
@@ -93,11 +96,11 @@ class LedSubmodule:
 
     def get(self, side: str) -> constants.StatusLEDStates:
         side = side.lower()
-        if side not in ('left', 'right'):
+        if side not in ('eyebrow-left', 'eyebrow-right'):
             errmsg = f"Invalid eyebrow side: {side}"
             alog.error(errmsg)
             return errmsg
-        elif side == 'left':
+        elif side == 'eyebrow-left':
             alog.test(f"Received request for {side} LED -> State: {self._left_led_state.value}", tests=['eyebrows-driver-unit-tests:led-get'])
             return self._left_led_state
         else:

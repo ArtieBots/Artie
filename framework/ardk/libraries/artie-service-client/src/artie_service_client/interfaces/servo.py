@@ -20,7 +20,7 @@ class ServoInterfaceV1:
         """
         raise NotImplementedError("servo_list method must be implemented by the service.")
 
-    def servo_set_position(self, servo_id: str, position: float) -> None:
+    def servo_set(self, servo_id: str, position: float) -> None:
         """
         Set the position of a specific servo.
 
@@ -30,7 +30,7 @@ class ServoInterfaceV1:
         """
         raise NotImplementedError("servo_set_position method must be implemented by the service.")
 
-    def servo_get_position(self, servo_id: str) -> float:
+    def servo_get(self, servo_id: str) -> float:
         """
         Get the current position of a specific servo.
 
