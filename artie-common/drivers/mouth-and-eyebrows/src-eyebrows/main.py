@@ -7,7 +7,7 @@ This driver is responsible for:
 * Animating eyebrows
 * Moving eyes
 
-This driver accepts ZeroRPC requests and controls the
+This driver accepts RPC requests and controls the
 MCUs over the Controller Node's CAN bus. It is
 therefore meant to be run on the Controller Node,
 and it needs to be run inside a container that
@@ -19,7 +19,6 @@ from artie_util import constants
 from artie_util import util
 from artie_service_client import artie_service
 from artie_service_client import interfaces
-from typing import Dict, List
 from . import ebcommon
 from . import fw
 from . import lcd
@@ -27,7 +26,8 @@ from . import led
 from . import metrics
 from . import servo
 import argparse
-import os
+import base64
+import binascii
 import rpyc
 
 SERVICE_NAME = "eyebrows-driver"
@@ -36,6 +36,7 @@ SERVICE_NAME = "eyebrows-driver"
 class DriverServer(
     interfaces.ServiceInterfaceV1,
     interfaces.DriverInterfaceV1,
+    interfaces.DisplayInterfaceV1,
     interfaces.MCUInterfaceV1,
     interfaces.StatusLEDInterfaceV1,
     artie_service.ArtieRPCService
@@ -57,7 +58,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DriverInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.DriverInterfaceV1)
-    def status(self) -> Dict[str, str]:
+    def status(self) -> dict[str, str]:
         """
         Return the status of this service's submodules.
         """
@@ -79,55 +80,39 @@ class DriverServer(
         self._servo_submodule.self_check()
 
     @rpyc.exposed
-    @alog.function_counter("led_on", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
+    @alog.function_counter("led_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_on(self, side: str) -> bool:
+    def led_list(self) -> list[str]:
+        """
+        RPC method to list all LEDs.
+        """
+        return self._led_submodule.list()
+
+    @rpyc.exposed
+    @alog.function_counter("led_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
+    def led_set(self, side: str, state: str) -> bool:
         """
         RPC method to turn led on.
 
         Args
         ----
-        - side: One of 'left' or 'right'
+        - side: One of 'eyebrow-left' or 'eyebrow-right'
+        - state: The state to set the LED to. Must be one of 'on', 'off', or 'heartbeat'.
 
         Returns
         -------
         bool: True if we do not detect an error. False otherwise.
         """
-        return self._led_submodule.on(side)
-
-    @rpyc.exposed
-    @alog.function_counter("led_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
-    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_off(self, side: str) -> bool:
-        """
-        RPC method to turn led off.
-
-        Args
-        ----
-        - side: One of 'left' or 'right'
-
-        Returns
-        -------
-        bool: True if we do not detect an error. False otherwise.
-        """
-        return self._led_submodule.off(side)
-
-    @rpyc.exposed
-    @alog.function_counter("led_heartbeat", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
-    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_heartbeat(self, side: str) -> bool:
-        """
-        RPC method to turn the led to heartbeat mode.
-
-        Args
-        ----
-        - side: One of 'left' or 'right'
-
-        Returns
-        -------
-        bool: True if we do not detect an error. False otherwise.
-        """
-        return self._led_submodule.heartbeat(side)
+        if state == 'on':
+            return self._led_submodule.on(side)
+        elif state == 'off':
+            return self._led_submodule.off(side)
+        elif state == 'heartbeat':
+            return self._led_submodule.heartbeat(side)
+        else:
+            alog.error(f"Invalid LED state: {state}")
+            return False
 
     @rpyc.exposed
     @alog.function_counter("led_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
@@ -139,14 +124,66 @@ class DriverServer(
         return self._led_submodule.get(side)
 
     @rpyc.exposed
-    @alog.function_counter("lcd_test", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_test(self, side: str) -> bool:
+    @alog.function_counter("display_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DisplayInterfaceV1.__interface_name__})
+    @interfaces.interface_method(interfaces.DisplayInterfaceV1)
+    def display_list(self) -> list[str]:
+        """
+        RPC method to list all displays.
+        """
+        return self._lcd_submodule.list()
+
+    @rpyc.exposed
+    @alog.function_counter("display_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    def display_set(self, side: str, eyebrow_state: str) -> bool:
+        """
+        RPC method to draw a specified eyebrow state to the LCD.
+
+        Args
+        ----
+        - side: One of 'eyebrow-left' or 'eyebrow-right'
+        - eyebrow_state: A base64-encoded string representing the eyebrow state to draw.
+          Must be a string of three 'H', 'L', and 'M' characters representing High, Low, and Medium vertices.
+
+        Returns
+        -------
+        bool: True if we do not detect an error. False otherwise.
+        """
+        # Decode from base64
+        try:
+            decoded_state = base64.b64decode(eyebrow_state).decode('utf-8')
+        except binascii.Error as e:
+            alog.error(f"Failed to decode eyebrow state from base64: {e}")
+            return False
+        except Exception as e:
+            alog.error(f"Failed to decode eyebrow state from base64: {e}")
+            return False
+
+        if not all(c in 'HLM' for c in decoded_state):
+            alog.error(f"Invalid eyebrow state after decoding: {decoded_state}. Must only contain 'H', 'L', and 'M' characters.")
+            return False
+
+        return self._lcd_submodule.draw(side, decoded_state)
+
+    @rpyc.exposed
+    @alog.function_counter("display_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    def display_get(self, side: str) -> str:
+        """
+        RPC method to get the LCD value that we think
+        we are displaying on the given side. Will return either
+        a list of vertices, 'test', 'clear', or 'error', any of which
+        is base64-encoded.
+        """
+        return base64.b64encode(self._lcd_submodule.get(side).encode('utf-8')).decode('utf-8')
+
+    @rpyc.exposed
+    @alog.function_counter("display_test", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    def display_test(self, side: str) -> bool:
         """
         RPC method to test the LCD.
 
         Args
         ----
-        - side: One of 'left' or 'right'
+        - side: One of 'eyebrow-left' or 'eyebrow-right'
 
         Returns
         -------
@@ -155,47 +192,20 @@ class DriverServer(
         return self._lcd_submodule.test(side)
 
     @rpyc.exposed
-    @alog.function_counter("lcd_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_off(self, side: str) -> bool:
+    @alog.function_counter("display_clear", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    def display_clear(self, side: str) -> bool:
         """
         RPC method to turn the LCD off.
 
         Args
         ----
-        - side: One of 'left' or 'right'
+        - side: One of 'eyebrow-left' or 'eyebrow-right'
 
         Returns
         -------
         bool: True if we do not detect an error. False otherwise.
         """
         return self._lcd_submodule.off(side)
-
-    @rpyc.exposed
-    @alog.function_counter("lcd_draw", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_draw(self, side: str, eyebrow_state: List[str]) -> bool:
-        """
-        RPC method to draw a specified eyebrow state to the LCD.
-
-        Args
-        ----
-        - side: One of 'left' or 'right'
-        - eyebrow_state: A list of 'H' or 'L' or 'M'
-
-        Returns
-        -------
-        bool: True if we do not detect an error. False otherwise.
-        """
-        return self._lcd_submodule.draw(side, eyebrow_state)
-
-    @rpyc.exposed
-    @alog.function_counter("lcd_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_get(self, side: str) -> List[str]|str:
-        """
-        RPC method to get the LCD value that we think
-        we are displaying on the given side. Will return either
-        a list of vertices, 'test', 'clear', or 'error'.
-        """
-        return self._lcd_submodule.get(side)
 
     @rpyc.exposed
     @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
@@ -220,7 +230,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.MCUInterfaceV1)
-    def mcu_list(self) -> List[str]:
+    def mcu_list(self) -> list[str]:
         """
         Return a list of MCU IDs that this service is responsible for.
         """
@@ -282,6 +292,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("servo_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.SERVO})
+    @interfaces.interface_method(interfaces.ServoInterfaceV1)
     def servo_get(self, side: str) -> float:
         """
         RPC method to get the servo's degrees. This could be off
@@ -295,14 +306,15 @@ class DriverServer(
         return self._servo_submodule.get(side)
 
     @rpyc.exposed
-    @alog.function_counter("servo_go", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.SERVO})
-    def servo_go(self, side: str, servo_degrees: float) -> bool:
+    @alog.function_counter("servo_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.SERVO})
+    @interfaces.interface_method(interfaces.ServoInterfaceV1)
+    def servo_set(self, side: str, servo_degrees: float) -> bool:
         """
         RPC method to move the servo to the given location.
 
         Args
         ----
-        - side: One of 'left' or 'right'
+        - side: One of 'eyebrow-left' or 'eyebrow-right'
         - servo_degrees: Any value in the interval [0, 180]
 
         Returns

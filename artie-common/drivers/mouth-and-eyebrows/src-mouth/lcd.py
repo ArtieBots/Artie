@@ -48,6 +48,10 @@ class LcdSubmodule:
         elif prev_state is not None:
             self.draw(prev_state)
 
+    def list(self) -> list[str]:
+        alog.test("Received request for mouth LCD -> LIST.", tests=['mouth-driver-unit-tests:lcd-list'])
+        return ["mouth"]
+
     def test(self) -> bool:
         alog.test("Received request for mouth LCD -> TEST.", tests=['mouth-driver-unit-tests:lcd-test'])
         lcd_test_bytes = CMD_MODULE_ID_LCD | 0x11

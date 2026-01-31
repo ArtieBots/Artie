@@ -18,12 +18,12 @@ from artie_util import artie_logging as alog
 from artie_service_client import artie_service
 from artie_service_client import interfaces
 from artie_util import util
-from typing import Dict
 from . import fw
 from . import lcd
 from . import led
 from . import metrics
 import argparse
+import base64
 import rpyc
 
 SERVICE_NAME = "mouth-driver"
@@ -32,6 +32,7 @@ SERVICE_NAME = "mouth-driver"
 class DriverServer(
     interfaces.ServiceInterfaceV1,
     interfaces.DriverInterfaceV1,
+    interfaces.DisplayInterfaceV1,
     interfaces.MCUInterfaceV1,
     interfaces.StatusLEDInterfaceV1,
     artie_service.ArtieRPCService
@@ -54,7 +55,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DriverInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.DriverInterfaceV1)
-    def status(self) -> Dict[str, str]:
+    def status(self) -> dict[str, str]:
         """
         Return the status of this service's submodules.
         """
@@ -75,58 +76,111 @@ class DriverServer(
         self._lcd_submodule.self_check()
 
     @rpyc.exposed
-    @alog.function_counter("led_on", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
+    @alog.function_counter("led_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_on(self) -> bool:
+    def led_list(self) -> list[str]:
+        """
+        RPC method to list all available status LEDs.
+
+        Returns
+        -------
+        list[str]: A list of all available status LED names.
+        """
+        return self._led_submodule.list()
+
+    @rpyc.exposed
+    @alog.function_counter("led_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
+    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
+    def led_set(self, which: str, state: str) -> bool:
         """
         RPC method to turn led on.
 
+        Args
+        ----
+        - which: Which LED to set to on. Ignored in mouth driver since there is only one LED.
+        - state: The state to set the LED to. Must be one of 'on', 'off', or 'heartbeat'.
+
         Returns
         ----
         True if it worked. False otherwise.
         """
-        return self._led_submodule.on()
-
-    @rpyc.exposed
-    @alog.function_counter("led_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
-    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_off(self) -> bool:
-        """
-        RPC method to turn led off.
-
-        Returns
-        ----
-        True if it worked. False otherwise.
-
-        """
-        return self._led_submodule.off()
-
-    @rpyc.exposed
-    @alog.function_counter("led_heartbeat", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
-    @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_heartbeat(self) -> bool:
-        """
-        RPC method to turn the led to heartbeat mode.
-
-        Returns
-        ----
-        True if it worked. False otherwise.
-
-        """
-        return self._led_submodule.heartbeat()
+        if state == 'on':
+            return self._led_submodule.on()
+        elif state == 'off':
+            return self._led_submodule.off()
+        elif state == 'heartbeat':
+            return self._led_submodule.heartbeat()
+        else:
+            alog.error(f"Invalid LED state: {state}")
+            return False
 
     @rpyc.exposed
     @alog.function_counter("led_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
     @interfaces.interface_method(interfaces.StatusLEDInterfaceV1)
-    def led_get(self) -> str:
+    def led_get(self, which: str) -> str:
         """
         RPC method to get the LED state.
+
+        Args
+        ----
+        - which: Which LED to get the state of. Ignored in mouth driver since there is only one LED.
+
+        Returns
+        ----
+        str: The current state of the LED.
         """
         return self._led_submodule.get()
 
     @rpyc.exposed
-    @alog.function_counter("lcd_test", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_test(self) -> bool:
+    @alog.function_counter("display_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DisplayInterfaceV1.__interface_name__})
+    @interfaces.interface_method(interfaces.DisplayInterfaceV1)
+    def display_list(self) -> list[str]:
+        """
+        RPC method to list all available displays.
+
+        Returns
+        -------
+        list[str]: A list of all available display IDs.
+        """
+        return self._lcd_submodule.list()
+
+    @rpyc.exposed
+    @alog.function_counter("display_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    @interfaces.interface_method(interfaces.DisplayInterfaceV1)
+    def display_set(self, which: str, val: str):
+        """
+        RPC method to draw the given configuration on the mouth LCD.
+
+        Args
+        ----
+        - which: The display ID to draw on. Ignored in mouth driver since there is only one display.
+        - val: One of the available MOUTH_DRAWING_CHOICES (a base64-encoded string thereof).
+
+        Returns
+        ----
+        True if it worked. False otherwise.
+        """
+        decoded_val = base64.b64decode(val).decode('utf-8')
+        return self._lcd_submodule.draw(decoded_val)
+
+    @rpyc.exposed
+    @alog.function_counter("display_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    @interfaces.interface_method(interfaces.DisplayInterfaceV1)
+    def display_get(self) -> str:
+        """
+        RPC method to get the current value (base64-encoded string) we think we are drawing.
+        """
+        current_val = self._lcd_submodule.get()
+
+        if current_val is None:
+            return None
+
+        return base64.b64encode(current_val.encode('utf-8')).decode('utf-8')
+
+    @rpyc.exposed
+    @alog.function_counter("display_test", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    @interfaces.interface_method(interfaces.DisplayInterfaceV1)
+    def display_test(self) -> bool:
         """
         RPC method to test the LCD.
 
@@ -137,8 +191,8 @@ class DriverServer(
         return self._lcd_submodule.test()
 
     @rpyc.exposed
-    @alog.function_counter("lcd_off", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_off(self):
+    @alog.function_counter("display_clear", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
+    def display_clear(self):
         """
         RPC method to turn the LCD off.
 
@@ -147,43 +201,6 @@ class DriverServer(
         True if it worked. False otherwise.
         """
         return self._lcd_submodule.off()
-
-    @rpyc.exposed
-    @alog.function_counter("lcd_draw", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_draw(self, val: str):
-        """
-        RPC method to draw the given configuration on the mouth LCD.
-
-        Args
-        ----
-        - val: One of the available MOUTH_DRAWING_CHOICES (a string).
-
-        Returns
-        ----
-        True if it worked. False otherwise.
-        """
-        return self._lcd_submodule.draw(val)
-
-    @rpyc.exposed
-    @alog.function_counter("lcd_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_get(self) -> str:
-        """
-        RPC method to get the current value we think we are drawing.
-        """
-        return self._lcd_submodule.get()
-
-    @rpyc.exposed
-    @alog.function_counter("lcd_talk", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def lcd_talk(self):
-        """
-        RPC method to have the mouth enter talking mode on LCD.
-
-        Returns
-        ----
-        True if it worked. False otherwise.
-
-        """
-        return self._lcd_submodule.talk()
 
     @rpyc.exposed
     @alog.function_counter("mcu_fw_load", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})

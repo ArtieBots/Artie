@@ -18,7 +18,7 @@ class LcdSubmodule:
         self.right_display_status = constants.SubmoduleStatuses.UNKNOWN
 
     def _set_status(self, side: str, status: constants.SubmoduleStatuses):
-        if side == 'left':
+        if side == 'eyebrow-left':
             self.left_display_status = status
         else:
             self.right_display_status = status
@@ -34,10 +34,10 @@ class LcdSubmodule:
 
         # Set back to originals
         if left_display is not None:
-            self.draw('left', left_display)
+            self.draw('eyebrow-left', left_display)
 
         if right_display is not None:
-            self.draw('right', right_display)
+            self.draw('eyebrow-right', right_display)
 
     def status(self) -> Dict[str, str]:
         return {
@@ -45,12 +45,15 @@ class LcdSubmodule:
             "LCD-RIGHT": self.right_display_status,
         }
 
+    def list(self) -> List[str]:
+        return ['eyebrow-left', 'eyebrow-right']
+
     def test(self, side: str) -> bool:
         alog.test(f"Received request for {side} LCD -> TEST.", tests=['eyebrows-driver-unit-tests:lcd-test'])
         address = ebcommon.get_address(side)
         lcd_test_bytes = CMD_MODULE_ID_LCD | 0x11
         wrote = i2c.write_bytes_to_address(address, lcd_test_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_display_state = 'test'
         else:
             self._right_display_state = 'test'
@@ -62,7 +65,7 @@ class LcdSubmodule:
         address = ebcommon.get_address(side)
         lcd_off_bytes = CMD_MODULE_ID_LCD | 0x22
         wrote = i2c.write_bytes_to_address(address, lcd_off_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_display_state = 'clear'
         else:
             self._right_display_state = 'clear'
@@ -99,7 +102,7 @@ class LcdSubmodule:
 
         lcd_draw_bytes = CMD_MODULE_ID_LCD | eyebrow_state_bytes
         wrote = i2c.write_bytes_to_address(address, lcd_draw_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_display_state = eyebrow_state
         else:
             self._right_display_state = eyebrow_state
@@ -108,11 +111,11 @@ class LcdSubmodule:
 
     def get(self, side: str) -> List[str]|str:
         side = side.lower()
-        if side not in ('left', 'right'):
+        if side not in ('eyebrow-left', 'eyebrow-right'):
             errmsg = f"Invalid eyebrow side: {side}"
             alog.error(errmsg)
             return "error"
-        elif side == 'left':
+        elif side == 'eyebrow-left':
             state = self._left_display_state
         else:
             state = self._right_display_state
@@ -121,6 +124,6 @@ class LcdSubmodule:
 
     def initialize(self):
         worked = True
-        worked &= self.draw('left', ['M', 'H', 'M'])
-        worked &= self.draw('right', ['M', 'H', 'M'])
+        worked &= self.draw('eyebrow-left', ['M', 'H', 'M'])
+        worked &= self.draw('eyebrow-right', ['M', 'H', 'M'])
         return worked
