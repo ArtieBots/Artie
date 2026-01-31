@@ -8,7 +8,24 @@ for example, 'mouth' or 'eyebrows'.
 
 # Version 1
 
-## Update LED State
+## List LEDs
+
+* *GET*: `/<service>/led/list`
+    * *Query Parameters*: None
+    * *Payload*: None
+* *Response 200*:
+    * *Payload (JSON)*:
+        ```json
+        {
+            "led-names":
+                [
+                    "<NAME1>",
+                    "<NAME2>",
+                ]
+        }
+        ```
+
+## Set LED State
 
 * *POST*: `/<service>/led`
     * *Query Parameters*:

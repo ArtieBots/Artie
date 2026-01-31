@@ -1,6 +1,7 @@
 """
 API interface for services that make use of displays.
 """
+import binascii
 from artie_util import artie_logging as alog
 from artie_service_client import client as asc
 from flask import request as r
@@ -68,26 +69,29 @@ def set_display_contents(service: str):
         }
         return errbody, 400
 
-    try:
-        # Decode base64 content
-        content = base64.b64decode(data['display'])
-    except Exception as e:
-        errbody = {
-            "service": service,
-            "which": display_id,
-            "error": f"Error decoding payload: {e}"
-        }
-        return errbody, 400
-
     # Get the service and set display contents
     try:
         s = asc.ServiceConnection(service)
-        s.display_set(display_id, content)
+        s.display_set(display_id, data['display'])
         return {
             "service": service,
             "which": display_id,
             "status": "success"
         }
+    except binascii.Error as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Display content is not valid base64: {e}"
+        }
+        return errbody, 400
+    except TypeError as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Display content has invalid type: {e}"
+        }
+        return errbody, 400
     except KeyError as e:
         errbody = {
             "service": service,
@@ -134,8 +138,22 @@ def get_display_contents(service: str):
         return {
             "service": service,
             "which": display_id,
-            "content": base64.b64encode(content).decode('utf-8')
+            "content": content
         }
+    except binascii.Error as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Display content is not valid base64: {e}"
+        }
+        return errbody, 400
+    except TypeError as e:
+        errbody = {
+            "service": service,
+            "which": display_id,
+            "error": f"Display content has invalid type: {e}"
+        }
+        return errbody, 400
     except KeyError as e:
         errbody = {
             "service": service,

@@ -16,7 +16,8 @@ class ModuleStatus(enum.StrEnum):
 
 class APIClient:
     """Base class for API clients."""
-    def __init__(self, profile: artie_profile.ArtieProfile, integration_test=False, unit_test=False, nretries=3) -> None:
+    def __init__(self, service_name: str, profile: artie_profile.ArtieProfile, integration_test=False, unit_test=False, nretries=3) -> None:
+        self.service_name = service_name
         self.artie = profile
         self.nretries = nretries
 

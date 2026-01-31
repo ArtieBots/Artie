@@ -34,78 +34,113 @@ steps:
         expected-outputs:
           - what: "Mocking MCU FW load."
             where: mouth-itest-mouth-driver
-      - test-name: fw-load
-        cmd-to-run-in-cli: "artie-cli mouth fw load --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-list
+        cmd-to-run-in-cli: "artie-cli mcu list -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "MCU IDs: ['mouth']"
+            where: mouth-itest-mouth-driver
+      - test-name: mcu-reload-fw
+        cmd-to-run-in-cli: "artie-cli mcu reload-fw mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "Mocking MCU FW load."
             where: mouth-itest-mouth-driver
-      - test-name: led-get
-        cmd-to-run-in-cli: "artie-cli mouth led get --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-reset
+        cmd-to-run-in-cli: "artie-cli mcu reset mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LED -> State: heartbeat"
+          - what: "Mocking MCU mouth Reset: DONE"
             where: mouth-itest-mouth-driver
-      - test-name: led-on
-        cmd-to-run-in-cli: "artie-cli mouth led on --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-self-check
+        cmd-to-run-in-cli: "artie-cli mcu self-check mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU mouth Self Check: PASS"
+            where: mouth-itest-mouth-driver
+      - test-name: mcu-status
+        cmd-to-run-in-cli: "artie-cli mcu status mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU mouth Status: OK"
+            where: mouth-itest-mouth-driver
+      - test-name: mcu-version
+        cmd-to-run-in-cli: "artie-cli mcu version mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU mouth Version: 1.0.0"
+            where: mouth-itest-mouth-driver
+      - test-name: led-list
+        cmd-to-run-in-cli: "artie-cli led list -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "LEDs: ['mouth']"
+            where: mouth-itest-mouth-driver
+      - test-name: led-set-on
+        cmd-to-run-in-cli: "artie-cli led set on -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> ON"
             where: mouth-itest-mouth-driver
-      - test-name: led-off
-        cmd-to-run-in-cli: "artie-cli mouth led off --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-set-off
+        cmd-to-run-in-cli: "artie-cli led set off -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> OFF"
             where: mouth-itest-mouth-driver
-      - test-name: led-heartbeat
-        cmd-to-run-in-cli: "artie-cli mouth led heartbeat --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-set-heartbeat
+        cmd-to-run-in-cli: "artie-cli led set heartbeat -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> HEARTBEAT"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-test
-        cmd-to-run-in-cli: "artie-cli mouth lcd test --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-get
+        cmd-to-run-in-cli: "artie-cli led get -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> TEST"
+          - what: "LED -> State: heartbeat"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-off
-        cmd-to-run-in-cli: "artie-cli mouth lcd off --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-list
+        cmd-to-run-in-cli: "artie-cli display list -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> OFF"
+          - what: "Displays: ['mouth']"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-talk
-        cmd-to-run-in-cli: "artie-cli mouth lcd talk --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-get
+        cmd-to-run-in-cli: "artie-cli display get mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "LCD -> smile"
+            where: mouth-itest-mouth-driver
+      - test-name: display-talk
+        cmd-to-run-in-cli: "artie-cli display set mouth 'dGFsaw==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Talking mode"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-frown
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw frown --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-frown
+        cmd-to-run-in-cli: "artie-cli display set mouth 'ZnJvd24=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw frown"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-line
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw line --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-line
+        cmd-to-run-in-cli: "artie-cli display set mouth 'bGluZQ==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw line"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-smirk
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw smirk --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-smirk
+        cmd-to-run-in-cli: "artie-cli display set mouth 'c21pcms=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw smirk"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-open-smile
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw open-smile --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-open-smile
+        cmd-to-run-in-cli: "artie-cli display set mouth 'b3Blbi1zbWlsZQ==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw open-smile"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-zig-zag
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw zig-zag --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-zig-zag
+        cmd-to-run-in-cli: "artie-cli display set mouth 'emlnLXpheg==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw zig-zag"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-draw-smile
-        cmd-to-run-in-cli: "artie-cli mouth lcd draw smile --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-smile
+        cmd-to-run-in-cli: "artie-cli display set mouth 'c21pbGU=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> Draw smile"
             where: mouth-itest-mouth-driver
-      - test-name: lcd-get
-        cmd-to-run-in-cli: "artie-cli mouth lcd get --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-test
+        cmd-to-run-in-cli: "artie-cli display test mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> smile"
+          - what: "LCD -> TEST"
+            where: mouth-itest-mouth-driver
+      - test-name: display-clear
+        cmd-to-run-in-cli: "artie-cli display clear mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "LCD -> OFF"
             where: mouth-itest-mouth-driver

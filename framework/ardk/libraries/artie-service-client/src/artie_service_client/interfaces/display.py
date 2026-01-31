@@ -20,17 +20,17 @@ class DisplayInterfaceV1:
         """
         raise NotImplementedError("display_list method must be implemented by the service.")
 
-    def display_set(self, display_id: str, content: bytes) -> None:
+    def display_set(self, display_id: str, content: str) -> None:
         """
         Set the content of a specific display.
 
         Args:
             display_id: The ID of the display to set.
-            content: The content to set on the display, as bytes.
+            content: The content to set on the display, as base-64-encoded bytes (a string).
         """
         raise NotImplementedError("display_set method must be implemented by the service.")
 
-    def display_get(self, display_id: str) -> bytes:
+    def display_get(self, display_id: str) -> str:
         """
         Get the current content of a specific display.
 
@@ -38,7 +38,7 @@ class DisplayInterfaceV1:
             display_id: The ID of the display to get.
 
         Returns:
-            The current content of the display, as bytes.
+            The current content of the display, as a base-64-encoded string.
         """
         raise NotImplementedError("display_get method must be implemented by the service.")
 

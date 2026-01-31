@@ -34,58 +34,98 @@ steps:
         expected-outputs:
           - what: "Mocking MCU FW load."
             where: eyebrows-itest-eyebrows-driver
-      - test-name: fw-load
-        cmd-to-run-in-cli: "artie-cli eyebrows fw load --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-list
+        cmd-to-run-in-cli: "artie-cli mcu list eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "MCU IDs: ['eyebrow-left', 'eyebrow-right']"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: mcu-reload-fw
+        cmd-to-run-in-cli: "artie-cli mcu reload-fw eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "Mocking MCU FW load."
             where: eyebrows-itest-eyebrows-driver
-      - test-name: led-get
-        cmd-to-run-in-cli: "artie-cli eyebrows led get --side left --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-reset
+        cmd-to-run-in-cli: "artie-cli mcu reset eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LED -> State: heartbeat"
+          - what: "Mocking MCU eyebrow-left Reset: DONE"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: led-on
-        cmd-to-run-in-cli: "artie-cli eyebrows led on --side left --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: mcu-self-check
+        cmd-to-run-in-cli: "artie-cli mcu self-check eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU eyebrow-right Self Check: PASS"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: mcu-status
+        cmd-to-run-in-cli: "artie-cli mcu status eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU eyebrow-right Status: OK"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: mcu-version
+        cmd-to-run-in-cli: "artie-cli mcu version eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Mocking MCU eyebrow-left Firmware Version: 1.0.0"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: led-list
+        cmd-to-run-in-cli: "artie-cli status-led list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "LEDs: ['eyebrow-left', 'eyebrow-right']"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: led-set-on
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left on -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "left LED -> ON"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: led-off
-        cmd-to-run-in-cli: "artie-cli eyebrows led off --side right --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-set-off
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-right off -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "right LED -> OFF"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: led-heartbeat
-        cmd-to-run-in-cli: "artie-cli eyebrows led heartbeat --side both --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-set-heartbeat
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left heartbeat -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "left LED -> HEARTBEAT"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: lcd-get
-        cmd-to-run-in-cli: "artie-cli eyebrows lcd get --side right --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: led-get
+        cmd-to-run-in-cli: "artie-cli status-led get eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "LED -> State: heartbeat"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: display-list
+        cmd-to-run-in-cli: "artie-cli display list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Displays: ['eyebrow-left', 'eyebrow-right']"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: display-get
+        cmd-to-run-in-cli: "artie-cli display get eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "right eyebrow LCD -> State: ['M', 'H', 'M']"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: lcd-test
-        cmd-to-run-in-cli: "artie-cli eyebrows lcd test --side both --integration-test --artie-profile /integration_test_profile.json"
-        expected-outputs:
-          - what: "right LCD -> TEST"
-            where: eyebrows-itest-eyebrows-driver
-      - test-name: lcd-off
-        cmd-to-run-in-cli: "artie-cli eyebrows lcd off --side left --integration-test --artie-profile /integration_test_profile.json"
-        expected-outputs:
-          - what: "left LCD -> OFF"
-            where: eyebrows-itest-eyebrows-driver
-      - test-name: lcd-draw
-        cmd-to-run-in-cli: "artie-cli eyebrows lcd draw H H L --side left --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-set
+        cmd-to-run-in-cli: "artie-cli display set eyebrow-left 'SEhM' -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "left LCD -> DRAW"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: servo-get
-        cmd-to-run-in-cli: "artie-cli eyebrows servo get --side right --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-test
+        cmd-to-run-in-cli: "artie-cli display test eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "right servo position -> 90.00"
+          - what: "right LCD -> TEST"
             where: eyebrows-itest-eyebrows-driver
-      - test-name: servo-go
-        cmd-to-run-in-cli: "artie-cli eyebrows servo go 45 --side right --integration-test --artie-profile /integration_test_profile.json"
+      - test-name: display-clear
+        cmd-to-run-in-cli: "artie-cli display clear eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "left LCD -> OFF"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: servo-list
+        cmd-to-run-in-cli: "artie-cli servo list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Servos: ['eyebrow-left', 'eyebrow-right']"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: servo-set
+        cmd-to-run-in-cli: "artie-cli servo set eyebrow-right 45 -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "right SERVO -> GO"
+            where: eyebrows-itest-eyebrows-driver
+      - test-name: servo-get
+        cmd-to-run-in-cli: "artie-cli servo get eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "right servo position -> 90.00"
             where: eyebrows-itest-eyebrows-driver

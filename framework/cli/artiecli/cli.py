@@ -18,7 +18,7 @@ import urllib3
 # Dynamically find and import all modules in the 'modules' directory so we can execute a function in each
 _artie_cli_dpath = os.path.dirname(os.path.realpath(__file__))
 _module_dpath = os.path.join(_artie_cli_dpath, "modules")
-MODULE_NAMES = [os.path.splitext(fname)[0] for fname in os.listdir(_module_dpath) if os.path.splitext(os.path.join(_module_dpath, fname))[-1].lower() == ".py"]
+MODULE_NAMES = [os.path.splitext(fname)[0].replace("_", "-") for fname in os.listdir(_module_dpath) if os.path.splitext(os.path.join(_module_dpath, fname))[-1].lower() == ".py"]
 MODULES = [importlib.import_module("." + name, package='artiecli.modules') for name in MODULE_NAMES]
 
 def _help(args):
@@ -43,7 +43,7 @@ def main():
     """
     Entrypoint for the script.
     """
-    parser = argparse.ArgumentParser(description=__doc__, usage="%(prog)s ([help]) [module] [subsystem] [cmd] <args>", add_help=False)
+    parser = argparse.ArgumentParser(description=__doc__, usage="%(prog)s ([help]) [module] [cmd] <args>", add_help=False)
     subparsers = parser.add_subparsers(title="Module", description="Module command", help="The Module to issue a command for")
 
     option_parser = argparse.ArgumentParser(description=__doc__, add_help=False)
@@ -52,6 +52,7 @@ def main():
     group.add_argument("--artie-profile", type=_argparse_file_path_type, default=None, help=f"If given, we use this Artie profile. If not given, and --artie-id is given, we attempt to use the profile corresponding to that Artie at {artie_profile.DEFAULT_SAVE_PATH}. If neither argument is given, we use only profile found at {artie_profile.DEFAULT_SAVE_PATH}; if more than one profile is found, we error out.")
     group.add_argument("--integration-test", action='store_true', help="If given, we do not access the Artie cluster. Used in integration tests.")
     group.add_argument("--ipv6", action='store_true', help="If given, we use IPv6 instead of IPv4.")
+    group.add_argument("--port", type=int, default=None, help="If given, the port to use when in test mode.")
     group.add_argument("--unit-test", action='store_true', help="If given, we do not access the Artie cluster. Used in unit tests.")
 
     # Disable the urllib3 warnings

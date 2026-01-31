@@ -12,59 +12,38 @@ class StatusLEDInterfaceV1:
         """Return the name of this interface. All interfaces must implement this method."""
         return "status-led-interface-v1"
 
-    def led_on(self, which: str = None) -> bool:
+    def led_list(self) -> list[str]:
         """
-        RPC method to turn led on.
-
-        Args
-        ----
-        - which: If provided, should specify which LED to turn on.
-          Only applicable for services with multiple status LEDs.
+        RPC method to list all available status LEDs.
 
         Returns
         -------
-        bool: True if we do not detect an error. False otherwise.
+        list[str]: A list of all available status LED names.
         """
-        raise NotImplementedError("Services with status LEDs must implement the `led_on` method.")
+        raise NotImplementedError("Services with status LEDs must implement the `led_list` method.")
 
-    def led_off(self, which: str = None) -> bool:
-        """
-        RPC method to turn led off.
-
-        Args
-        ----
-        - which: If provided, should specify which LED to turn off.
-          Only applicable for services with multiple status LEDs.
-
-        Returns
-        -------
-        bool: True if we do not detect an error. False otherwise.
-        """
-        raise NotImplementedError("Services with status LEDs must implement the `led_off` method.")
-
-    def led_heartbeat(self, which: str = None) -> bool:
+    def led_set(self, which: str, state: str) -> bool:
         """
         RPC method to turn the led to heartbeat mode.
 
         Args
         ----
-        - which: If provided, should specify which LED to set to heartbeat mode.
-          Only applicable for services with multiple status LEDs.
+        - which: Which LED to set to the given state.
+        - state: The state to set the LED to. Must be one of 'on', 'off', or 'heartbeat'.
 
         Returns
         -------
         bool: True if we do not detect an error. False otherwise.
         """
-        raise NotImplementedError("Services with status LEDs must implement the `led_heartbeat` method.")
+        raise NotImplementedError("Services with status LEDs must implement the `led_set` method.")
 
-    def led_get(self, which: str = None) -> str:
+    def led_get(self, which: str) -> str:
         """
         RPC method to get the state of the given LED.
 
         Args
         ----
-        - which: If provided, should specify which LED to get the state of.
-          Only applicable for services with multiple status LEDs.
+        - which: Which LED to get the state of.
 
         Returns
         -------

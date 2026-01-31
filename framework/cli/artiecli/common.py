@@ -49,12 +49,12 @@ class _ConnectionWrapper:
 
 def connect(host, port=None, ipv6=False):
     """
-    Connect to the RPyC server on `host`, which could be an IP address or a
+    Connect to the Artie Server on `host`, which could be an IP address or a
     anything that will DNS-resolve to an IP address.
 
     If we are running outside the Kubernetes cluster, we will need to do
     some authentication, and our abilities will be limited to connecting
-    to only externally-available services.
+    to only externally-available services by means of the Artie API Server.
 
     If we are running on the cluster, we do not need to do any authentication,
     and we have access to any service.
@@ -96,9 +96,9 @@ def int_or_hex_type(val):
     else:
         return int(val)
 
-def format_print_result(result: tooling_errors.HTTPError|Any, module: str, submodule: str, artie_id: str):
+def format_print_result(result: tooling_errors.HTTPError|Any, module: str, cmd: str, artie_id: str):
     """
-    Prints ({artie_id}) {module} {submodule}: {msg}
+    Prints ({artie_id}) {module} {cmd}: {msg}
 
     If `result` is an instance of `tooling_errors.HTTPError`, 'msg' is
     read from `result.message`. Otherwise, 'msg' is just `result`.
@@ -108,7 +108,7 @@ def format_print_result(result: tooling_errors.HTTPError|Any, module: str, submo
     else:
         msg = str(result)
 
-    print(f"({artie_id}) {module} {submodule}: {msg}")
+    print(f"({artie_id}) {module} {cmd}: {msg}")
 
 def format_print_status_result(result, module: str, artie_id: str):
     """
