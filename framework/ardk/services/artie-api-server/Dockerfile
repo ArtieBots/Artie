@@ -8,10 +8,7 @@ RUN pip install flask gunicorn
 COPY ./src /app
 
 # Install apt dependencies
-RUN apt-get update && apt-get install -y \
-    openssl \
-    dos2unix
-RUN chmod +x /app/run.sh && dos2unix /app/run.sh
+RUN apt-get update && apt-get install -y openssl
 
 # Configuration stuff
 ARG SERVE_ON_PORT=8782
