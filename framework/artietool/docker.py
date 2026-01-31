@@ -628,6 +628,19 @@ def push_docker_image(args, docker_image_name: DockerImageName, nretries=3):
     if err is not None:
         raise Exception(f"Could not push {docker_image_name}: {err}")
 
+def remove_docker_image(docker_image_name: DockerImageName, fail_ok=False):
+    """
+    Removes the given Docker image from the local system.
+
+    If `fail_ok` is True, we do not raise an exception if the image cannot be found.
+    """
+    client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
+    try:
+        client.images.remove(str(docker_image_name), force=True)
+    except docker_errors.ImageNotFound:
+        if not fail_ok:
+            raise
+
 def run_docker_container(image_name, cmd, timeout_s=30, log_to_stdout=False, **kwargs):
     """
     Like `start_docker_container()`, but runs to completion before returning

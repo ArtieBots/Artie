@@ -69,8 +69,15 @@ class DockerBuildJob(job.Job):
                     fpath = value[0]
                     buildargs += f" --build-arg {arg.key}={os.path.basename(fpath)}"
 
+
         # Create the name object from the Docker repo, name, and tag
         docker_image_name = docker.construct_docker_image_name(args, self.img_base_name, self.platform)
+
+        # If --force, we have to remove the image first
+        if args.force_build:
+            docker.remove_docker_image(docker_image_name, fail_ok=True)
+
+        # Build the Docker image
         docker.build_docker_image(args, self.dockerfile_dpath, docker_image_name, self.buildx, fpaths, self.build_context, buildargs, self.dockerfile_fname, platform=self.platform)
 
         self.mark_all_artifacts_as_built()
