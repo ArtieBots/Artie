@@ -58,21 +58,21 @@ def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentPar
     list_parser.set_defaults(cmd=_cmd_mcu_list)
 
     reload_fw_parser = subparsers.add_parser("reload-fw", parents=[option_parser])
-    reload_fw_parser.add_argument("mcu_id", type=str, default=None, required=True, help="The MCU ID to reload firmware for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
+    reload_fw_parser.add_argument("mcu_id", type=str, default=None, help="The MCU ID to reload firmware for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
     reload_fw_parser.set_defaults(cmd=_cmd_mcu_reload_fw)
 
     reset_parser = subparsers.add_parser("reset", parents=[option_parser])
-    reset_parser.add_argument("mcu_id", type=str, default=None, required=True, help="The MCU ID to reset. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
+    reset_parser.add_argument("mcu_id", type=str, default=None, help="The MCU ID to reset. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
     reset_parser.set_defaults(cmd=_cmd_mcu_reset)
 
     self_check_parser = subparsers.add_parser("self-check", parents=[option_parser])
-    self_check_parser.add_argument("mcu_id", type=str, default=None, required=True, help="The MCU ID to run self check on. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
+    self_check_parser.add_argument("mcu_id", type=str, default=None, help="The MCU ID to run self check on. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
     self_check_parser.set_defaults(cmd=_cmd_mcu_self_check)
 
     status_parser = subparsers.add_parser("status", parents=[option_parser])
-    status_parser.add_argument("mcu_id", type=str, default=None, required=True, help="The MCU ID to get status for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
+    status_parser.add_argument("mcu_id", type=str, default=None, help="The MCU ID to get status for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
     status_parser.set_defaults(cmd=_cmd_mcu_status)
 
     version_parser = subparsers.add_parser("version", parents=[option_parser])
-    version_parser.add_argument("mcu_id", type=str, default=None, required=True, help="The MCU ID to get version for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
+    version_parser.add_argument("mcu_id", type=str, default=None, help="The MCU ID to get version for. Must match the ID in the Artie HW Manifest. Use `cli mcu list` to see available MCUs.")
     version_parser.set_defaults(cmd=_cmd_mcu_version)
