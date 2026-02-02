@@ -47,7 +47,7 @@ class _ConnectionWrapper:
         if self._connection:
             self._connection.close()
 
-def connect(host, port=None, ipv6=False):
+def connect(host, port: int, ipv6=False):
     """
     Connect to the Artie Server on `host`, which could be an IP address or a
     anything that will DNS-resolve to an IP address.
@@ -66,6 +66,8 @@ def connect(host, port=None, ipv6=False):
     """
     if LOCAL_ONLY:
         raise OSError(f"Running a local version of CLI. Cannot access any RPyC services. Install with [remote] dependencies if possible.")
+    elif port is None:
+        raise ValueError("Port must be specified when not running locally.")
 
     # TODO: Deal with authentication when trying to access K3S service
     # TODO: Deal with ports and hosts when on K3S
