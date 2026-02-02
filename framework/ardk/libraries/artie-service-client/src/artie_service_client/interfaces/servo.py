@@ -28,7 +28,7 @@ class ServoInterfaceV1:
             servo_id: The ID of the servo to set.
             position: The position to set the servo to, as a float.
         """
-        raise NotImplementedError("servo_set_position method must be implemented by the service.")
+        raise NotImplementedError("servo_set method must be implemented by the service.")
 
     def servo_get(self, servo_id: str) -> float:
         """
@@ -43,4 +43,4 @@ class ServoInterfaceV1:
         Returns:
             The current position of the servo, as a float.
         """
-        raise NotImplementedError("servo_get_position method must be implemented by the service.")
+        raise NotImplementedError("servo_get method must be implemented by the service.")

@@ -33,37 +33,37 @@ steps:
       - test-name: led-set-on
         cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left on -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "left LED -> ON"
+          - what: "eyebrow-left LED -> ON"
             where: ${DUT}
       - test-name: led-set-off
         cmd-to-run-in-cli: "artie-cli status-led set eyebrow-right off -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "right LED -> OFF"
+          - what: "eyebrow-right LED -> OFF"
             where: ${DUT}
       - test-name: led-set-heartbeat
         cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left heartbeat -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "left LED -> HEARTBEAT"
+          - what: "eyebrow-left LED -> HEARTBEAT"
             where: ${DUT}
       - test-name: display-get
         cmd-to-run-in-cli: "artie-cli display get eyebrow-right -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "right eyebrow LCD -> State: ['M', 'H', 'M']"
+          - what: "eyebrow-right eyebrow LCD -> State: MHM"
             where: ${DUT}
       - test-name: display-test
         cmd-to-run-in-cli: "artie-cli display test eyebrow-right -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "right LCD -> TEST"
+          - what: "eyebrow-right LCD -> TEST"
             where: ${DUT}
       - test-name: display-clear
         cmd-to-run-in-cli: "artie-cli display clear eyebrow-left -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "left LCD -> OFF"
+          - what: "eyebrow-left LCD -> OFF"
             where: ${DUT}
       - test-name: display-set
         cmd-to-run-in-cli: "artie-cli display set eyebrow-left SGhITAo= -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "left LCD -> DRAW"
+          - what: "eyebrow-left LCD -> DRAW"
             where: ${DUT}
       - test-name: mcu-reload-fw
         cmd-to-run-in-cli: "artie-cli mcu reload-fw eyebrow-left -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
@@ -73,12 +73,12 @@ steps:
       - test-name: servo-get-position
         cmd-to-run-in-cli: "artie-cli servo get eyebrow-right -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "right servo position -> 90.00"
+          - what: "eyebrow-right servo position -> 90.00"
             where: ${DUT}
       - test-name: servo-set-position
         cmd-to-run-in-cli: "artie-cli servo set eyebrow-right 45 -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "right SERVO -> GO"
+          - what: "eyebrow-right SERVO -> GO"
             where: ${DUT}
       - test-name: driver-self-check
         cmd-to-run-in-cli: "artie-cli driver self-check -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"

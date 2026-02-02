@@ -17,14 +17,14 @@ def _cmd_servo_list(args):
     client = _connect_client(args)
     common.format_print_result(client.servo_list(), "servo", "list", args.artie_id)
 
-def _cmd_servo_set_position(args):
+def _cmd_servo_set(args):
     client = _connect_client(args)
-    common.format_print_result(client.servo_set_position(args.which, args.position), "servo", "set-position", args.artie_id)
+    common.format_print_result(client.servo_set(args.which, args.position), "servo", "set", args.artie_id)
 
-def _cmd_servo_get_position(args):
+def _cmd_servo_get(args):
     client = _connect_client(args)
-    result = client.servo_get_position(args.which)
-    common.format_print_result(f"{args.which} position: {result}", "servo", "get-position", args.artie_id)
+    result = client.servo_get(args.which)
+    common.format_print_result(f"{args.which} position: {result}", "servo", "get", args.artie_id)
 
 def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(title="Commands", description="The servo module's commands")
@@ -38,11 +38,11 @@ def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentPar
     list_parser = subparsers.add_parser("list", parents=[option_parser])
     list_parser.set_defaults(cmd=_cmd_servo_list)
 
-    set_position_parser = subparsers.add_parser("set-position", parents=[option_parser])
+    set_position_parser = subparsers.add_parser("set", parents=[option_parser])
     set_position_parser.add_argument("which", type=str, help="Which servo to set. Must match the name in the Artie HW Manifest. Use `cli servo list` to see available servos.")
     set_position_parser.add_argument("position", type=float, help="The position value to set (as a float).")
-    set_position_parser.set_defaults(cmd=_cmd_servo_set_position)
+    set_position_parser.set_defaults(cmd=_cmd_servo_set)
 
-    get_position_parser = subparsers.add_parser("get-position", parents=[option_parser])
+    get_position_parser = subparsers.add_parser("get", parents=[option_parser])
     get_position_parser.add_argument("which", type=str, help="Which servo to get position for. Must match the name in the Artie HW Manifest. Use `cli servo list` to see available servos.")
-    get_position_parser.set_defaults(cmd=_cmd_servo_get_position)
+    get_position_parser.set_defaults(cmd=_cmd_servo_get)

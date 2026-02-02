@@ -118,7 +118,7 @@ class LcdSubmodule:
         self._set_status(side, constants.SubmoduleStatuses.WORKING if wrote else constants.SubmoduleStatuses.NOT_WORKING)
         return wrote
 
-    def get(self, side: ebcommon.EyebrowSides) -> list[str]|str:
+    def get(self, side: ebcommon.EyebrowSides) -> str:
         if side not in (ebcommon.EyebrowSides.LEFT, ebcommon.EyebrowSides.RIGHT):
             errmsg = f"Invalid eyebrow side: {side}"
             alog.error(errmsg)
