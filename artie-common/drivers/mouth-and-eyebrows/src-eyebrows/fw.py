@@ -20,13 +20,13 @@ class FirmwareSubmodule:
         self.firmware_status = constants.SubmoduleStatuses.UNKNOWN
         self._ipv6 = ipv6
 
-    def _set_mcu_status(self, mcu: str, status):
-        if mcu == 'eyebrow-left':
+    def _set_mcu_status(self, mcu: ebcommon.EyebrowSides, status):
+        if mcu == ebcommon.EyebrowSides.LEFT:
             self.left_status = status
         else:
             self.right_status = status
 
-    def _check_mcu(self, mcu: str) -> bool:
+    def _check_mcu(self, mcu: ebcommon.EyebrowSides) -> bool:
         """
         Check whether the given ('eyebrow-left' or 'eyebrow-right') MCU is present on the I2C bus.
         Log the results and return `None` if not found or the correct I2C bus instance
@@ -44,10 +44,10 @@ class FirmwareSubmodule:
 
     def self_check_all(self):
         alog.test("Checking FW subsystem...", tests=['eyebrows-driver-unit-tests:self-check'])
-        self._check_mcu("eyebrow-left")
-        self._check_mcu("eyebrow-right")
+        self._check_mcu(ebcommon.EyebrowSides.LEFT)
+        self._check_mcu(ebcommon.EyebrowSides.RIGHT)
 
-    def self_check(self, mcu_id: str):
+    def self_check(self, mcu_id: ebcommon.EyebrowSides):
         """
         Run a self diagnostics check on the given MCU ID and set our submodule statuses appropriately.
         """
@@ -83,16 +83,16 @@ class FirmwareSubmodule:
         pass
 
         # Reset the eyebrows
-        worked &= self.reset("eyebrow-left")
-        worked &= self.reset("eyebrow-right")
+        worked &= self.reset(ebcommon.EyebrowSides.LEFT)
+        worked &= self.reset(ebcommon.EyebrowSides.RIGHT)
         time.sleep(0.1)  # Give it a moment to come back online
 
         # Sanity check that both MCUs are present on the I2C bus
-        worked &= self._check_mcu("eyebrow-left")
-        worked &= self._check_mcu("eyebrow-right")
+        worked &= self._check_mcu(ebcommon.EyebrowSides.LEFT)
+        worked &= self._check_mcu(ebcommon.EyebrowSides.RIGHT)
         return worked
 
-    def reset(self, mcu_id: str) -> bool:
+    def reset(self, mcu_id: ebcommon.EyebrowSides) -> bool:
         """
         Attempt to reset the given MCU. Return True if we succeed, False if we fail.
         """
@@ -107,7 +107,7 @@ class FirmwareSubmodule:
         worked = True
         return worked
 
-    def version(self, mcu_id: str) -> str:
+    def version(self, mcu_id: ebcommon.EyebrowSides) -> str:
         """
         Return the firmware version information for the given MCU ID.
         """

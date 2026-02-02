@@ -31,17 +31,17 @@ steps:
           - what: "LED -> State: heartbeat"
             where: ${DUT}
       - test-name: led-set-on
-        cmd-to-run-in-cli: "artie-cli status-led set on eyebrow-left -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left on -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "left LED -> ON"
             where: ${DUT}
       - test-name: led-set-off
-        cmd-to-run-in-cli: "artie-cli status-led set off eyebrow-right -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-right off -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "right LED -> OFF"
             where: ${DUT}
       - test-name: led-set-heartbeat
-        cmd-to-run-in-cli: "artie-cli status-led set heartbeat eyebrow-left -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left heartbeat -n eyebrows-driver --unit-test --port 18863 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "left LED -> HEARTBEAT"
             where: ${DUT}

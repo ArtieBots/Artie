@@ -269,9 +269,9 @@ class DriverServer(
         *Returns*: A string representing the status of the MCU. This string
         should be one of the enum values of `artie_util.constants.SubmoduleStatuses`.
         """
-        if mcu_id == "left":
+        if mcu_id == ebcommon.EyebrowSides.LEFT:
             return self._fw_submodule.left_status
-        elif mcu_id == "right":
+        elif mcu_id == ebcommon.EyebrowSides.RIGHT:
             return self._fw_submodule.right_status
         else:
             alog.error(f"Requested status for invalid MCU ID {mcu_id}.")
