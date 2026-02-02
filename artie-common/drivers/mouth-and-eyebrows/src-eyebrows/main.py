@@ -342,7 +342,7 @@ if __name__ == "__main__":
 
     # If we are in testing mode, we need to manually initialize some stuff
     if util.in_test_mode():
-        i2c.manually_initialize(i2c_instances=[0], instance_to_address_map={0: [ebcommon.MCU_ADDRESS_MAP['left'], ebcommon.MCU_ADDRESS_MAP['right']]})
+        i2c.manually_initialize(i2c_instances=[0], instance_to_address_map={0: [ebcommon.MCU_ADDRESS_MAP['eyebrow-left'], ebcommon.MCU_ADDRESS_MAP['eyebrow-right']]})
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
     server = DriverServer(args.port, args.fw_fpath, ipv6=args.ipv6)
