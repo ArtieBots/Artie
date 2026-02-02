@@ -21,14 +21,14 @@ class FirmwareSubmodule:
         self._ipv6 = ipv6
 
     def _set_mcu_status(self, mcu: str, status):
-        if mcu == 'left':
+        if mcu == 'eyebrow-left':
             self.left_status = status
         else:
             self.right_status = status
 
     def _check_mcu(self, mcu: str) -> bool:
         """
-        Check whether the given ('left' or 'right') MCU is present on the I2C bus.
+        Check whether the given ('eyebrow-left' or 'eyebrow-right') MCU is present on the I2C bus.
         Log the results and return `None` if not found or the correct I2C bus instance
         if it is.
         """
@@ -44,8 +44,8 @@ class FirmwareSubmodule:
 
     def self_check_all(self):
         alog.test("Checking FW subsystem...", tests=['eyebrows-driver-unit-tests:self-check'])
-        self._check_mcu("left")
-        self._check_mcu("right")
+        self._check_mcu("eyebrow-left")
+        self._check_mcu("eyebrow-right")
 
     def self_check(self, mcu_id: str):
         """
@@ -83,13 +83,13 @@ class FirmwareSubmodule:
         pass
 
         # Reset the eyebrows
-        worked &= self.reset("left")
-        worked &= self.reset("right")
+        worked &= self.reset("eyebrow-left")
+        worked &= self.reset("eyebrow-right")
         time.sleep(0.1)  # Give it a moment to come back online
 
         # Sanity check that both MCUs are present on the I2C bus
-        worked &= self._check_mcu("left")
-        worked &= self._check_mcu("right")
+        worked &= self._check_mcu("eyebrow-left")
+        worked &= self._check_mcu("eyebrow-right")
         return worked
 
     def reset(self, mcu_id: str) -> bool:

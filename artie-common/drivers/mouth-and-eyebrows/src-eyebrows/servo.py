@@ -19,7 +19,7 @@ class ServoSubmodule:
         self.right_servo_status = constants.SubmoduleStatuses.UNKNOWN
 
     def _set_status(self, side: str, status: constants.SubmoduleStatuses):
-        if side == 'left':
+        if side == 'eyebrow-left':
             self.left_servo_status = status
         else:
             self.right_servo_status = status
@@ -29,8 +29,8 @@ class ServoSubmodule:
         # servos, but should set our statuses appropriately in case we can't write to
         # the I2C bus.
         alog.test("Checking servo subsystem...", tests=['eyebrows-driver-unit-tests:self-check'])
-        self.go('left', self._left_servo_degrees)
-        self.go('right', self._right_servo_degrees)
+        self.go('eyebrow-left', self._left_servo_degrees)
+        self.go('eyebrow-right', self._right_servo_degrees)
 
     def status(self) -> Dict[str, str]:
         return {
@@ -40,11 +40,11 @@ class ServoSubmodule:
 
     def get(self, side: str) -> float:
         side = side.lower()
-        if side not in ('left', 'right'):
+        if side not in ('eyebrow-left', 'eyebrow-right'):
             errmsg = f"Invalid side for servo: {side}"
             alog.error(errmsg)
             return -1.0
-        elif side == 'left':
+        elif side == 'eyebrow-left':
             degrees = self._left_servo_degrees
         else:
             degrees = self._right_servo_degrees
@@ -65,7 +65,7 @@ class ServoSubmodule:
         go_val_bytes = 0b00111111 if go_val_bytes > 0b00111111 else go_val_bytes
         servo_go_bytes = CMD_MODULE_ID_SERVO | go_val_bytes
         wrote = i2c.write_bytes_to_address(address, servo_go_bytes)
-        if side.lower() == 'left':
+        if side.lower() == 'eyebrow-left':
             self._left_servo_degrees = servo_degrees
         else:
             self._right_servo_degrees = servo_degrees
