@@ -16,6 +16,7 @@ MOUTH_DRAWING_CHOICES = {
     "OPEN":         (CMD_MODULE_ID_LCD | 0x04),
     "OPEN-SMILE":   (CMD_MODULE_ID_LCD | 0x05),
     "ZIG-ZAG":      (CMD_MODULE_ID_LCD | 0x06),
+    "TALK":         (CMD_MODULE_ID_LCD | 0x07),
 }
 
 class LcdSubmodule:
@@ -84,11 +85,3 @@ class LcdSubmodule:
     def get(self) -> str:
         alog.test(f"Received request for mouth LCD -> {self._current_display}", tests=['mouth-driver-unit-tests:lcd-get'])
         return self._current_display
-
-    def talk(self) -> bool:
-        alog.test("Received request for mouth LCD -> Talking mode.", tests=['mouth-driver-unit-tests:lcd-draw-talk'])
-        lcd_talk_bytes = CMD_MODULE_ID_LCD | 0x07
-        worked = i2c.write_bytes_to_address(board.I2C_ADDRESS_MOUTH_MCU, lcd_talk_bytes)
-        self._current_display = "TALKING"
-        self._set_status(worked)
-        return worked

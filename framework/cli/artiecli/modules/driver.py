@@ -11,7 +11,7 @@ def _connect_client(args) -> common._ConnectionWrapper | driver_client.DriverCli
     if common.in_test_mode(args):
         connection = common.connect("localhost", args.port, ipv6=args.ipv6)
     else:
-        connection = driver_client.DriverClient(profile=args.artie_profile, integration_test=args.integration_test, unit_test=args.unit_test)
+        connection = driver_client.DriverClient(args.service_name, profile=args.artie_profile, integration_test=args.integration_test, unit_test=args.unit_test)
     return connection
 
 def _cmd_driver_status(args):

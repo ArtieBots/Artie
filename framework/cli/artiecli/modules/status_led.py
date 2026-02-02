@@ -10,7 +10,7 @@ def _connect_client(args) -> common._ConnectionWrapper | status_led_client.Statu
     if common.in_test_mode(args):
         connection = common.connect("localhost", args.port, ipv6=args.ipv6)
     else:
-        connection = status_led_client.StatusLEDClient(profile=args.artie_profile, integration_test=args.integration_test, unit_test=args.unit_test)
+        connection = status_led_client.StatusLEDClient(args.service_name, profile=args.artie_profile, integration_test=args.integration_test, unit_test=args.unit_test)
     return connection
 
 def _cmd_led_list(args):

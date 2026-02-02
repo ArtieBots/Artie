@@ -26,22 +26,22 @@ steps:
           - what: "Mocking MCU FW load."
             where: ${DUT}
       - test-name: led-get
-        cmd-to-run-in-cli: "artie-cli status-led get -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led get mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "LED -> State: heartbeat"
             where: ${DUT}
       - test-name: led-set-on
-        cmd-to-run-in-cli: "artie-cli status-led set on mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth on -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "LED -> ON"
             where: ${DUT}
       - test-name: led-set-off
-        cmd-to-run-in-cli: "artie-cli status-led set off mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth off -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "LED -> OFF"
             where: ${DUT}
       - test-name: led-set-heartbeat
-        cmd-to-run-in-cli: "artie-cli status-led set heartbeat mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth heartbeat -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "LED -> HEARTBEAT"
             where: ${DUT}
@@ -58,7 +58,7 @@ steps:
       - test-name: display-set-talk
         cmd-to-run-in-cli: "artie-cli display set mouth dGFsaw== -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Talking mode"
+          - what: "LCD -> Draw talk"
             where: ${DUT}
       - test-name: display-set-frown
         cmd-to-run-in-cli: "artie-cli display set mouth ZnJvd24= -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
