@@ -47,10 +47,10 @@ class DriverServer(
         self._fw_submodule.load()
 
         # Set up the starting display
-        self.lcd_draw("SMILE")
+        self._lcd_submodule.draw("SMILE")
 
         # Set up the LED
-        self.led_heartbeat()
+        self._led_submodule.heartbeat()
 
     @rpyc.exposed
     @alog.function_counter("status", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.DriverInterfaceV1.__interface_name__})
@@ -166,7 +166,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("display_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
     @interfaces.interface_method(interfaces.DisplayInterfaceV1)
-    def display_get(self) -> str:
+    def display_get(self, which: str) -> str:
         """
         RPC method to get the current value (base64-encoded string) we think we are drawing.
         """
@@ -180,7 +180,7 @@ class DriverServer(
     @rpyc.exposed
     @alog.function_counter("display_test", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
     @interfaces.interface_method(interfaces.DisplayInterfaceV1)
-    def display_test(self) -> bool:
+    def display_test(self, which: str) -> bool:
         """
         RPC method to test the LCD.
 
@@ -192,7 +192,7 @@ class DriverServer(
 
     @rpyc.exposed
     @alog.function_counter("display_clear", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
-    def display_clear(self):
+    def display_clear(self, which: str):
         """
         RPC method to turn the LCD off.
 
@@ -218,10 +218,10 @@ class DriverServer(
         worked = self._fw_submodule.load()
 
         # Set up the starting display
-        self.lcd_draw("SMILE")
+        self._lcd_submodule.draw("SMILE")
 
         # Set up the LED
-        self.led_heartbeat()
+        self._led_submodule.heartbeat()
 
         return worked
 

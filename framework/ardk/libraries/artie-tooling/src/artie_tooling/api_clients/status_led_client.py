@@ -8,13 +8,14 @@ See [API documentation](../../../../../misc-micro-services/artie-api-server/READ
 from . import api_client
 from .. import errors
 from artie_service_client.interfaces import status_led as status_led_interface
+from artie_tooling import artie_profile
 
 class StatusLEDClient(
     status_led_interface.StatusLEDInterfaceV1,
     api_client.APIClient
     ):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, service_name: str, profile: artie_profile.ArtieProfile, integration_test=False, unit_test=False, nretries=3) -> None:
+        super().__init__(service_name=service_name, profile=profile, integration_test=integration_test, unit_test=unit_test, nretries=nretries)
 
     def led_list(self) -> list[str] | errors.HTTPError:
         response = self.get(f"/{self.service_name}/led/list")
