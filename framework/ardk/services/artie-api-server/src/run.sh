@@ -17,7 +17,7 @@ mkdir -p /etc/artie-api-server/certs
 python -c "from artie_util import util, constants
 server_certfpath = '/etc/artie-api-server/certs/tls.crt'
 server_keyfpath = '/etc/artie-api-server/certs/tls.key'
-if util.mode() not in (constants.ArtieRunModes.INTEGRATION_TESTING, constants.ArtieRunModes.PRODUCTION):
+if util.mode() != constants.ArtieRunModes.PRODUCTION:
     util.generate_self_signed_cert(server_certfpath, server_keyfpath, days=None, force=True)
 "
 

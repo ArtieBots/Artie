@@ -44,13 +44,13 @@ if __name__ == "__main__":
     # We also have a cert for the API server itself to use for HTTPS.
     server_certfpath = "/etc/artie-api-server/certs/tls.crt"
     server_keyfpath = "/etc/artie-api-server/certs/tls.key"
-    if util.mode() not in (constants.ArtieRunModes.INTEGRATION_TESTING, constants.ArtieRunModes.PRODUCTION):
+    if util.mode() != constants.ArtieRunModes.PRODUCTION:
         util.generate_self_signed_cert(server_certfpath, server_keyfpath, days=None, force=True)
 
     # Run the server
     if args.ipv6:
-        alog.info("Starting Artie API Server on IPv6 %s:%d", args.host, args.port)
+        alog.info(f"Starting Artie API Server on IPv6 {args.host}:{args.port}")
         app.run(host=args.host, port=args.port, ssl_context=(server_certfpath, server_keyfpath), debug=(args.loglevel == "debug"), threaded=True)
     else:
-        alog.info("Starting Artie API Server on IPv4 %s:%d", args.host, args.port)
+        alog.info(f"Starting Artie API Server on IPv4 {args.host}:{args.port}")
         app.run(host=args.host, port=args.port, ssl_context=(server_certfpath, server_keyfpath), debug=(args.loglevel == "debug"), threaded=True)
