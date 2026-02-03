@@ -232,7 +232,9 @@ class DriverServer(
         """
         Return a list of MCU IDs that this service is responsible for.
         """
-        return [fw.MOUTH_MCU_NAME]
+        mcus = [fw.MOUTH_MCU_NAME]
+        alog.test(f"MCU IDs: {mcus}", tests=["mouth-driver-integration-tests:mcu-list"])
+        return mcus
 
     @rpyc.exposed
     @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})

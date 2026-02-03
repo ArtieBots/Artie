@@ -39,7 +39,6 @@ services:
       - ARTIE_LOG_LEVEL=DEBUG
 
   artie-api-server:
-    command: python main.py --port 8782
     container_name: mouth-itest-api-server
     image: ${ARTIE_API_SERVER_TEST_IMAGE}
     depends_on:

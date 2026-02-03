@@ -15,7 +15,7 @@ def get_driver_status(service: str):
     """
     try:
         s = asc.ServiceConnection(service)
-        statuses = s.status()
+        statuses = dict(s.status())  # Necessary to copy the generator to a dict for return
         return {
             "service": service,
             "submodule-statuses": statuses

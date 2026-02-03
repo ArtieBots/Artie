@@ -37,14 +37,7 @@ def set_led_state(service: str):
     # Get the service and set LED state
     try:
         s = asc.ServiceConnection(service)
-
-        if state == 'on':
-            result = s.led_on(which)
-        elif state == 'off':
-            result = s.led_off(which)
-        elif state == 'heartbeat':
-            result = s.led_heartbeat(which)
-
+        result = bool(s.led_set(which, state))
         return {
             "service": service,
             "which": which,
@@ -84,7 +77,7 @@ def get_led_state(service: str):
     # Get the service and get LED state
     try:
         s = asc.ServiceConnection(service)
-        state = s.led_get(which)
+        state = str(s.led_get(which))
         return {
             "service": service,
             "which": which,

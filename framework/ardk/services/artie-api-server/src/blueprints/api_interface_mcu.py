@@ -20,7 +20,7 @@ def mcu_reload_fw(service: str):
     # Get the service and reload firmware
     try:
         s = asc.ServiceConnection(service)
-        result = s.mcu_fw_load(mcu_id)
+        result = bool(s.mcu_fw_load(mcu_id))
         return {
             "service": service,
             "mcu-id": mcu_id,
@@ -56,9 +56,7 @@ def mcu_list(service: str):
     """
     try:
         s = asc.ServiceConnection(service)
-        alog.info(f"Successfully initialized service connection. Now listing MCUs for service: {service}")
-        mcus = s.mcu_list()
-        alog.info(f"Got MCUS: {mcus} for service: {service}")
+        mcus = list(s.mcu_list())  # Necessary to copy the generator to a list for return
         return {
             "service": service,
             "mcu-names": mcus
@@ -174,7 +172,7 @@ def mcu_status(service: str):
     # Get the service and get MCU status
     try:
         s = asc.ServiceConnection(service)
-        status = s.mcu_status(mcu_id)
+        status = str(s.mcu_status(mcu_id))
         return {
             "service": service,
             "mcu-id": mcu_id,
@@ -214,7 +212,7 @@ def mcu_version(service: str):
     # Get the service and get MCU version
     try:
         s = asc.ServiceConnection(service)
-        version = s.mcu_version(mcu_id)
+        version = str(s.mcu_version(mcu_id))
         return {
             "service": service,
             "mcu-id": mcu_id,

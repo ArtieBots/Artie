@@ -19,7 +19,7 @@ def list_displays(service: str):
     # Get the service and list displays
     try:
         s = asc.ServiceConnection(service)
-        displays = s.display_list()
+        displays = list(s.display_list())  # Necessary to copy the generator to a list for return
         return {
             "service": service,
             "displays": displays
@@ -134,7 +134,7 @@ def get_display_contents(service: str):
     # Get the service and get display contents
     try:
         s = asc.ServiceConnection(service)
-        content = s.display_get(display_id)
+        content = str(s.display_get(display_id))
         return {
             "service": service,
             "which": display_id,

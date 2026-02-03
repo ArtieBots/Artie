@@ -15,7 +15,7 @@ def whoami(service: str):
     """
     try:
         s = asc.ServiceConnection(service)
-        result = s.whoami()
+        result = str(s.whoami())
 
         # Parse the result which is in format "name:git-hash"
         if ':' in result:
