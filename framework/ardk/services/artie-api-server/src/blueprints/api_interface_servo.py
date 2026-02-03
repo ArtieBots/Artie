@@ -16,7 +16,7 @@ def list_servos(service: str):
     """
     try:
         s = asc.ServiceConnection(service)
-        servos = s.servo_list()
+        servos = list(s.servo_list())  # Necessary to copy the generator to a list for return
         return {
             "service": service,
             "servo-names": servos
@@ -134,7 +134,7 @@ def get_servo_position(service: str):
     # Get the service and get servo position
     try:
         s = asc.ServiceConnection(service)
-        position = s.servo_get_position(servo_id)
+        position = float(s.servo_get_position(servo_id))
         return {
             "service": service,
             "which": servo_id,
