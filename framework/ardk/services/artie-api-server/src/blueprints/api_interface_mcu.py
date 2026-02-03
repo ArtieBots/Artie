@@ -56,7 +56,9 @@ def mcu_list(service: str):
     """
     try:
         s = asc.ServiceConnection(service)
+        alog.info(f"Successfully initialized service connection. Now listing MCUs for service: {service}")
         mcus = s.mcu_list()
+        alog.info(f"Got MCUS: {mcus} for service: {service}")
         return {
             "service": service,
             "mcu-names": mcus
