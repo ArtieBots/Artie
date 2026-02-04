@@ -70,22 +70,22 @@ steps:
           - what: "LEDs: ['mouth']"
             where: mouth-itest-mouth-driver
       - test-name: led-set-on
-        cmd-to-run-in-cli: "artie-cli status-led set on -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth on -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> ON"
             where: mouth-itest-mouth-driver
       - test-name: led-set-off
-        cmd-to-run-in-cli: "artie-cli status-led set off -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth off -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> OFF"
             where: mouth-itest-mouth-driver
       - test-name: led-set-heartbeat
-        cmd-to-run-in-cli: "artie-cli status-led set heartbeat -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set mouth heartbeat -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> HEARTBEAT"
             where: mouth-itest-mouth-driver
       - test-name: led-get
-        cmd-to-run-in-cli: "artie-cli status-led get -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led get mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LED -> State: heartbeat"
             where: mouth-itest-mouth-driver
