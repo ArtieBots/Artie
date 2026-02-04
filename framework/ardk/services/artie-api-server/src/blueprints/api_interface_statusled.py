@@ -8,6 +8,39 @@ import flask
 
 statusled_api = flask.Blueprint('statusled_api', __name__, url_prefix="/<service>")
 
+@statusled_api.route("/led/list", methods=["GET"])
+@alog.function_counter("list_leds", alog.MetricSWCodePathAPIOrder.CALLS)
+def list_leds(service: str):
+    """
+    List all status LEDs.
+    """
+    # Get the service and list LEDs
+    try:
+        s = asc.ServiceConnection(service)
+        led_names = s.led_list()
+        return {
+            "service": service,
+            "led-names": led_names
+        }
+    except KeyError as e:
+        errbody = {
+            "service": service,
+            "error": f"Service not found: {e}"
+        }
+        return errbody, 404
+    except TimeoutError as e:
+        errbody = {
+            "service": service,
+            "error": f"Timed out trying to list LEDs: {e}"
+        }
+        return errbody, 504
+    except Exception as e:
+        errbody = {
+            "service": service,
+            "error": f"Error trying to list LEDs: {e}"
+        }
+        return errbody, 500
+
 @statusled_api.route("/led", methods=["POST"])
 @alog.function_counter("set_led_state", alog.MetricSWCodePathAPIOrder.CALLS)
 def set_led_state(service: str):
