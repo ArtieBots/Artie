@@ -138,7 +138,7 @@ def get_display_contents(service: str):
         return {
             "service": service,
             "which": display_id,
-            "content": content
+            "display": content
         }
     except binascii.Error as e:
         errbody = {
