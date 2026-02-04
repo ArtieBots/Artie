@@ -47,22 +47,22 @@ steps:
       - test-name: mcu-reset
         cmd-to-run-in-cli: "artie-cli mcu reset mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU mouth Reset: DONE"
+          - what: "Mocking a CAN call for reset."
             where: mouth-itest-mouth-driver
       - test-name: mcu-self-check
         cmd-to-run-in-cli: "artie-cli mcu self-check mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU mouth Self Check: PASS"
+          - what: "Checking FW subsystem..."
             where: mouth-itest-mouth-driver
       - test-name: mcu-status
         cmd-to-run-in-cli: "artie-cli mcu status mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU mouth Status: OK"
+          - what: "Mocking FW status."
             where: mouth-itest-mouth-driver
       - test-name: mcu-version
         cmd-to-run-in-cli: "artie-cli mcu version mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU mouth Version: 1.0.0"
+          - what: "Mocking a CAN call for version."
             where: mouth-itest-mouth-driver
       - test-name: led-list
         cmd-to-run-in-cli: "artie-cli led list -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
@@ -92,7 +92,7 @@ steps:
       - test-name: display-list
         cmd-to-run-in-cli: "artie-cli display list -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Displays: ['mouth']"
+          - what: "Received request for mouth LCD -> LIST."
             where: mouth-itest-mouth-driver
       - test-name: display-get
         cmd-to-run-in-cli: "artie-cli display get mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
