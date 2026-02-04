@@ -97,42 +97,42 @@ steps:
       - test-name: display-get
         cmd-to-run-in-cli: "artie-cli display get mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> smile"
+          - what: "LCD -> SMILE"
             where: mouth-itest-mouth-driver
       - test-name: display-talk
         cmd-to-run-in-cli: "artie-cli display set mouth 'dGFsaw==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Talking mode"
+          - what: "LCD -> TALK"
             where: mouth-itest-mouth-driver
       - test-name: display-frown
         cmd-to-run-in-cli: "artie-cli display set mouth 'ZnJvd24=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw frown"
+          - what: "LCD -> FROWN"
             where: mouth-itest-mouth-driver
       - test-name: display-line
         cmd-to-run-in-cli: "artie-cli display set mouth 'bGluZQ==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw line"
+          - what: "LCD -> LINE"
             where: mouth-itest-mouth-driver
       - test-name: display-smirk
         cmd-to-run-in-cli: "artie-cli display set mouth 'c21pcms=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw smirk"
+          - what: "LCD -> SMIRK"
             where: mouth-itest-mouth-driver
       - test-name: display-open-smile
         cmd-to-run-in-cli: "artie-cli display set mouth 'b3Blbi1zbWlsZQ==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw open-smile"
+          - what: "LCD -> OPEN-SMILE"
             where: mouth-itest-mouth-driver
       - test-name: display-zig-zag
         cmd-to-run-in-cli: "artie-cli display set mouth 'emlnLXpheg==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw zig-zag"
+          - what: "LCD -> ZIG-ZAG"
             where: mouth-itest-mouth-driver
       - test-name: display-smile
         cmd-to-run-in-cli: "artie-cli display set mouth 'c21pbGU=' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw smile"
+          - what: "LCD -> SMILE"
             where: mouth-itest-mouth-driver
       - test-name: display-test
         cmd-to-run-in-cli: "artie-cli display test mouth -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"

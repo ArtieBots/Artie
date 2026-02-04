@@ -68,7 +68,6 @@ class LcdSubmodule:
         return worked
 
     def draw(self, val: str) -> bool:
-        alog.test(f"Received request for mouth LCD -> Draw {val}", tests=['mouth-driver-unit-tests:lcd-draw-*'])
         lcd_draw_bytes = MOUTH_DRAWING_CHOICES.get(val, None)
         if lcd_draw_bytes is None:
             lcd_draw_bytes = MOUTH_DRAWING_CHOICES.get(val.upper(), None)
@@ -76,6 +75,8 @@ class LcdSubmodule:
         if lcd_draw_bytes is None:
             alog.error(f"Cannot draw {val} - choose from: {MOUTH_DRAWING_CHOICES}")
             return False
+
+        alog.test(f"Received request for mouth LCD -> {val}", tests=['mouth-driver-*-tests:lcd-draw-*'])
 
         worked = i2c.write_bytes_to_address(board.I2C_ADDRESS_MOUTH_MCU, lcd_draw_bytes)
         self._current_display = val
