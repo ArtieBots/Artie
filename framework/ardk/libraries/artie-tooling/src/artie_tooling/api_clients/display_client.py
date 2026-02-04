@@ -38,9 +38,9 @@ class DisplayClient(
         response = self.get(f"/{self.service_name}/display/contents", params={'which': display_id})
         if response.status_code != 200:
             return errors.HTTPError(response.status_code, f"Error getting display '{display_id}': {response.content.decode('utf-8')}")
-        elif 'display' not in response.json():
-            return errors.HTTPError(500, "Malformed response from server: missing 'display' field.")
-        return response.json()['display']
+        elif 'content' not in response.json():
+            return errors.HTTPError(500, "Malformed response from server: missing 'content' field.")
+        return response.json()['content']
 
     def display_test(self, display_id: str) -> errors.HTTPError|None:
         response = self.post(f"/{self.service_name}/display/test", params={'which': display_id})
