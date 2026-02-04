@@ -26,12 +26,15 @@ class FirmwareSubmodule:
             self._fw_status = constants.SubmoduleStatuses.NOT_WORKING
 
     def status(self):
+        if util.in_test_mode():
+            alog.test("Mocking FW status.", tests=['mouth-driver-integration-tests:status'])
+
         return {
             "FW": self._fw_status
         }
 
     def self_check(self):
-        alog.test("Checking FW subsystem...", tests=['mouth-driver-unit-tests:self-check'])
+        alog.test("Checking FW subsystem...", tests=['mouth-driver-unit-tests:self-check', 'mouth-driver-integration-tests:self-check'])
         self._check_mcu()
 
     def load(self) -> bool:
@@ -83,7 +86,7 @@ class FirmwareSubmodule:
         """
         # No CAN bus in test mode
         if util.in_test_mode():
-            alog.test("Mocking a CAN call for version.", tests=[])  # TODO: Add test for this method
+            alog.test("Mocking a CAN call for version.", tests=['mouth-driver-integration-tests:mcu-version'])
             return "MOUTH_MCU_FW_V1.0.0-MOCK"
 
         # TODO: Use CAN to get the version string

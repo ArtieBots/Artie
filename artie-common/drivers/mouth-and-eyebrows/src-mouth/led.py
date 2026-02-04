@@ -46,7 +46,9 @@ class LedSubmodule:
                 self.heartbeat()
 
     def list(self) -> list[str]:
-        return ['mouth']
+        leds = ['mouth']
+        alog.test(f"LEDs: {leds}", tests=["mouth-driver-integration-tests:led-list"])
+        return leds
 
     def on(self) -> bool:
         alog.test("Received request for mouth LED -> ON.", tests=['mouth-driver-unit-tests:led-on'])
