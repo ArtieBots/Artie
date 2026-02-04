@@ -8,6 +8,7 @@ import blueprints.api_server_api as api_server_api
 import blueprints.logs_api as logs_api
 import blueprints.metrics_api as metrics_api
 import blueprints.api_interface_mcu as api_interface_mcu
+import blueprints.api_interface_display as api_interface_display
 import blueprints.api_interface_driver as api_interface_driver
 import blueprints.api_interface_servo as api_interface_servo
 import blueprints.api_interface_statusled as api_interface_statusled
@@ -19,6 +20,7 @@ app.register_blueprint(api_server_api.api_server_api)
 app.register_blueprint(logs_api.logs_api)
 app.register_blueprint(metrics_api.metrics_api)
 app.register_blueprint(api_interface_mcu.mcu_api)
+app.register_blueprint(api_interface_display.display_api)
 app.register_blueprint(api_interface_driver.driver_api)
 app.register_blueprint(api_interface_servo.servo_api)
 app.register_blueprint(api_interface_statusled.statusled_api)
