@@ -86,7 +86,7 @@ def set_servo_position(service: str):
     # Get the service and set servo position
     try:
         s = asc.ServiceConnection(service)
-        s.servo_set_position(servo_id, position)
+        s.servo_set(servo_id, position)
         return {
             "service": service,
             "which": servo_id,
@@ -134,7 +134,7 @@ def get_servo_position(service: str):
     # Get the service and get servo position
     try:
         s = asc.ServiceConnection(service)
-        position = float(s.servo_get_position(servo_id))
+        position = float(s.servo_get(servo_id))
         return {
             "service": service,
             "which": servo_id,

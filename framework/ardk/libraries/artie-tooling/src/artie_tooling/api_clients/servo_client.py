@@ -25,7 +25,7 @@ class ServoClient(
             return errors.HTTPError(500, "Malformed response from server: missing 'servo-names' field.")
         return response.json()['servo-names']
 
-    def servo_set_position(self, servo_id: str, position: float) -> errors.HTTPError | None:
+    def servo_set(self, servo_id: str, position: float) -> errors.HTTPError | None:
         body = {
             "position": position
         }
@@ -34,7 +34,7 @@ class ServoClient(
             return errors.HTTPError(response.status_code, f"Error setting servo '{servo_id}' position: {response.content.decode('utf-8')}")
         return None
 
-    def servo_get_position(self, servo_id: str) -> float | errors.HTTPError:
+    def servo_get(self, servo_id: str) -> float | errors.HTTPError:
         response = self.get(f"/{self.service_name}/servo/position", params={'which': servo_id})
         if response.status_code != 200:
             return errors.HTTPError(response.status_code, f"Error getting servo '{servo_id}' position: {response.content.decode('utf-8')}")
