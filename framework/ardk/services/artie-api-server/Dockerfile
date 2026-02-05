@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y openssl dos2unix
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN dos2unix /app/run.sh
+RUN chmod +x /app/run.sh
 
 # Configuration stuff
 ARG SERVE_ON_PORT=8782
