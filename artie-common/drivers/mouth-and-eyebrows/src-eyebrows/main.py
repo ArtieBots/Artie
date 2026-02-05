@@ -299,6 +299,17 @@ class DriverServer(
         return self._fw_submodule.version(mcu_id)
 
     @rpyc.exposed
+    @alog.function_counter("mcu_list", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
+    @interfaces.interface_method(interfaces.ServoInterfaceV1)
+    def servo_list(self) -> list[str]:
+        """
+        Return a list of servo IDs that this service is responsible for.
+        """
+        servo_ids = [ebcommon.EyebrowSides.LEFT.value, ebcommon.EyebrowSides.RIGHT.value]
+        alog.test(f"Servo IDs: {servo_ids}", tests=['eyebrows-driver-integration-tests:servo-list'])
+        return servo_ids
+
+    @rpyc.exposed
     @alog.function_counter("servo_get", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.SERVO})
     @interfaces.interface_method(interfaces.ServoInterfaceV1)
     def servo_get(self, side: str) -> float:
