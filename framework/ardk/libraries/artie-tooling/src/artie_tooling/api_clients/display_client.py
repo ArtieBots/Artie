@@ -49,7 +49,7 @@ class DisplayClient(
         return None
 
     def display_clear(self, display_id: str) -> errors.HTTPError|None:
-        response = self.post(f"/{self.service_name}/display/clear", params={'which': display_id})
+        response = self.post(f"/{self.service_name}/display/off", params={'which': display_id})
         if response.status_code != 200:
             return errors.HTTPError(response.status_code, f"Error clearing display '{display_id}': {response.content.decode('utf-8')}")
         return None
