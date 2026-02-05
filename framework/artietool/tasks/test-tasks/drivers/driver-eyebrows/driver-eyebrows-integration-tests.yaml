@@ -117,7 +117,7 @@ steps:
       - test-name: servo-list
         cmd-to-run-in-cli: "artie-cli servo list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Servos IDs: ['eyebrow-left', 'eyebrow-right']"
+          - what: "Servo IDs: ['eyebrow-left', 'eyebrow-right']"
             where: eyebrows-itest-eyebrows-driver
       - test-name: servo-set
         cmd-to-run-in-cli: "artie-cli servo set eyebrow-right 45 -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
