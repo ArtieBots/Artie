@@ -58,42 +58,42 @@ steps:
       - test-name: display-set-talk
         cmd-to-run-in-cli: "artie-cli display set mouth dGFsaw== -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw talk"
+          - what: "LCD -> TALK"
             where: ${DUT}
       - test-name: display-set-frown
         cmd-to-run-in-cli: "artie-cli display set mouth ZnJvd24= -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw frown"
+          - what: "LCD -> FROWN"
             where: ${DUT}
       - test-name: display-set-line
         cmd-to-run-in-cli: "artie-cli display set mouth bGluZQ== -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw line"
+          - what: "LCD -> LINE"
             where: ${DUT}
       - test-name: display-set-smirk
         cmd-to-run-in-cli: "artie-cli display set mouth c21pcms= -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw smirk"
+          - what: "LCD -> SMIRK"
             where: ${DUT}
       - test-name: display-set-open-smile
         cmd-to-run-in-cli: "artie-cli display set mouth b3Blbi1zbWlsZQ== -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw open-smile"
+          - what: "LCD -> OPEN-SMILE"
             where: ${DUT}
       - test-name: display-set-zig-zag
         cmd-to-run-in-cli: "artie-cli display set mouth emlnLXphZw== -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw zig-zag"
+          - what: "LCD -> ZIG-ZAG"
             where: ${DUT}
       - test-name: display-set-smile
         cmd-to-run-in-cli: "artie-cli display set mouth c21pbGU= -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> Draw smile"
+          - what: "LCD -> SMILE"
             where: ${DUT}
       - test-name: display-get
         cmd-to-run-in-cli: "artie-cli display get mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "LCD -> smile"
+          - what: "LCD -> SMILE"
             where: ${DUT}
       - test-name: mcu-reload-fw
         cmd-to-run-in-cli: "artie-cli mcu reload-fw mouth -n mouth-driver --unit-test --port 18862 --artie-profile /unit_test_profile.json"
