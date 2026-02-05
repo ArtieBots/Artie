@@ -125,7 +125,7 @@ steps:
           - what: "LCD -> OPEN-SMILE"
             where: mouth-itest-mouth-driver
       - test-name: display-zig-zag
-        cmd-to-run-in-cli: "artie-cli display set mouth 'emlnLXpheg==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli display set mouth 'emlnLXphZw==' -n mouth-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "LCD -> ZIG-ZAG"
             where: mouth-itest-mouth-driver

@@ -76,10 +76,10 @@ class LcdSubmodule:
             alog.error(f"Cannot draw {val} - choose from: {MOUTH_DRAWING_CHOICES}")
             return False
 
-        alog.test(f"Received request for mouth LCD -> {val}", tests=['mouth-driver-*-tests:lcd-draw-*'])
+        alog.test(f"Received request for mouth LCD -> {val.upper()}", tests=['mouth-driver-*-tests:lcd-draw-*'])
 
         worked = i2c.write_bytes_to_address(board.I2C_ADDRESS_MOUTH_MCU, lcd_draw_bytes)
-        self._current_display = val
+        self._current_display = val.upper()
         self._set_status(worked)
         return worked
 
