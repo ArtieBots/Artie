@@ -35,7 +35,7 @@ steps:
           - what: "Mocking MCU FW load."
             where: eyebrows-itest-eyebrows-driver
       - test-name: mcu-list
-        cmd-to-run-in-cli: "artie-cli mcu list eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli mcu list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "MCU IDs: ['eyebrow-left', 'eyebrow-right']"
             where: eyebrows-itest-eyebrows-driver
