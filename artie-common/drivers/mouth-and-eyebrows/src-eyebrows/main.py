@@ -86,7 +86,9 @@ class DriverServer(
         """
         RPC method to list all LEDs.
         """
-        return self._led_submodule.list()
+        leds = self._led_submodule.list()
+        alog.test(f"LEDs: {leds}", tests=['eyebrows-driver-integration-tests:led-list'])
+        return leds
 
     @rpyc.exposed
     @alog.function_counter("led_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LED, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.StatusLEDInterfaceV1.__interface_name__})
@@ -130,7 +132,9 @@ class DriverServer(
         """
         RPC method to list all displays.
         """
-        return self._lcd_submodule.list()
+        displays = self._lcd_submodule.list()
+        alog.test(f"Displays: {displays}", tests=['eyebrows-driver-integration-tests:display-list'])
+        return displays
 
     @rpyc.exposed
     @alog.function_counter("display_set", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.LCD})
@@ -257,6 +261,7 @@ class DriverServer(
         """
         Run a self diagnostics check on the given MCU and set our submodule statuses appropriately.
         """
+        alog.test(f"Running self check on MCU {mcu_id}...", tests=[f'eyebrows-driver-integration-tests:mcu-self-check'])
         return self._fw_submodule.self_check(mcu_id)
 
     @rpyc.exposed
@@ -271,6 +276,7 @@ class DriverServer(
         *Returns*: A string representing the status of the MCU. This string
         should be one of the enum values of `artie_util.constants.SubmoduleStatuses`.
         """
+        alog.test(f"Checking status of MCU {mcu_id}...", tests=[f'eyebrows-driver-integration-tests:mcu-status'])
         if mcu_id == ebcommon.EyebrowSides.LEFT:
             return self._fw_submodule.left_status
         elif mcu_id == ebcommon.EyebrowSides.RIGHT:

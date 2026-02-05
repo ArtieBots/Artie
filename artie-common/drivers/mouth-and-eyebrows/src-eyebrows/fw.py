@@ -76,7 +76,7 @@ class FirmwareSubmodule:
             return False
 
         if util.in_test_mode():
-            alog.test("Mocking MCU FW load.", tests=['eyebrows-driver-unit-tests:init-mcu'])
+            alog.test("Mocking MCU FW load.", tests=['eyebrows-driver-unit-tests:init-mcu', 'eyebrows-driver-integration-tests:mcu-reload-fw'])
 
         # Use CAN to load the two FW files
         # TODO
@@ -100,7 +100,7 @@ class FirmwareSubmodule:
 
         # No CAN bus in test mode
         if util.in_test_mode():
-            alog.test("Mocking a CAN call for reset.", tests=['*-integration-tests:*'])
+            alog.test(f"Mocking a CAN call for reset: {mcu_id}", tests=['*-integration-tests:*'])
             return True
 
         # TODO: Use CAN to reset the MCUs

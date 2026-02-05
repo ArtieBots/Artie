@@ -47,22 +47,22 @@ steps:
       - test-name: mcu-reset
         cmd-to-run-in-cli: "artie-cli mcu reset eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU eyebrow-left Reset: DONE"
+          - what: "Mocking a CAN call for reset: eyebrow-right"
             where: eyebrows-itest-eyebrows-driver
       - test-name: mcu-self-check
         cmd-to-run-in-cli: "artie-cli mcu self-check eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU eyebrow-right Self Check: PASS"
+          - what: "Running self check on MCU eyebrow-right..."
             where: eyebrows-itest-eyebrows-driver
       - test-name: mcu-status
         cmd-to-run-in-cli: "artie-cli mcu status eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU eyebrow-right Status: OK"
+          - what: "Checking status of MCU eyebrow-right..."
             where: eyebrows-itest-eyebrows-driver
       - test-name: mcu-version
         cmd-to-run-in-cli: "artie-cli mcu version eyebrow-left -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Mocking MCU eyebrow-left Firmware Version: 1.0.0"
+          - what: "Mocking MCU FW version."
             where: eyebrows-itest-eyebrows-driver
       - test-name: led-list
         cmd-to-run-in-cli: "artie-cli status-led list -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
@@ -97,7 +97,7 @@ steps:
       - test-name: display-get
         cmd-to-run-in-cli: "artie-cli display get eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "right eyebrow LCD -> State: ['M', 'H', 'M']"
+          - what: "eyebrow-right eyebrow LCD -> State: 'MMM'"
             where: eyebrows-itest-eyebrows-driver
       - test-name: display-set
         cmd-to-run-in-cli: "artie-cli display set eyebrow-left 'SEhM' -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
