@@ -35,7 +35,7 @@ steps:
         producing-task: artie-cli
     steps:
       - test-name: led-on
-        cmd-to-run-in-cli: "artie-cli eyebrows led on --side left --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli status-led set eyebrow-left on -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "Test Passed"
             where: metrics-itest-metrics-collector

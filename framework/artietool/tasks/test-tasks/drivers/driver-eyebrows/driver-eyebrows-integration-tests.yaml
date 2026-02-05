@@ -127,5 +127,5 @@ steps:
       - test-name: servo-get
         cmd-to-run-in-cli: "artie-cli servo get eyebrow-right -n eyebrows-driver --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "right servo position -> 90.00"
+          - what: "right servo position -> 45.00"
             where: eyebrows-itest-eyebrows-driver
