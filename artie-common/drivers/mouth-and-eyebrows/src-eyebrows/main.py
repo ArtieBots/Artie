@@ -86,7 +86,7 @@ class DriverServer(
         """
         RPC method to list all LEDs.
         """
-        leds = self._led_submodule.list()
+        leds = [e.value for e in self._led_submodule.list()]
         alog.test(f"LEDs: {leds}", tests=['eyebrows-driver-integration-tests:led-list'])
         return leds
 
