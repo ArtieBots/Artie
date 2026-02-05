@@ -234,7 +234,9 @@ class DriverServer(
         """
         Return a list of MCU IDs that this service is responsible for.
         """
-        return list([str(k) for k in ebcommon.MCU_ADDRESS_MAP.keys()])
+        mcu_ids = list([str(k) for k in ebcommon.MCU_ADDRESS_MAP.keys()])
+        alog.test(f"MCU IDs: {mcu_ids}", tests=['eyebrows-driver-integration-tests:mcu-list'])
+        return mcu_ids
 
     @rpyc.exposed
     @alog.function_counter("mcu_reset", alog.MetricSWCodePathAPIOrder.CALLS, attributes={alog.KnownMetricAttributes.SUBMODULE: metrics.SubmoduleNames.FIRMWARE, alog.KnownMetricAttributes.INTERFACE_NAME: interfaces.MCUInterfaceV1.__interface_name__})
