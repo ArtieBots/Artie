@@ -132,7 +132,7 @@ class DriverServer(
         """
         RPC method to list all displays.
         """
-        displays = self._lcd_submodule.list()
+        displays = [e.value for e in self._lcd_submodule.list()]
         alog.test(f"Displays: {displays}", tests=['eyebrows-driver-integration-tests:display-list'])
         return displays
 
