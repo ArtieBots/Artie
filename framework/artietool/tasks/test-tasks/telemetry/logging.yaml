@@ -25,7 +25,7 @@ steps:
           dependency:
             name: docker-image
             producing-task: artie-api-server
-      - SERVICE_BROKER_TEST_IMAGE:
+      - ARTIE_SERVICE_BROKER_TEST_IMAGE:
           dependency:
             name: docker-image
             producing-task: artie-service-broker
