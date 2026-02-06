@@ -43,9 +43,9 @@ if platform.system() == "Linux":
 else:
     alog.warning("Detected that we are not on Linux. Certain functionality will be limited.")
 
-def create_rpc_server(server, keyfpath: str, certfpath: str, port: int, ipv6=False):
+def create_server(server, keyfpath: str, certfpath: str, port: int, ipv6=False):
     """
-    Create and return an RPC server using sane security defaults.
+    Create and return an Artie server using sane security defaults.
     """
     # Authentication itself is handled by means of the Kubernetes trust boundary
     # i.e., we trust (and do no real authentication of) any pods that are able to connect to us.

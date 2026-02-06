@@ -1,5 +1,5 @@
 """
-This module contains a cache monitor for the Artie RPC Broker service.
+This module contains a cache monitor for the Artie Service Broker service.
 
 The cache monitor is constantly monitoring the broker cache directory
 for changes and invalidating the in-memory cache of services
@@ -27,7 +27,7 @@ IN_CLOEXEC = 0x00080000
 
 class CacheMonitor(threading.Thread):
     """
-    This class implements a cache monitor for the Artie RPC Broker service.
+    This class implements a cache monitor for the Artie Service Broker service.
     It monitors the broker cache directory for changes and invalidates
     the in-memory cache of services when changes are detected.
     """

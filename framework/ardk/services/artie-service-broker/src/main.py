@@ -1,8 +1,8 @@
 """
-Main module for the Artie RPC Broker service.
+Main module for the Artie Service Broker service.
 
-The Artie RPC Broker is responsible for registering and
-discovering services in the Artie cluster that are making use of RPC.
+The Artie Service Broker is responsible for registering and
+discovering services in the Artie cluster.
 """
 from artie_service_client import dns
 from artie_util import artie_logging as alog

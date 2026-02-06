@@ -1,20 +1,20 @@
-# Artie RPC Broker Design Document
+# Artie Service Broker Design Document
 
-Artie RPC Broker is a microservice that facilitates communication between various Artie microservices using Remote Procedure Calls (RPC). This document outlines the design and architecture of the Artie RPC Broker.
+Artie Service Broker is a microservice that facilitates communication between various Artie microservices using Remote Procedure Calls (RPC). This document outlines the design and architecture of the Artie Service Broker.
 
 ## Overview
 
-The Artie RPC Broker is built using the [RPyC library](https://rpyc.readthedocs.io/en/latest/),
+The Artie Service Broker is built using the [RPyC library](https://rpyc.readthedocs.io/en/latest/),
 which allows for transparent remote procedure calls between microservices. The broker acts as an intermediary
 that routes requests from clients to the appropriate service handlers, decoupling service implementations from their consumers.
 
 ## Requirements
 
 - **Service discovery**: Services can be discovered at runtime based on their capabilities.
-  All Artie RPC services are derived from the `ArtieRPCService` class found in
+  All Artie Services are derived from the `ArtieService` class found in
   [artie_service_client/artie_service.py](../../libraries/artie-service-client/src/artie_service_client/artie_service.py)
-  and are further inherited from mixins defined in [artie_service_client/interfaces](../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py). The `ArtieRPCService` class provides methods
-  to register with the Artie RPC Broker. Clients can then query the broker, either by service name
+  and are further inherited from mixins defined in [artie_service_client/interfaces](../../libraries/artie-service-client/src/artie_service_client/interfaces/service.py). The `ArtieService` class provides methods
+  to register with the Artie Service Broker. Clients can then query the broker, either by service name
   or by interface signature (e.g., "I am looking for a service that is an 'led-driver' and an 'accelerometer-driver').
 - **Latency**: Service lookups must be extremely fast.
 

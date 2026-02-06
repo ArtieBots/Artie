@@ -31,7 +31,7 @@ steps:
             name: fw-files
             producing-task: fw-mouth
             match: ".+\\.elf"
-      - RPC_PORT: 4243
+      - SERVICE_PORT: 4243
       - GIT_TAG: ${GIT_TAG}
       - ARTIE_BASE_IMG:
           dependency:
