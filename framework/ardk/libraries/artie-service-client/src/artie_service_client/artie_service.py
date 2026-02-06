@@ -11,13 +11,13 @@ from artie_util import constants
 from artie_util import util
 from rpyc.utils.registry import TCPRegistryClient
 
-class ArtieRPCService(rpyc.Service):
+class ArtieService(rpyc.Service):
     ALIASES = []
     """List of alternative names for this service. We use this to tell RPyC the name of our service."""
 
     def __init__(self, service_name: str, port: int, register_service=True):
         """
-        Initialize the ArtieRPCService, registering it with the RPC broker
+        Initialize the ArtieService, registering it with the Artie Service Broker
         service by default. Pass `register_service=False` to disable automatic
         registration on startup.
         """
@@ -52,13 +52,13 @@ class ArtieRPCService(rpyc.Service):
 
     def register_service(self):
         """
-        Register this service with the RPC Broker service.
+        Register this service with the Artie Service Broker service.
         """
         self.registrar.register(self.fully_qualified_name, self.port)
 
     def unregister_service(self):
         """
-        Unregister this service from the RPC Broker service.
+        Unregister this service from the Artie Service Broker service.
         """
         self.registrar.unregister(self.port)
 

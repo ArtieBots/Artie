@@ -4,7 +4,7 @@ This module contains the `MCUInterface` mixin definition.
 
 class MCUInterfaceV1:
     """
-    `MCUInterfaceV1` is a mixin to be used by all RPC services in Artie that
+    `MCUInterfaceV1` is a mixin to be used by all services in Artie that
     take control of one or more microcontrollers (MCUs) on the robot.
     """
     @staticmethod

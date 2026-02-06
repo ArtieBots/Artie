@@ -6,7 +6,7 @@ This driver is responsible for:
 * Loading mouth MCU firmware
 * Animating the mouth
 
-This driver accepts ZeroRPC requests and controls the
+This driver accepts RPC requests and controls the
 MCU over the Controller Node's I2C bus. It is therefore
 meant to be run on the Controller Node, and it needs to
 be run inside a container that has access to CAN
@@ -35,7 +35,7 @@ class DriverServer(
     interfaces.DisplayInterfaceV1,
     interfaces.MCUInterfaceV1,
     interfaces.StatusLEDInterfaceV1,
-    artie_service.ArtieRPCService
+    artie_service.ArtieService
     ):
     def __init__(self, port: int, fw_fpath: str, ipv6=False):
         super().__init__(SERVICE_NAME, port)
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     parser.add_argument("fw_fpath", metavar="fw-fpath", type=str, help="The path to the FW file. It must be an .elf file.")
     parser.add_argument("--ipv6", action='store_true', help="Use IPv6 if given, otherwise IPv4.")
     parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
-    parser.add_argument("-p", "--port", type=int, default=18862, help="The port to bind for the RPC server.")
+    parser.add_argument("-p", "--port", type=int, default=18862, help="The port to bind for the server.")
     args = parser.parse_args()
 
     # Set up logging
@@ -324,5 +324,5 @@ if __name__ == "__main__":
 
     # Instantiate the single (multi-tenant) server instance and block forever, serving
     server = DriverServer(args.port, args.fw_fpath, ipv6=args.ipv6)
-    t = util.create_rpc_server(server, keyfpath, certfpath, args.port, ipv6=args.ipv6)
+    t = util.create_server(server, keyfpath, certfpath, args.port, ipv6=args.ipv6)
     t.start()

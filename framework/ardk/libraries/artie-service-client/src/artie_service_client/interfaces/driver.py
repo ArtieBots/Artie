@@ -3,7 +3,7 @@ This module contains the code for the `DriverInterface` mixin.
 """
 class DriverInterfaceV1:
     """
-    `DriverInterfaceV1` is a mixin to be used by all RPC driver services in Artie.
+    `DriverInterfaceV1` is a mixin to be used by all driver services in Artie.
     """
     @staticmethod
     def __interface_name__() -> str:

@@ -4,7 +4,7 @@ This module contains the `StatusLEDInterface` mixin definition.
 
 class StatusLEDInterfaceV1:
     """
-    `StatusLEDInterfaceV1` is a mixin to be used by all RPC services that
+    `StatusLEDInterfaceV1` is a mixin to be used by all services that
     control at least one status LED.
     """
     @staticmethod
@@ -14,7 +14,7 @@ class StatusLEDInterfaceV1:
 
     def led_list(self) -> list[str]:
         """
-        RPC method to list all available status LEDs.
+        Method to list all available status LEDs.
 
         Returns
         -------
@@ -24,7 +24,7 @@ class StatusLEDInterfaceV1:
 
     def led_set(self, which: str, state: str) -> bool:
         """
-        RPC method to turn the led to heartbeat mode.
+        Method to turn the led to heartbeat mode.
 
         Args
         ----
@@ -39,7 +39,7 @@ class StatusLEDInterfaceV1:
 
     def led_get(self, which: str) -> str:
         """
-        RPC method to get the state of the given LED.
+        Method to get the state of the given LED.
 
         Args
         ----

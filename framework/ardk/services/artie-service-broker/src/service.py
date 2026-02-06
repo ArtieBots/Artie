@@ -6,7 +6,7 @@ from artie_util import artie_logging as alog
 class ServiceRegistration:
     """
     This class represents a service that can be registered
-    with the Artie RPC Broker.
+    with the Artie Service Broker.
 
     This is meant to be an immutable, hashable object.
     """
