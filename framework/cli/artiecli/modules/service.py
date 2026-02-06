@@ -6,7 +6,7 @@ import argparse
 import os
 
 def _connect_registrar(args) -> TCPRegistryClient:
-    registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864)))
+    registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_PORT, 18864)))
     return registrar
 
 def _cmd_list(args):
