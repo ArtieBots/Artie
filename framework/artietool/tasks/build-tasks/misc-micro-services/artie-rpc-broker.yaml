@@ -1,4 +1,4 @@
-name: artie-rpc-broker
+name: artie-service-broker
 labels:
   - docker-image
 dependencies:
@@ -16,10 +16,10 @@ steps:
   - job: docker-build
     artifacts:
       - docker-image-amd64
-    img-base-name: artie-rpc-broker
+    img-base-name: artie-service-broker
     buildx: true
     platform: linux/amd64
-    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/services/artie-rpc-broker"
+    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/services/artie-service-broker"
     dockerfile: Dockerfile
     build-context: "."
     build-args:
@@ -28,14 +28,14 @@ steps:
           dependency:
             name: docker-image-amd64
             producing-task: artie-base-image
-      - RPC_PORT: 18864
+      - SERVICE_BROKER_PORT: 18864
   - job: docker-build
     artifacts:
       - docker-image-arm64
-    img-base-name: artie-rpc-broker
+    img-base-name: artie-service-broker
     buildx: true
     platform: linux/arm64
-    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/services/artie-rpc-broker"
+    dockerfile-dpath: "${REPO_ROOT}/framework/ardk/services/artie-service-broker"
     dockerfile: Dockerfile
     build-context: "."
     build-args:
@@ -44,15 +44,15 @@ steps:
           dependency:
             name: docker-image-arm64
             producing-task: artie-base-image
-      - RPC_PORT: 18864
+      - SERVICE_BROKER_PORT: 18864
   - job: docker-manifest
     artifacts:
       - docker-image
-    img-base-name: artie-rpc-broker
+    img-base-name: artie-service-broker
     images:
       - dependency:
           name: docker-image-amd64
-          producing-task: artie-rpc-broker
+          producing-task: artie-service-broker
       - dependency:
           name: docker-image-arm64
-          producing-task: artie-rpc-broker
+          producing-task: artie-service-broker

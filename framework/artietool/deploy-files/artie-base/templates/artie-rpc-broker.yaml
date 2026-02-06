@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rpc-broker
+  name: service-broker
   namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/component: rpc-broker
+    app.kubernetes.io/component: service-broker
     {{- tpl (toYaml .Values.labels) . | nindent 4 }}
   annotations:
     description: {{ .Chart.Description }}
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/component: rpc-broker
+      app.kubernetes.io/component: service-broker
       {{- tpl (toYaml .Values.labels) . | nindent 6 }}
   replicas: 1
   minReadySeconds: {{ .Values.minReadySeconds }}
   strategy:
-  {{- .Values.rpcBrokerUpdateStrategy | toYaml | nindent 4 }}
+  {{- .Values.serviceBrokerUpdateStrategy | toYaml | nindent 4 }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: rpc-broker
+        app.kubernetes.io/component: service-broker
         {{- tpl (toYaml .Values.labels) . | nindent 8 }}
       annotations:
     spec:
@@ -31,8 +31,8 @@ spec:
           persistentVolumeClaim:
             claimName: broker-cache-pvc
       containers:
-        - name: rpc-broker
-          image: "{{ .Values.repository }}/artie-rpc-broker:{{ .Values.imageTag }}"
+        - name: service-broker
+          image: "{{ .Values.repository }}/artie-service-broker:{{ .Values.imageTag }}"
           imagePullPolicy: {{ .Values.imagePullPolicy }}
           volumeMounts:
             - name: broker-cache
@@ -46,21 +46,21 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .Values.rpcBrokerHostName }}-{{ .Values.artieId }}"
+  name: "{{ .Values.serviceBrokerHostName }}-{{ .Values.artieId }}"
   namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/component: rpc-broker
+    app.kubernetes.io/component: service-broker
     {{- tpl (toYaml .Values.labels) . | nindent 4 }}
   annotations:
     description: {{ .Chart.Description }}
 spec:
   selector:
-    app.kubernetes.io/component: rpc-broker
+    app.kubernetes.io/component: service-broker
     {{- tpl (toYaml .Values.labels) . | nindent 4 }}
   ports:
     - name: api
-      port: {{ .Values.ports.rpcBroker }}
-      targetPort: {{ .Values.ports.rpcBroker }}
+      port: {{ .Values.ports.serviceBroker }}
+      targetPort: {{ .Values.ports.serviceBroker }}
       protocol: TCP
   type: ClusterIP
 
@@ -68,10 +68,10 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: rpc-broker-hpa
+  name: service-broker-hpa
   namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/component: rpc-broker
+    app.kubernetes.io/component: service-broker
     {{- tpl (toYaml .Values.labels) . | nindent 4 }}
   annotations:
     description: {{ .Chart.Description }}
@@ -81,7 +81,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: rpc-broker
+    name: service-broker
   metrics:
     - type: Resource
       resource:

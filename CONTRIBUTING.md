@@ -97,7 +97,7 @@ These directories contain infrastructure-related code and configurations.
             * `artie-api-server/`: Code and Dockerfile for Artie API server, which currently serves as the single input/output
               gateway for the Artie Kubernetes cluster.
             * `artie-pubsub-broker/`: Code and Dockerfile for the Pub/Sub messaging broker.
-            * `artie-rpc-broker/`: Code and Dockerfile for the RPC messaging broker.
+            * `artie-service-broker/`: Code and Dockerfile for the service broker.
             * `telemetry/`: Code and Dockerfiles for the telemetry microservices.
     * `artietool/`: Artie Tool code and related resources.
       See the [Artie Tool contributing guide](./docs/contributing/artie-tool-contributions.md) for more information.
