@@ -23,12 +23,12 @@ steps:
       - test-name: list-services
         cmd-to-run-in-cli: "artie-cli service list --unit-test --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "Found ('mock-service:service-interface-v1:driver-interface-v1:status-led-interface-v1',)"
+          - what: "Found ('mock-server:service-interface-v1:driver-interface-v1:status-led-interface-v1',)"
             where: ${DUT}
       - test-name: list-services-with-host-filter-expected-yes
         cmd-to-run-in-cli: "artie-cli service list --host localhost --unit-test --artie-profile /unit_test_profile.json"
         expected-outputs:
-          - what: "Found ('mock-service:service-interface-v1:driver-interface-v1:status-led-interface-v1',)"
+          - what: "Found ('mock-server:service-interface-v1:driver-interface-v1:status-led-interface-v1',)"
             where: ${DUT}
       - test-name: list-services-with-host-filter-expected-no
         cmd-to-run-in-cli: "artie-cli service list --host nonexistent-host --unit-test --artie-profile /unit_test_profile.json"
@@ -36,7 +36,7 @@ steps:
           - what: "Found ()"
             where: ${DUT}
       - test-name: query-fully-qualified-name-expected-yes
-        cmd-to-run-in-cli: "artie-cli service query --name mock-service:service-interface-v1:driver-interface-v1:status-led-interface-v1 --unit-test --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli service query --name mock-server:service-interface-v1:driver-interface-v1:status-led-interface-v1 --unit-test --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "Found [('127.0.0.1', 18865)]"
             where: ${DUT}
@@ -46,7 +46,7 @@ steps:
           - what: "No such service"
             where: ${DUT}
       - test-name: query-by-simple-name-expected-yes
-        cmd-to-run-in-cli: "artie-cli service query --name mock-service --unit-test --artie-profile /unit_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli service query --name mock-server --unit-test --artie-profile /unit_test_profile.json"
         expected-outputs:
           - what: "Found [('127.0.0.1', 18865)]"
             where: ${DUT}
