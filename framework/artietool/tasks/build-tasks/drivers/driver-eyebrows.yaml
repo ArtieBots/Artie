@@ -31,7 +31,7 @@ steps:
             name: fw-files
             producing-task: fw-eyebrows
             match: ".+\\.elf"
-      - RPC_PORT: 18861
+      - SERVICE_PORT: 18861
       - GIT_TAG: ${GIT_TAG}
       - ARTIE_BASE_IMG:
           dependency:

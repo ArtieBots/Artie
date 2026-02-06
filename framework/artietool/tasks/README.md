@@ -99,7 +99,7 @@ steps:
             producing-task: fw-eyebrows
             # We only take files that match the pattern *.elf
             match: "*.elf"
-      - RPC_PORT: 18861
+      - SERVICE_PORT: 18861
       - GIT_TAG: ${GIT_TAG}
       - ARTIE_BASE_IMG:
           dependency:

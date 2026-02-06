@@ -1,4 +1,4 @@
-# persistent Volume for RPC Broker Cache
+# persistent Volume for Service Broker Cache
 apiVersion: v1
 kind: PersistentVolume
 metadata:
