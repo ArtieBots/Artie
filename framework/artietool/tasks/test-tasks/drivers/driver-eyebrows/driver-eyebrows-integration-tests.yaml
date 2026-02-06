@@ -6,7 +6,7 @@ dependencies:
   - driver-eyebrows: docker-image
   - artie-api-server: docker-image
   - artie-cli: docker-image
-  - artie-rpc-broker: docker-image
+  - artie-service-broker: docker-image
 type: test
 steps:
   - job: docker-compose-test-suite
@@ -20,10 +20,10 @@ steps:
           dependency:
             name: docker-image
             producing-task: artie-api-server
-      - RPC_BROKER_TEST_IMAGE:
+      - SERVICE_BROKER_TEST_IMAGE:
           dependency:
             name: docker-image
-            producing-task: artie-rpc-broker
+            producing-task: artie-service-broker
     cli-image:
       dependency:
         name: docker-image

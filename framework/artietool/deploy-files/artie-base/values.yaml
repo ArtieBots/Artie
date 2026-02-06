@@ -87,10 +87,10 @@ baseEnvironment:
     value: "{{ .Values.ports.logCollector }}"
   - name: METRICS_SERVER_PORT
     value: "{{ .Values.ports.metricsCollector }}"
-  - name: RPC_BROKER_HOSTNAME
-    value: "{{ .Values.rpcBrokerHostName }}-{{ .Values.artieId }}"
-  - name: RPC_BROKER_PORT
-    value: "{{ .Values.ports.rpcBroker }}"
+  - name: ARTIE_SERVICE_BROKER_HOSTNAME
+    value: "{{ .Values.serviceBrokerHostName }}-{{ .Values.artieId }}"
+  - name: ARTIE_SERVICE_BROKER_PORT
+    value: "{{ .Values.ports.serviceBroker }}"
 
 # Minimum size of the broker cache PVC
 brokerCacheMinimumSize: 10Gi
@@ -109,15 +109,15 @@ ports:
   eyebrowsDriver: 18863
   logCollector: 5170
   metricsCollector: 8090
-  rpcBroker: 18864
+  serviceBroker: 18864
   artieApiServer: 8782
 
 # repository: The repository we use for the images.
 repository: maxfieldstrange
 
-# rpcBrokerHostName: The hostname of the RPC broker service.
+# serviceBrokerHostName: The hostname of the service broker service.
 # Make sure this matches those found in all the Docker compose files for testing.
-rpcBrokerHostName: "rpc-broker-service"
+serviceBrokerHostName: "service-broker-service"
 
 # --------------- Stuff the user is expected to override --------------------
 

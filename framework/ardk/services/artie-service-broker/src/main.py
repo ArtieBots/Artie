@@ -19,13 +19,13 @@ import multiprocessing
 import os
 import time
 
-SERVICE_NAME = "rpc-broker-service"
+SERVICE_NAME = "artie-service-broker"
 
-class ArtieRPCBrokerServer(TCPRegistryServer):
+class ArtieServiceBrokerServer(TCPRegistryServer):
     """
-    This class implements the RPC Broker service, which is
+    This class implements the Service Broker service, which is
     responsible for registering and discovering services in the
-    Artie cluster that are making use of RPC.
+    Artie cluster.
     """
     def __init__(self, host: str, port: int, broker_cache_dpath: str):
         super().__init__(host, port, allow_listing=True)
@@ -146,7 +146,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
             services = [fully_qualified_name for fully_qualified_name in self.services.keys()]
             services = tuple(services)
 
-        alog.test(f"Found {services}", tests=["rpc-broker-unit-tests:list-services"])
+        alog.test(f"Found {services}", tests=["service-broker-unit-tests:list-services"])
         return services
 
     @read_cache
@@ -187,7 +187,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 
         # Remove after iterating to avoid modifying the dict while iterating
         for name, s in remove:
-            alog.test(f"Removing service {name} at {s.host}:{s.port}", tests=["rpc-broker-unit-tests:unregister"])
+            alog.test(f"Removing service {name} at {s.host}:{s.port}", tests=["service-broker-unit-tests:unregister"])
             self._remove_service(name, s)
 
         return "OK"
@@ -215,11 +215,11 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
                     servers.append((s.host, s.port))
 
         if not servers:
-            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-interface-list-expected-no", "rpc-broker-unit-tests:query-by-interface-list-partial-expected-no"])
+            alog.test("No such service", tests=["service-broker-unit-tests:query-by-interface-list-expected-no", "service-broker-unit-tests:query-by-interface-list-partial-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
-        alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-interface-list-expected-yes", "rpc-broker-unit-tests:query-by-interface-list-partial-expected-yes"])
+        alog.test(f"Found {servers}", tests=["service-broker-unit-tests:query-by-interface-list-expected-yes", "service-broker-unit-tests:query-by-interface-list-partial-expected-yes"])
         alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
         return tuple(servers)
 
@@ -235,7 +235,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         """
         alog.debug(f"Querying for service by simple name: {simple_name}")
         if simple_name not in self.name_mapping:
-            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-simple-name-expected-no"])
+            alog.test("No such service", tests=["service-broker-unit-tests:query-by-simple-name-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
@@ -252,7 +252,7 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
         else:
-            alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-simple-name-expected-yes"])
+            alog.test(f"Found {servers}", tests=["service-broker-unit-tests:query-by-simple-name-expected-yes"])
             alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
             return tuple(servers)
 
@@ -262,12 +262,12 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
         """
         alog.debug(f"Querying for service by fully-qualified name: {fq_name}")
         if fq_name not in self.services:
-            alog.test("No such service", tests=["rpc-broker-unit-tests:query-by-fully-qualified-name-expected-no"])
+            alog.test("No such service", tests=["service-broker-unit-tests:query-by-fully-qualified-name-expected-no"])
             alog.update_counter(1, "dns_miss", alog.MetricSWCodePathAPICallFamily.FAILURE, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query failed to find a service.")
             return ()
 
         servers = [(s.host, s.port) for s in self.services[fq_name].keys()]
-        alog.test(f"Found {servers}", tests=["rpc-broker-unit-tests:query-by-fully-qualified-name-expected-yes"])
+        alog.test(f"Found {servers}", tests=["service-broker-unit-tests:query-by-fully-qualified-name-expected-yes"])
         alog.update_counter(1, "dns_hit", alog.MetricSWCodePathAPICallFamily.SUCCESS, unit=alog.MetricUnits.CALLS, description="Number of times a cmd_query successfully found a service.")
         return tuple(servers)
 
@@ -312,21 +312,21 @@ class ArtieRPCBrokerServer(TCPRegistryServer):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-l", "--loglevel", type=str, default=None, choices=["debug", "info", "warning", "error"], help="The log level.")
-    parser.add_argument("-p", "--port", type=int, default=18864, help="The port to bind for the RPC server.")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="The host to bind for the RPC server.")
+    parser.add_argument("-p", "--port", type=int, default=18864, help="The port to bind for the service broker server.")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="The host to bind for the service broker server.")
     parser.add_argument("--broker-cache-path", type=str, default=os.getenv("BROKER_CACHE_PATH", "/broker-cache"), help="Path to the broker cache directory.")
     args = parser.parse_args()
 
     # Set up logging
     alog.init(SERVICE_NAME, args)
 
-    # If we are in unit-testing mode, we need to start up a mock RPCService in addition
-    # to the RPC Broker.
+    # If we are in unit-testing mode, we need to start up a mock service broker server in addition
+    # to the service broker.
     if util.mode() == constants.ArtieRunModes.UNIT_TESTING:
-        alog.info("Starting test RPC service for unit-testing mode.")
-        test_process = multiprocessing.Process(target=test_server.start_test_rpc_service, args=(args.port,))
+        alog.info("Starting test service broker server for unit-testing mode.")
+        test_process = multiprocessing.Process(target=test_server.start_test_service_broker_server, args=(args.port,))
         test_process.start()
 
     # Instantiate the single server instance and block forever, serving
-    server = ArtieRPCBrokerServer(args.host, args.port, args.broker_cache_path)
+    server = ArtieServiceBrokerServer(args.host, args.port, args.broker_cache_path)
     server.start()

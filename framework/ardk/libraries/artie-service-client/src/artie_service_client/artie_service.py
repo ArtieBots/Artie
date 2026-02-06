@@ -26,7 +26,7 @@ class ArtieRPCService(rpyc.Service):
 
         # Args
         self.port = port
-        self.registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.RPC_BROKER_PORT, 18864)))
+        self.registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_PORT, 18864)))
 
         # Fully-qualified service name, including interface names
         self.fully_qualified_name = self.get_fully_qualified_name()
