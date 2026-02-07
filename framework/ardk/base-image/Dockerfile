@@ -9,7 +9,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libftdi1 \
     openssl
 RUN pip install \
-    rpyc
+    rpyc \
+    kafka-python
 
 # Build artie-util lib
 COPY ./tmp/artie-util /tmp/artie-util/
