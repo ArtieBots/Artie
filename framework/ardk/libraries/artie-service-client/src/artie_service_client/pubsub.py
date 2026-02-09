@@ -103,7 +103,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
     It also provides a uniform API that encapsulates the details of how datastreams are implemented in Artie,
     so that the implementation can be easily switched out if needed without affecting the rest of the codebase.
     """
-    def __init__(self, topics: str|list[str]|tuple[str], service_name: str, fetch_min_bytes=1, certfpath=None, keyfpath=None, fetch_max_bytes=10*1024*1024):
+    def __init__(self, topics: str|list[str]|tuple[str], service_name: str, fetch_min_bytes=1, certfpath=None, keyfpath=None, fetch_max_bytes=10*1024*1024, consumer_group_id=None):
         """
         Args
         ----
@@ -112,7 +112,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
                 The topics should typically be in the format <simple interface name>:<interface version>:<id>
                 (e.g. "my-service:sensor-imu-v1:imu-1"). Topics can also be subscribed to later using the subscribe method.
         service_name: The name of the service subscribing to the datastream. This is used as the client ID
-                and the group ID for the Kafka consumer and should typically be the same as the simple name of the service (e.g. "my-service").
+                for the Kafka consumer and should typically be the same as the simple name of the service (e.g. "my-service").
         fetch_min_bytes: The minimum amount of data the subscriber will fetch in a single request.
                 This is useful to tune together with the publish batch size and linger time of the publisher to achieve
                 the desired tradeoff between latency and throughput.
@@ -120,6 +120,10 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         keyfpath: The path to the key file to use for decryption. This is only used if the stream is encrypted.
         fetch_max_bytes: The maximum amount of data the subscriber will fetch in a single request.
                 This should typically be set to the same value as the max_request_size_bytes parameter of the publisher to ensure that messages are not rejected by the consumer for being too large.
+        consumer_group_id: The name of the consumer group for this subscriber to join.
+                If None (the default), consumer groups will be disabled for this subscriber. Consumer groups allow multiple subscribers
+                to share the workload of processing messages from the same topic, while still ensuring that each message
+                is only processed by one subscriber in the group.
 
         Usage
         -----
@@ -135,8 +139,8 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
 
         super().__init__(
             *topics,
-            group_id=service_name,
             client_id=service_name,
+            group_id=consumer_group_id,
             allow_auto_create_topics=True,
             bootstrap_servers=f"{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_HOSTNAME, 'localhost')}:{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_PORT, '9092')}",
             fetch_min_bytes=fetch_min_bytes,
