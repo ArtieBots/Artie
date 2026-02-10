@@ -1,0 +1,15 @@
+name: pubsub-broker-sanity-tests
+labels:
+  - docker-image
+  - sanity
+dependencies:
+  - artie-pubsub-broker: docker-image
+type: test
+steps:
+  - job: single-container-sanity-suite
+    steps:
+      - test-name: start-pubsub-broker
+        docker-image-under-test:
+          dependency:
+            name: docker-image
+            producing-task: artie-pubsub-broker

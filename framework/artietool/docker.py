@@ -641,7 +641,7 @@ def remove_docker_image(docker_image_name: DockerImageName, fail_ok=False):
         if not fail_ok:
             raise
 
-def run_docker_container(image_name, cmd, timeout_s=30, log_to_stdout=False, **kwargs):
+def run_docker_container(image_name, cmd: str|None, timeout_s=30, log_to_stdout=False, **kwargs):
     """
     Like `start_docker_container()`, but runs to completion before returning
     (or it times out).
@@ -658,7 +658,7 @@ def run_docker_container(image_name, cmd, timeout_s=30, log_to_stdout=False, **k
     """
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     common.info(f"Running command: {cmd} ; using kwargs: {kwargs}")
-    stdout = common.manage_timeout(client.containers.run, timeout_s, image_name, cmd, remove=True, stdout=True, stderr=True, **kwargs)
+    stdout = common.manage_timeout(client.containers.run, timeout_s, image=image_name, command=cmd, remove=True, stdout=True, stderr=True, **kwargs)
 
     if log_to_stdout and stdout is not None:
         common.info(f"Docker output: {stdout.decode()}")
@@ -674,7 +674,7 @@ def stop_docker_container(image_id):
     """
     subprocess.run(f"docker stop {image_id}".split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def start_docker_container(image_name: str|DockerImageName, cmd, **kwargs):
+def start_docker_container(image_name: str|DockerImageName, cmd: str|None, **kwargs):
     """
     Starts a Docker container with the given command executed inside the container
     and returns a `Container` object from the `docker` package after detaching from it.
