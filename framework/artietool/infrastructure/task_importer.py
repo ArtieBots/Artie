@@ -78,6 +78,8 @@ def _replace_variables(s: str, fpath: str, key_value_pairs:Dict=None, incomplete
     """
     if issubclass(type(s), dependency.Dependency):
         return s
+    elif s is None:
+        return None
 
     s = str(s)
 
@@ -448,10 +450,9 @@ def _import_sanity_test_job(job_def: Dict, fpath: str) -> single_container_sanit
     for sdef in steps_def:
         _validate_dict(sdef, 'test-name', keyerrmsg=f"Missing 'test-name' from 'steps' section in {fpath}")
         _validate_dict(sdef, 'docker-image-under-test', keyerrmsg=f"Missing 'docker-image-under-test' from 'steps' section in {fpath}")
-        _validate_dict(sdef, 'cmd-to-run-in-dut', keyerrmsg=f"Missing 'cmd-to-run-in-dut' from 'steps' section in {fpath}")
         dut = _replace_variables(sdef['docker-image-under-test'], fpath) if type(sdef['docker-image-under-test']) != dict else _import_single_dependency(sdef['docker-image-under-test'], fpath)
         test_name = _replace_variables(sdef['test-name'], fpath, {"DUT": dut})
-        cmd_to_run_in_dut = _replace_variables(sdef['cmd-to-run-in-dut'], fpath, {"DUT": dut})
+        cmd_to_run_in_dut = _replace_variables(sdef.get('cmd-to-run-in-dut', None), fpath, {"DUT": dut})
         test_step = single_container_sanity_suite_job.SanityTest(test_name, dut, cmd_to_run_in_dut)
         sanity_test_steps.append(test_step)
     return single_container_sanity_suite_job.SingleContainerSanitySuiteJob(sanity_test_steps)
@@ -472,11 +473,10 @@ def _import_expected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) ->
 def _import_unit_test_job(job_def: Dict, fpath: str) -> test_job.CLITest:
     _validate_dict(job_def, 'steps', keyerrmsg=f"Missing 'steps' section in 'single-container-cli-suite' definition in {fpath}")
     _validate_dict(job_def, 'docker-image-under-test', keyerrmsg=f"Missing 'docker-image-under-test' in {fpath}")
-    _validate_dict(job_def, 'cmd-to-run-in-dut', keyerrmsg=f"Missing 'cmd-to-run-in-dut' in {fpath}")
     _validate_dict(job_def, 'cli-image', keyerrmsg=f"Missing 'cli-image' key in {fpath}")
     dut = _replace_variables(job_def['docker-image-under-test'], fpath) if type(job_def['docker-image-under-test']) != dict else _import_single_dependency(job_def['docker-image-under-test'], fpath)
     cli_image = _replace_variables(job_def['cli-image'], fpath, {'DUT': dut}) if type(job_def['cli-image']) != dict else _import_single_dependency(job_def['cli-image'], fpath)
-    cmd_to_run_in_dut = _replace_variables(job_def['cmd-to-run-in-dut'], fpath, {'DUT': dut})
+    cmd_to_run_in_dut = _replace_variables(job_def.get('cmd-to-run-in-dut', None), fpath, {'DUT': dut})
     dut_port_mappings = {k: v for mapping in job_def.get('dut-port-mappings', []) for k, v in mapping.items()}
     cli_test_steps = []
     steps_def = job_def['steps']

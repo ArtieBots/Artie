@@ -15,7 +15,7 @@ import queue
 import rpyc
 import threading
 
-SERVICE_NAME = "example-sensor-driver"
+SERVICE_NAME = "example-sensor-service"
 
 @rpyc.service
 class ExampleSensorService(

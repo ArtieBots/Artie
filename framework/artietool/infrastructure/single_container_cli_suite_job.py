@@ -7,7 +7,7 @@ from .. import docker
 import time
 
 class SingleContainerCLISuiteJob(test_job.TestJob):
-    def __init__(self, steps: List[test_job.CLITest], docker_image_under_test: str | dependency.Dependency, cmd_to_run_in_dut: str, dut_port_mappings: Dict[int, int]) -> None:
+    def __init__(self, steps: List[test_job.CLITest], docker_image_under_test: str | dependency.Dependency, cmd_to_run_in_dut: str|None, dut_port_mappings: Dict[int, int]) -> None:
         super().__init__(artifacts=[], steps=steps)
         self.dut = docker_image_under_test
         self.cmd_to_run_in_dut = cmd_to_run_in_dut
