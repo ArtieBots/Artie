@@ -36,7 +36,7 @@ ENV KAFKA_PROCESS_ROLES=broker,controller
 # The controller port is used for inter-broker communication and
 # controller election, while the client port is used for communication
 # between producers/consumers and the Kafka broker.
-ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@0.0.0.0:${CONTROLLER_PORT}
+ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:${CONTROLLER_PORT}
 
 # Kafka topics have a replication factor that determines how many
 # copies of each partition are maintained across the cluster for
@@ -51,7 +51,7 @@ ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 # listener for clients (producers/consumers) to connect to (using PUBSUB_BROKER_PORT),
 # and we also need a CONTROLLER listener for inter-broker communication
 # and controller election (using CONTROLLER_PORT).
-ENV KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://0.0.0.0:${CONTROLLER_PORT}
+ENV KAFKA_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
 
 # The advertised listeners that Kafka will tell clients to connect to.
 # This is important for when the Kafka broker is running in a container,
