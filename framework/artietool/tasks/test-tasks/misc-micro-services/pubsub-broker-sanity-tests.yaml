@@ -13,3 +13,4 @@ steps:
           dependency:
             name: docker-image
             producing-task: artie-pubsub-broker
+        cmd-to-run-in-dut: "/etc/kafka/docker/run"
