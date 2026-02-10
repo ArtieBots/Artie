@@ -6,7 +6,7 @@ from .. import docker
 from typing import List
 
 class SanityTest:
-    def __init__(self, test_name: str, docker_image_under_test: str | dependency.Dependency, cmd_to_run_in_dut: str) -> None:
+    def __init__(self, test_name: str, docker_image_under_test: str | dependency.Dependency, cmd_to_run_in_dut: str|None) -> None:
         self.test_name = test_name
         self.docker_image_under_test = docker_image_under_test
         self.cmd_to_run_in_dut = cmd_to_run_in_dut

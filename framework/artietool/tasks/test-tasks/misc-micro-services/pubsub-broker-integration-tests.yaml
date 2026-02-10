@@ -10,3 +10,44 @@
 # - Attempt to publish messages with encryption enabled and verify that they are received and can be decrypted by subscribers with the correct cert/key files, and that subscribers without the correct cert/key files cannot decrypt the messages
 # - Verify latency of various sizes of messages
 # - Verify throughput of various sizes of messages and various numbers of subscribers and publishers
+name: pubsub-broker-integration-tests
+labels:
+  - docker-image
+  - integration
+dependencies:
+  - artie-api-server: docker-image
+  - artie-cli: docker-image
+  - artie-service-broker: docker-image
+  - test-sensor-service: docker-image
+  - artie-pubsub-broker: docker-image
+type: test
+steps:
+  - job: docker-compose-test-suite
+    compose-fname: compose.pubsub.yaml
+    compose-docker-image-variables:
+      - ARTIE_PUBSUB_BROKER_TEST_IMAGE:
+          dependency:
+            name: docker-image
+            producing-task: artie-pubsub-broker
+      - ARTIE_API_SERVER_TEST_IMAGE:
+          dependency:
+            name: docker-image
+            producing-task: artie-api-server
+      - ARTIE_SERVICE_BROKER_TEST_IMAGE:
+          dependency:
+            name: docker-image
+            producing-task: artie-service-broker
+      - TEST_SENSOR_SERVICE_TEST_IMAGE:
+          dependency:
+            name: docker-image
+            producing-task: test-sensor-service
+    cli-image:
+      dependency:
+        name: docker-image
+        producing-task: artie-cli
+    steps:
+      - test-name: list-topics
+        cmd-to-run-in-cli: "artie-cli service list-topics"
+        expected-outputs:
+          - what: "TODO"
+            where: artie-api-server

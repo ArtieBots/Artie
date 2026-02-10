@@ -7,15 +7,66 @@ ENV ARTIE_GIT_TAG=${GIT_TAG}
 ENV ARTIE_LOG_LEVEL=INFO
 
 # Kafka Defaults. Can be overridden in docker-compose or in Helm Chart
+ARG PUBSUB_BROKER_PORT=9092
+ARG CONTROLLER_PORT=9093
+
+# Use KRaft mode (so you don't need ZooKeeper)
+ENV KAFKA_KRAFT_MODE=true
+
+# Cluster ID. Can just be hard-coded here because
+# different Arties are K3S-namespaced and so won't interfere with each other.
+ENV KAFKA_CLUSTER_ID=artie-cluster
+
+# Node ID for this Kafka broker (must be unique within the cluster)
+# The Helm Chart will typically override this with a unique value for each
+# replica, e.g. using the StatefulSet ordinal
 ENV KAFKA_NODE_ID=1
+
+# The Kafka controller is responsible for managing the cluster metadata
+# and coordinating partition leadership. There is always exactly one
+# controller in the cluster, and it is elected from the set of brokers.
+# In Helm, when there are more than one brokers, this environment
+# variable will be overridden for all the brokers that are not
+# designated as the controller.
 ENV KAFKA_PROCESS_ROLES=broker,controller
-ENV KAFKA_LISTENERS=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
-ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-ENV KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+
+# This is the set of nodes (format: node_id@host:port,...)
+# that are eligible to be elected and to vote for controller election.
+# Note that the port specified here is the controller port, not the client port.
+# The controller port is used for inter-broker communication and
+# controller election, while the client port is used for communication
+# between producers/consumers and the Kafka broker.
+ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@0.0.0.0:${CONTROLLER_PORT}
+
+# Kafka topics have a replication factor that determines how many
+# copies of each partition are maintained across the cluster for
+# fault tolerance.
+# A partition is a unit of parallelism in Kafka, where each topic is
+# divided into one or more partitions.
+# The Helm Chart will typically override this with a value equal to
+# the number of replicas in the StatefulSet.
 ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-ENV KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-ENV KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-ENV KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-ENV KAFKA_NUM_PARTITIONS=3
+
+# The listeners that Kafka will bind to. We need at least a PLAINTEXT
+# listener for clients (producers/consumers) to connect to (using PUBSUB_BROKER_PORT),
+# and we also need a CONTROLLER listener for inter-broker communication
+# and controller election (using CONTROLLER_PORT).
+ENV KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://0.0.0.0:${CONTROLLER_PORT}
+
+# The advertised listeners that Kafka will tell clients to connect to.
+# This is important for when the Kafka broker is running in a container,
+# because the internal hostname and port may be different from what clients
+# need to use to connect from outside the container.
+ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT}
+
+# Same thing for this, but for some reason you only have to specify "CONTROLLER"
+ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+
+# Kafka log directories (where it stores the data for the topics)
+# Note that in Helm, this will need to be a persistent volume mount
+# to avoid data loss when the container restarts.
+ENV KAFKA_LOG_DIRS=/kafka-logs
+
+# TODO Figure out TLS
+
+RUN mkdir -p /kafka-logs && chown kafka:kafka /kafka-logs
