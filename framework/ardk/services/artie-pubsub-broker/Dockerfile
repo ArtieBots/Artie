@@ -62,11 +62,4 @@ ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT}
 # Same thing for this, but for some reason you only have to specify "CONTROLLER"
 ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 
-# Kafka log directories (where it stores the data for the topics)
-# Note that in Helm, this will need to be a persistent volume mount
-# to avoid data loss when the container restarts.
-ENV KAFKA_LOG_DIRS=/kafka-logs
-
 # TODO Figure out TLS
-
-RUN mkdir -p /kafka-logs && chown kafka:kafka /kafka-logs
