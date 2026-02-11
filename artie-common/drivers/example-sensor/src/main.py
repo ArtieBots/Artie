@@ -2,6 +2,7 @@
 Example user-space driver for some sensors.
 Mostly used for testing.
 """
+from . import datastream
 from artie_util import artie_logging as alog
 from artie_util import artie_time
 from artie_util import constants
@@ -9,7 +10,6 @@ from artie_util import util
 from artie_service_client import artie_service
 from artie_service_client import interfaces
 import argparse
-import datastream
 import os
 import queue
 import rpyc
