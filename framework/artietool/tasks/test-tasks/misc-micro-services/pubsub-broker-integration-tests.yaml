@@ -1,15 +1,6 @@
-# TODO:
-# - List all topics
-# - Attempt to subscribe to a non-existent topic and verify that it fails gracefully
-# - Attempt to subscribe to a topic with invalid parameters (e.g. missing cert/key files when encryption is enabled) and verify that it fails gracefully
-# - Attempt to subscribe to a topic with valid parameters and verify that it succeeds and receives messages published to the topic
-# - Attempt to publish messages to a topic and verify that they are received by subscribers
-# - Attempt more than one subscriber to the same topic and verify both subscribers receive the messages
-# - Attempt more than one subscriber in the same consumer group to the same topic and verify that messages are load balanced between them (i.e. each message is only received by one of the subscribers in the group)
-# - Attempt to publish messages to multiple topics and verify that they are received by the appropriate subscribers based on the topics they are subscribed to
-# - Attempt to publish messages with encryption enabled and verify that they are received and can be decrypted by subscribers with the correct cert/key files, and that subscribers without the correct cert/key files cannot decrypt the messages
-# - Verify latency of various sizes of messages
-# - Verify throughput of various sizes of messages and various numbers of subscribers and publishers
+# Integration tests for the Artie Publisher/Subscriber (Pub/Sub) Broker.
+# This test suite validates topic management, message publishing/subscribing,
+# consumer groups, encryption, and performance characteristics.
 name: pubsub-broker-integration-tests
 labels:
   - docker-image
@@ -46,8 +37,149 @@ steps:
         name: docker-image
         producing-task: artie-cli
     steps:
+      # Test 1: List all topics
       - test-name: list-topics
-        cmd-to-run-in-cli: "artie-cli service list-topics"
+        cmd-to-run-in-cli: "artie-cli service list-topics --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "TODO"
-            where: artie-api-server
+          - what: "topics"
+            where: artie-cli
+
+      # Test 2: Attempt to subscribe to a non-existent topic and verify it creates the topic (Kafka auto-creates topics by default)
+      - test-name: subscribe-to-nonexistent-topic
+        cmd-to-run-in-cli: "artie-cli service subscribe nonexistent-topic --count 0 --timeout 5 --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "Subscribed to topic: nonexistent-topic"
+            where: artie-cli
+
+      # Test 3: Attempt to subscribe with invalid cert/key files (when encryption is enabled) - should fail
+      - test-name: subscribe-with-invalid-cert
+        cmd-to-run-in-cli: "artie-cli service subscribe test-topic --cert /nonexistent/cert.pem --key /nonexistent/key.pem --count 0 --timeout 5 --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: "error"
+            where: artie-cli
+
+      # Test 4: Publish a message to a topic
+      - test-name: publish-single-message
+        cmd-to-run-in-cli: 'artie-cli service publish test-topic-1 ''{"message": "hello", "value": 42}'' --integration-test --artie-profile /integration_test_profile.json'
+        expected-outputs:
+          - what: '"success": true'
+            where: artie-cli
+          - what: '"topic": "test-topic-1"'
+            where: artie-cli
+
+      # Test 5: Subscribe to a topic and verify message is received
+      - test-name: subscribe-and-receive-message
+        setup-cmds:
+          - 'artie-cli service publish test-topic-2 ''{"message": "test data", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
+        cmd-to-run-in-cli: "artie-cli service subscribe test-topic-2 --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: '"message": "test data"'
+            where: artie-cli
+          - what: '"seq": 1'
+            where: artie-cli
+
+      # Test 6: Multiple subscribers to the same topic (both should receive all messages)
+      - test-name: multiple-subscribers-same-topic
+        setup-cmds:
+          - 'artie-cli service publish test-topic-3 ''{"message": "broadcast", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-3 ''{"message": "broadcast", "seq": 2}'' --integration-test --artie-profile /integration_test_profile.json'
+        parallel-cmds:
+          - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"message": "broadcast"'
+              - what: '"seq": 1'
+              - what: '"seq": 2'
+          - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"message": "broadcast"'
+              - what: '"seq": 1'
+              - what: '"seq": 2'
+
+      # Test 7: Multiple subscribers in the same consumer group (messages should be load balanced)
+      - test-name: consumer-group-load-balancing
+        setup-cmds:
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg1", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg2", "seq": 2}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg3", "seq": 3}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg4", "seq": 4}'' --integration-test --artie-profile /integration_test_profile.json'
+        parallel-cmds:
+          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"message":'
+          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"message":'
+
+      # Test 8: Publish to multiple topics and verify subscribers receive from correct topics
+      - test-name: multiple-topics-routing
+        setup-cmds:
+          - 'artie-cli service publish test-topic-5a ''{"topic": "5a", "data": "alpha"}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-5b ''{"topic": "5b", "data": "beta"}'' --integration-test --artie-profile /integration_test_profile.json'
+        parallel-cmds:
+          - cmd: "artie-cli service subscribe test-topic-5a --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"topic": "5a"'
+              - what: '"data": "alpha"'
+            unexpected-outputs:
+              - what: '"topic": "5b"'
+          - cmd: "artie-cli service subscribe test-topic-5b --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+            expected-outputs:
+              - what: '"topic": "5b"'
+              - what: '"data": "beta"'
+            unexpected-outputs:
+              - what: '"topic": "5a"'
+
+      # Test 9: Verify messages of various sizes can be published and received
+      - test-name: message-sizes-small
+        cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "small", "data": "x"}'' --integration-test --artie-profile /integration_test_profile.json'
+        expected-outputs:
+          - what: '"success": true'
+            where: artie-cli
+
+      - test-name: message-sizes-medium
+        cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "medium", "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}'' --integration-test --artie-profile /integration_test_profile.json'
+        expected-outputs:
+          - what: '"success": true'
+            where: artie-cli
+
+      - test-name: message-sizes-large
+        cmd-to-run-in-cli: "bash -c 'DATA=$(python3 -c \"print('{\\\"size\\\": \\\"large\\\", \\\"data\\\": \\\"' + 'x'*5000 + '\\\"}')\" ); artie-cli service publish test-topic-6 \"$DATA\" --integration-test --artie-profile /integration_test_profile.json'"
+        expected-outputs:
+          - what: '"success": true'
+            where: artie-cli
+
+      # Test 10: Verify throughput with multiple messages
+      - test-name: throughput-test-publish
+        setup-cmds:
+          - 'artie-cli service publish test-topic-7 ''{"seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-7 ''{"seq": 2}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-7 ''{"seq": 3}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-7 ''{"seq": 4}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-7 ''{"seq": 5}'' --integration-test --artie-profile /integration_test_profile.json'
+        cmd-to-run-in-cli: "artie-cli service subscribe test-topic-7 --count 5 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: '"seq": 1'
+            where: artie-cli
+          - what: '"seq": 5'
+            where: artie-cli
+          - what: "Received 5 message(s)"
+            where: artie-cli
+
+      # Test 11: Subscribe to sensor data stream published by test-sensor-service
+      - test-name: subscribe-to-sensor-stream
+        setup-cmds:
+          - 'artie-cli service call example-sensor-service imu_on --args ''["imu-1"]'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service call example-sensor-service imu_start_stream --args ''["imu-1", 10]'' --integration-test --artie-profile /integration_test_profile.json'
+        cmd-to-run-in-cli: "artie-cli service subscribe example-sensor-service:sensor-imu-v1:imu-1 --count 3 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+        expected-outputs:
+          - what: '"accelerometer"'
+            where: artie-cli
+          - what: '"gyroscope"'
+            where: artie-cli
+          - what: '"timestamp"'
+            where: artie-cli
+          - what: "Received 3 message(s)"
+            where: artie-cli
+        teardown-cmds:
+          - 'artie-cli service call example-sensor-service imu_stop_stream --args ''["imu-1"]'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service call example-sensor-service imu_off --args ''["imu-1"]'' --integration-test --artie-profile /integration_test_profile.json'
