@@ -316,7 +316,7 @@ def set_up_logging(args):
     stream_handler= logging.StreamHandler(sys.stdout)
     handlers = [stream_handler]
     if hasattr(args, 'output') and args.output:
-        file_handler = logging.FileHandler(args.output)
+        file_handler = logging.FileHandler(args.output, mode='w')
         handlers += [file_handler]
 
     # Set up root logger to log only at WARNING or above
