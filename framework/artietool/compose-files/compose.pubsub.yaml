@@ -38,10 +38,10 @@ services:
       - ARTIE_PUBSUB_BROKER_HOSTNAME=pubsub-itest-broker
       - ARTIE_PUBSUB_BROKER_PORT=9092
 
-  test-sensor-service:
+  artie-test-sensor-service:
     command: python -m src.main --port 18865
     container_name: pubsub-itest-sensor-service
-    image: ${TEST_SENSOR_SERVICE_TEST_IMAGE}
+    image: ${ARTIE_TEST_SENSOR_SERVICE_TEST_IMAGE}
     depends_on:
       - artie-pubsub-broker
       - artie-service-broker

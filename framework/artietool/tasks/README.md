@@ -297,9 +297,64 @@ A sanity test job looks like this:
 - *cli-image*: As [above](#unit-test-job).
 - *steps*:
   - *test-name*: The name of the individual test.
-  - *cmd-to-run-in-cli*: The command to run in the CLI continer.
-  - *expected-outputs*: As [above](#unit-test-job), but `where` cannot be `${DUT}`, but may be a container name as specified
+  - *setup-cmds*: (Optional) A list of commands to run before the main test command. Each command runs in its own CLI container.
+                  Useful for setting up test data or preconditions.
+  - *cmd-to-run-in-cli*: The command to run in the CLI container. This is used for single-command tests.
+                         **Cannot be used together with `parallel-cmds`**.
+  - *parallel-cmds*: (Optional) A list of commands to run in parallel, each in its own CLI container.
+                     Useful for testing scenarios like multiple subscribers or consumer groups.
+                     **Cannot be used together with `cmd-to-run-in-cli`**.
+      * *cmd*: The command to run in this parallel CLI container.
+      * *expected-outputs*: A list of `what` items (strings) expected in this parallel command's output.
+      * *unexpected-outputs*: (Optional) A list of `what` items (strings) that should NOT appear in this parallel command's output.
+  - *expected-outputs*: (For single-command tests) As [above](#unit-test-job), but `where` cannot be `${DUT}`, but may be a container name as specified
                         in the compose file.
+  - *unexpected-outputs*: (Optional, for single-command tests) A list of outputs that should NOT appear in the container logs.
+      * *what*: The string that should NOT be found in the output/logs.
+      * *where*: The container we are checking. Should be a container name from the compose file or `${CLI}`.
+  - *teardown-cmds*: (Optional) A list of commands to run after the test completes (success or failure). Each command runs in its own CLI container.
+                     Useful for cleanup. These commands will run even if the test fails.
+
+**Example with single command:**
+```yaml
+- test-name: subscribe-and-receive-message
+  setup-cmds:
+    - 'artie-cli service publish test-topic ''{"message": "test"}'' --integration-test'
+  cmd-to-run-in-cli: "artie-cli service subscribe test-topic --count 1 --timeout 10 --integration-test"
+  expected-outputs:
+    - what: '"message": "test"'
+      where: artie-cli
+  teardown-cmds:
+    - 'artie-cli service delete-topic test-topic --integration-test'
+```
+
+**Example with parallel commands:**
+```yaml
+- test-name: multiple-subscribers-same-topic
+  setup-cmds:
+    - 'artie-cli service publish test-topic ''{"message": "broadcast"}'' --integration-test'
+  parallel-cmds:
+    - cmd: "artie-cli service subscribe test-topic --count 1 --timeout 10 --integration-test"
+      expected-outputs:
+        - what: '"message": "broadcast"'
+    - cmd: "artie-cli service subscribe test-topic --count 1 --timeout 10 --integration-test"
+      expected-outputs:
+        - what: '"message": "broadcast"'
+```
+
+**Example with unexpected-outputs:**
+```yaml
+- test-name: topic-isolation
+  setup-cmds:
+    - 'artie-cli service publish topic-a ''{"topic": "a"}'' --integration-test'
+  cmd-to-run-in-cli: "artie-cli service subscribe topic-b --count 1 --timeout 5 --integration-test"
+  expected-outputs:
+    - what: "Subscribed to topic"
+      where: artie-cli
+  unexpected-outputs:
+    - what: '"topic": "a"'
+      where: artie-cli
+```
 
 Note that Docker compose tests require compose files, and these compose files MUST include a `networks` section that
 specifies a Docker network that the test will create. Since the test creates it, it should be labeled in the Compose

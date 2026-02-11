@@ -11,6 +11,7 @@ from artietool.build import build
 from artietool.deploy import deploy
 from artietool.flash import flash
 from artietool.get import get
+from artietool.infrastructure import artifact
 from artietool.install import install
 from artietool.install import uninstall
 from artietool.release import release
@@ -33,6 +34,8 @@ def _clean(args):
     """
     Clean up after anything artie-tool may have done.
     """
+    artifact.initialize(args)
+
     if args.all:
         common.clean()
     else:

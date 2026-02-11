@@ -548,23 +548,67 @@ def _import_integration_test_job(job_def: Dict, fpath: str) -> docker_compose_te
     steps_def = job_def['steps']
     for sdef in steps_def:
         _validate_dict(sdef, 'test-name', keyerrmsg=f"Missing 'test-name' from 'steps' section in {fpath}")
-        _validate_dict(sdef, 'cmd-to-run-in-cli', keyerrmsg=f"Missing 'cmd-to-run-in-cli' from 'steps' section in {fpath}")
-        _validate_dict(sdef, 'expected-outputs', keyerrmsg=f"Missing 'expected-outputs' section from 'steps' section in {fpath}")
         test_name = _replace_variables(sdef['test-name'], fpath, {"CLI": cli_image})
-        cli_cmd = _replace_variables(sdef['cmd-to-run-in-cli'], fpath, {"CLI": cli_image})
-        expected_outputs = _import_expected_outputs(sdef, fpath, {'CLI': cli_image})
-        unexpected_outputs = _import_unexpected_outputs(sdef, fpath, {'CLI': cli_image})
 
-        # Parse optional setup-cmds and teardown-cmds
-        setup_cmds = []
-        if 'setup-cmds' in sdef:
-            setup_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['setup-cmds']]
+        # Check if this uses parallel-cmds or cmd-to-run-in-cli
+        if 'parallel-cmds' in sdef and 'cmd-to-run-in-cli' in sdef:
+            raise ValueError(f"Test '{test_name}' in {fpath} cannot have both 'cmd-to-run-in-cli' and 'parallel-cmds'")
 
-        teardown_cmds = []
-        if 'teardown-cmds' in sdef:
-            teardown_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['teardown-cmds']]
+        if 'parallel-cmds' in sdef:
+            # Parse parallel commands
+            parallel_cmds = []
+            for pcmd_def in sdef['parallel-cmds']:
+                _validate_dict(pcmd_def, 'cmd', keyerrmsg=f"Missing 'cmd' in 'parallel-cmds' for test '{test_name}' in {fpath}")
+                _validate_dict(pcmd_def, 'expected-outputs', keyerrmsg=f"Missing 'expected-outputs' in 'parallel-cmds' for test '{test_name}' in {fpath}")
 
-        cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs, network=network, setup_cmds=setup_cmds, teardown_cmds=teardown_cmds, unexpected_outputs=unexpected_outputs))
+                pcmd = _replace_variables(pcmd_def['cmd'], fpath, {"CLI": cli_image})
+
+                # Parse expected outputs for this parallel command
+                pcmd_expected_outputs = []
+                for eout in pcmd_def['expected-outputs']:
+                    _validate_dict(eout, 'what', keyerrmsg=f"Missing 'what' in 'expected-outputs' for parallel command in test '{test_name}' in {fpath}")
+                    what = _replace_variables(eout['what'], fpath, {'CLI': cli_image})
+                    # For parallel commands, outputs are always checked in CLI logs
+                    pcmd_expected_outputs.append(test_job.ExpectedOutput(what, cli_image, cli=True))
+
+                # Parse unexpected outputs if present
+                pcmd_unexpected_outputs = []
+                if 'unexpected-outputs' in pcmd_def:
+                    for uout in pcmd_def['unexpected-outputs']:
+                        _validate_dict(uout, 'what', keyerrmsg=f"Missing 'what' in 'unexpected-outputs' for parallel command in test '{test_name}' in {fpath}")
+                        what = _replace_variables(uout['what'], fpath, {'CLI': cli_image})
+                        pcmd_unexpected_outputs.append(test_job.UnexpectedOutput(what, cli_image, cli=True))
+
+                parallel_cmds.append(test_job.ParallelCommand(pcmd, pcmd_expected_outputs, pcmd_unexpected_outputs))
+
+            # Parse optional setup-cmds and teardown-cmds
+            setup_cmds = []
+            if 'setup-cmds' in sdef:
+                setup_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['setup-cmds']]
+
+            teardown_cmds = []
+            if 'teardown-cmds' in sdef:
+                teardown_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['teardown-cmds']]
+
+            cli_test_steps.append(test_job.CLITest(test_name, cli_image, parallel_cmds=parallel_cmds, network=network, setup_cmds=setup_cmds, teardown_cmds=teardown_cmds))
+        else:
+            # Traditional single command path
+            _validate_dict(sdef, 'cmd-to-run-in-cli', keyerrmsg=f"Missing 'cmd-to-run-in-cli' from 'steps' section in {fpath}")
+            _validate_dict(sdef, 'expected-outputs', keyerrmsg=f"Missing 'expected-outputs' section from 'steps' section in {fpath}")
+            cli_cmd = _replace_variables(sdef['cmd-to-run-in-cli'], fpath, {"CLI": cli_image})
+            expected_outputs = _import_expected_outputs(sdef, fpath, {'CLI': cli_image})
+            unexpected_outputs = _import_unexpected_outputs(sdef, fpath, {'CLI': cli_image})
+
+            # Parse optional setup-cmds and teardown-cmds
+            setup_cmds = []
+            if 'setup-cmds' in sdef:
+                setup_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['setup-cmds']]
+
+            teardown_cmds = []
+            if 'teardown-cmds' in sdef:
+                teardown_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['teardown-cmds']]
+
+            cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs, network=network, setup_cmds=setup_cmds, teardown_cmds=teardown_cmds, unexpected_outputs=unexpected_outputs))
     return docker_compose_test_suite_job.DockerComposeTestSuiteJob(cli_test_steps, compose_fname, compose_docker_image_variables, network)
 
 def _import_hardware_test_job(job_def: Dict, fpath: str) -> hardware_test_job.HardwareTestJob:

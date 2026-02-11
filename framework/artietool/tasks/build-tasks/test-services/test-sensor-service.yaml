@@ -1,4 +1,4 @@
-name: test-sensor-service
+name: artie-test-sensor-service
 labels:
   - docker-image
 dependencies:
@@ -11,7 +11,7 @@ steps:
   - job: docker-build
     artifacts:
       - docker-image
-    img-base-name: test-sensor-service
+    img-base-name: artie-test-sensor-service
     buildx: true
     platform: linux/arm64
     dockerfile-dpath: "${REPO_ROOT}/artie-common/drivers/example-sensor"

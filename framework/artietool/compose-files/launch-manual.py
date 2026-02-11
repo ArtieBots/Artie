@@ -78,6 +78,10 @@ def determine_image_dependencies(fpath: str) -> List[str]:
                 docker_images.append((depname, retrieve_latest_docker_image("artie-api-server")))
             case "ARTIE_SERVICE_BROKER_TEST_IMAGE":
                 docker_images.append((depname, retrieve_latest_docker_image("artie-service-broker")))
+            case "ARTIE_PUBSUB_BROKER_TEST_IMAGE":
+                docker_images.append((depname, retrieve_latest_docker_image("artie-pubsub-broker")))
+            case "ARTIE_TEST_SENSOR_SERVICE_TEST_IMAGE":
+                docker_images.append((depname, retrieve_latest_docker_image("artie-test-sensor-service")))
             case _:
                 print(f"Unrecognized value for a dependant image. Program me! {depname}")
                 exit(1)

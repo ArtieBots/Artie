@@ -32,7 +32,7 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
         """
         super().clean(args)
 
-        if args.skip_teardown:
+        if hasattr(args, "skip_teardown") and args.skip_teardown:
             common.info(f"--skip-teardown detected. You will need to manually clean up the Docker containers.")
             return
 

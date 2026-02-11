@@ -6,10 +6,12 @@ from . import job
 from . import result
 from .. import common
 from .. import docker
+from dataclasses import dataclass
 from enum import Enum
 from enum import unique
 import datetime
 import os
+import threading
 import time
 import traceback
 
@@ -21,6 +23,19 @@ class TestStatuses(Enum):
     SUCCESS = 0
     FAIL = 1
     DID_NOT_RUN = 2
+
+@dataclass
+class ParallelCommand:
+    """
+    A command to run in parallel with other commands, with its own expected outputs.
+    """
+    cmd: str
+    expected_outputs: List['ExpectedOutput']
+    unexpected_outputs: List['UnexpectedOutput'] = None
+
+    def __post_init__(self):
+        if self.unexpected_outputs is None:
+            self.unexpected_outputs = []
 
 class ExpectedOutput:
     """
@@ -125,17 +140,24 @@ class HWTest:
         self.expected_results = expected_results
 
 class CLITest:
-    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str, expected_outputs: List[ExpectedOutput], need_to_access_cluster=False, network=None, setup_cmds: List[str]=None, teardown_cmds: List[str]=None, unexpected_outputs: List[UnexpectedOutput]=None) -> None:
+    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str=None, expected_outputs: List[ExpectedOutput]=None, need_to_access_cluster=False, network=None, setup_cmds: List[str]=None, teardown_cmds: List[str]=None, unexpected_outputs: List[UnexpectedOutput]=None, parallel_cmds: List[ParallelCommand]=None) -> None:
         self.test_name = test_name
         self.cli_image = cli_image
         self.cmd_to_run_in_cli = cmd_to_run_in_cli
-        self.expected_outputs = expected_outputs
+        self.parallel_cmds = parallel_cmds or []
+        self.expected_outputs = expected_outputs or []
         self.unexpected_outputs = unexpected_outputs or []
         self.producing_task_name = None  # Filled in by Job
         self.need_to_access_cluster = need_to_access_cluster
         self.network = network
         self.setup_cmds = setup_cmds or []
         self.teardown_cmds = teardown_cmds or []
+
+        # Validate that we have either cmd_to_run_in_cli OR parallel_cmds, but not both
+        if cmd_to_run_in_cli and parallel_cmds:
+            raise ValueError(f"Test {test_name} cannot have both 'cmd-to-run-in-cli' and 'parallel-cmds'")
+        if not cmd_to_run_in_cli and not parallel_cmds:
+            raise ValueError(f"Test {test_name} must have either 'cmd-to-run-in-cli' or 'parallel-cmds'")
 
     def __call__(self, args) -> result.TestResult:
         # Run setup commands
@@ -206,11 +228,23 @@ class CLITest:
 
     def _run_cli(self, args) -> result.TestResult:
         """
+        Run CLI command(s) and check for expected/unexpected outputs.
+        Handles both single command and parallel commands.
+
+        Return None if success or a failing TestResult otherwise.
+        """
+        if self.parallel_cmds:
+            return self._run_parallel_cmds(args)
+        else:
+            return self._run_single_cmd(args)
+
+    def _run_single_cmd(self, args) -> result.TestResult:
+        """
         Run a single CLI command and check it for expected_cli_out and unexpected_cli_out.
 
         Return None if success or a failing TestResult otherwise.
         """
-        logs = self._try_ntimes(args, 5)
+        logs = self._try_ntimes(args, 5, self.cmd_to_run_in_cli)
 
         # Check expected outputs
         expected_cli_out = self._find_expected_cli_out(args)
@@ -228,7 +262,67 @@ class CLITest:
 
         return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.SUCCESS)
 
-    def _try_ntimes(self, args, n: int):
+    def _run_parallel_cmds(self, args) -> result.TestResult:
+        """
+        Run multiple CLI commands in parallel and check their outputs.
+        """
+        common.info(f"Running {len(self.parallel_cmds)} parallel commands for test {self.test_name}...")
+
+        # Storage for results from each thread
+        results = {}
+        exceptions = {}
+
+        def run_cmd_thread(idx: int, parallel_cmd: ParallelCommand):
+            """Run a single command in a thread and store its output."""
+            try:
+                logs = self._try_ntimes(args, 5, parallel_cmd.cmd)
+                results[idx] = logs
+            except Exception as e:
+                exceptions[idx] = e
+
+        # Start all commands in parallel
+        threads = []
+        for idx, parallel_cmd in enumerate(self.parallel_cmds):
+            thread = threading.Thread(target=run_cmd_thread, args=(idx, parallel_cmd))
+            thread.start()
+            threads.append(thread)
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        # Check if any thread had an exception
+        if exceptions:
+            first_exception = exceptions[min(exceptions.keys())]
+            return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.FAIL, exception=first_exception)
+
+        # Check expected outputs for each parallel command
+        for idx, parallel_cmd in enumerate(self.parallel_cmds):
+            logs = results[idx]
+
+            # Check expected outputs
+            for expected_out in parallel_cmd.expected_outputs:
+                if expected_out.what not in logs:
+                    return result.TestResult(
+                        self.test_name,
+                        self.producing_task_name,
+                        result.TestStatuses.FAIL,
+                        msg=f"Expected output '{expected_out.what}' not found in parallel command {idx+1}"
+                    )
+
+            # Check unexpected outputs
+            for unexpected_out in parallel_cmd.unexpected_outputs:
+                if unexpected_out.what in logs:
+                    return result.TestResult(
+                        self.test_name,
+                        self.producing_task_name,
+                        result.TestStatuses.FAIL,
+                        msg=f"Unexpected output '{unexpected_out.what}' found in parallel command {idx+1}"
+                    )
+
+        return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.SUCCESS)
+
+    def _try_ntimes(self, args, n: int, cmd: str):
         """
         Try running the CLI command up to `n` times to guard against transient timing errors. Yuck.
         """
@@ -243,7 +337,7 @@ class CLITest:
 
         for i in range(n):
             try:
-                logs = docker.run_docker_container(cli_img, self.cmd_to_run_in_cli, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
+                logs = docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
                 return logs
             except Exception:
                 if i != n - 1:
