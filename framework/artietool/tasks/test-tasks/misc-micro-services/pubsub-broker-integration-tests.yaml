@@ -9,7 +9,7 @@ dependencies:
   - artie-api-server: docker-image
   - artie-cli: docker-image
   - artie-service-broker: docker-image
-  - test-sensor-service: docker-image
+  - artie-test-sensor-service: docker-image
   - artie-pubsub-broker: docker-image
 type: test
 steps:
@@ -28,10 +28,10 @@ steps:
           dependency:
             name: docker-image
             producing-task: artie-service-broker
-      - TEST_SENSOR_SERVICE_TEST_IMAGE:
+      - ARTIE_TEST_SENSOR_SERVICE_TEST_IMAGE:
           dependency:
             name: docker-image
-            producing-task: test-sensor-service
+            producing-task: artie-test-sensor-service
     cli-image:
       dependency:
         name: docker-image
@@ -165,7 +165,7 @@ steps:
           - what: "Received 5 message(s)"
             where: artie-cli
 
-      # Test 11: Subscribe to sensor data stream published by test-sensor-service
+      # Test 11: Subscribe to sensor data stream published by artie-test-sensor-service
       - test-name: subscribe-to-sensor-stream
         setup-cmds:
           - 'artie-cli service call example-sensor-service imu_on --args ''["imu-1"]'' --integration-test --artie-profile /integration_test_profile.json'
