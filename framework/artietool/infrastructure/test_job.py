@@ -81,6 +81,37 @@ class ExpectedOutput:
         else:
             return result.TestResult(test_name, task_name, result.TestStatuses.FAIL)
 
+class UnexpectedOutput:
+    """
+    An `UnexpectedOutput` is a string that we expect NOT to find inside a Docker container or logs.
+    If found, the test should fail.
+    """
+    def __init__(self, what: str, where: str | dependency.Dependency, cli=False) -> None:
+        self.what = what
+        self.where = where
+        self.cli = cli  # is 'where' the CLI container? It gets treated differently than all the others
+        self.pid = None  # Needs to be filled in by whoever launches the DUT(s)
+
+    def evaluated_where(self, args) -> str:
+        """
+        Returns our `where`, after evaluating it if it is a dependency.
+        """
+        if issubclass(type(self.where), dependency.Dependency):
+            where = self.where.evaluate(args).item
+        else:
+            where = self.where
+        return where
+
+    def check_in_logs(self, args, logs: str, test_name: str, task_name: str) -> result.TestResult:
+        """
+        Check that the unexpected text is NOT in the logs. If it is found, the test fails.
+        """
+        common.info(f"Checking {test_name}'s logs to ensure '{self.what}' is NOT present...")
+        if self.what in logs:
+            return result.TestResult(test_name, task_name, result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
+        else:
+            return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
+
 class HWTest:
     """
     A HWTest is a list of CLI commands to run inside the one Kubernetes hw test job and the output we expect.
@@ -94,36 +125,53 @@ class HWTest:
         self.expected_results = expected_results
 
 class CLITest:
-    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str, expected_outputs: List[ExpectedOutput], need_to_access_cluster=False, network=None) -> None:
+    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str, expected_outputs: List[ExpectedOutput], need_to_access_cluster=False, network=None, setup_cmds: List[str]=None, teardown_cmds: List[str]=None, unexpected_outputs: List[UnexpectedOutput]=None) -> None:
         self.test_name = test_name
         self.cli_image = cli_image
         self.cmd_to_run_in_cli = cmd_to_run_in_cli
         self.expected_outputs = expected_outputs
+        self.unexpected_outputs = unexpected_outputs or []
         self.producing_task_name = None  # Filled in by Job
         self.need_to_access_cluster = need_to_access_cluster
         self.network = network
+        self.setup_cmds = setup_cmds or []
+        self.teardown_cmds = teardown_cmds or []
 
     def __call__(self, args) -> result.TestResult:
-        # Launch the CLI command
-        res = self._run_cli(args)
-        if res.status != result.TestStatuses.SUCCESS:
-            return res
+        # Run setup commands
+        try:
+            self._run_setup_cmds(args)
+        except Exception as e:
+            common.error(f"Setup command failed for test {self.test_name}: {e}")
+            return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.FAIL, exception=e)
 
-        # Check the DUT(s) output(s)
-        results = self._check_duts(args)
-        results = [r for r in results if r is not None and r.status != result.TestStatuses.SUCCESS]
+        try:
+            # Launch the CLI command
+            res = self._run_cli(args)
+            if res.status != result.TestStatuses.SUCCESS:
+                return res
 
-        # If we got more than one result, let's log the various problems and just return the first failing one
-        if len(results) > 1:
-            common.error(f"Multiple failures detected in {self.test_name}. Returning the first detected failure and logging all of them.")
+            # Check the DUT(s) output(s)
+            results = self._check_duts(args)
+            results = [r for r in results if r is not None and r.status != result.TestStatuses.SUCCESS]
 
-        for r in results:
-            common.error(f"Error in test {self.test_name}: {r.to_verbose_str()}")
+            # If we got more than one result, let's log the various problems and just return the first failing one
+            if len(results) > 1:
+                common.error(f"Multiple failures detected in {self.test_name}. Returning the first detected failure and logging all of them.")
 
-        if results:
-            return results[0]
+            for r in results:
+                common.error(f"Error in test {self.test_name}: {r.to_verbose_str()}")
 
-        return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.SUCCESS)
+            if results:
+                return results[0]
+
+            return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.SUCCESS)
+        finally:
+            # Always run teardown commands, even if test failed
+            try:
+                self._run_teardown_cmds(args)
+            except Exception as e:
+                common.error(f"Teardown command failed for test {self.test_name}: {e}")
 
     def link_pids_to_expected_outs(self, args, pids: Dict[str, str]):
         """
@@ -158,18 +206,27 @@ class CLITest:
 
     def _run_cli(self, args) -> result.TestResult:
         """
-        Run a single CLI command and check it for expected_cli_out.
+        Run a single CLI command and check it for expected_cli_out and unexpected_cli_out.
 
         Return None if success or a failing TestResult otherwise.
         """
         logs = self._try_ntimes(args, 5)
 
+        # Check expected outputs
         expected_cli_out = self._find_expected_cli_out(args)
         if expected_cli_out is not None:
-            return expected_cli_out.check_in_logs(args, logs, self.test_name, self.producing_task_name)
-        else:
-            # We do not expect anything interesting from CLI logs
-            return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.SUCCESS)
+            res = expected_cli_out.check_in_logs(args, logs, self.test_name, self.producing_task_name)
+            if res.status != result.TestStatuses.SUCCESS:
+                return res
+
+        # Check unexpected outputs
+        for unexpected_out in self.unexpected_outputs:
+            if unexpected_out.cli:
+                res = unexpected_out.check_in_logs(args, logs, self.test_name, self.producing_task_name)
+                if res.status != result.TestStatuses.SUCCESS:
+                    return res
+
+        return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.SUCCESS)
 
     def _try_ntimes(self, args, n: int):
         """
@@ -207,6 +264,51 @@ class CLITest:
                 timeout_s = 1  # Give us a chance to collect the rest of the results
             results.append(r)
         return results
+
+    def _run_setup_cmds(self, args):
+        """
+        Run all setup commands before the main test command.
+        """
+        if not self.setup_cmds:
+            return
+
+        common.info(f"Running {len(self.setup_cmds)} setup command(s) for test {self.test_name}...")
+        cli_img = self._evaluated_cli_image(args)
+        kwargs = {'network_mode': 'host'} if self.network is None else {'network': self.network}
+
+        # Add kubeconfig if we need it
+        if self.need_to_access_cluster:
+            bind = {'bind': '/mnt/kube_config', 'mode': 'ro'}
+            kube_config_dpath = os.path.dirname(args.kube_config)
+            kwargs['volumes'] = {kube_config_dpath: bind}
+
+        for i, cmd in enumerate(self.setup_cmds):
+            common.info(f"Running setup command {i+1}/{len(self.setup_cmds)}: {cmd}")
+            docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
+
+    def _run_teardown_cmds(self, args):
+        """
+        Run all teardown commands after the main test command.
+        """
+        if not self.teardown_cmds:
+            return
+
+        common.info(f"Running {len(self.teardown_cmds)} teardown command(s) for test {self.test_name}...")
+        cli_img = self._evaluated_cli_image(args)
+        kwargs = {'network_mode': 'host'} if self.network is None else {'network': self.network}
+
+        # Add kubeconfig if we need it
+        if self.need_to_access_cluster:
+            bind = {'bind': '/mnt/kube_config', 'mode': 'ro'}
+            kube_config_dpath = os.path.dirname(args.kube_config)
+            kwargs['volumes'] = {kube_config_dpath: bind}
+
+        for i, cmd in enumerate(self.teardown_cmds):
+            common.info(f"Running teardown command {i+1}/{len(self.teardown_cmds)}: {cmd}")
+            try:
+                docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
+            except Exception as e:
+                common.warning(f"Teardown command {i+1} failed (continuing anyway): {e}")
 
 class TestJob(job.Job):
     """

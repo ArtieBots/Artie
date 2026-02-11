@@ -9,7 +9,34 @@ so that the implementation can be easily switched out if needed without affectin
 from artie_util import constants
 import json
 import kafka
+import kafka.admin
 import os
+
+def get_bootstrap_servers():
+    """
+    Get the Kafka bootstrap servers from environment variables.
+    Returns a string in the format "hostname:port".
+    """
+    hostname = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_HOSTNAME, 'localhost')
+    port = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_PORT, '9092')
+    return f"{hostname}:{port}"
+
+def list_topics(timeout_s=10):
+    """
+    List all topics in the pubsub broker.
+
+    Args:
+        timeout_s: Timeout in seconds for the list_topics operation (default: 10)
+
+    Returns:
+        A list of topic names
+
+    Raises:
+        Exception: If the operation fails
+    """
+    admin_client = kafka.admin.AdminClient(bootstrap_servers=get_bootstrap_servers())
+    metadata = admin_client.list_topics(timeout=timeout_s)
+    return list(metadata.topics.keys())
 
 class ArtieStreamPublisher(kafka.KafkaProducer):
     """
@@ -49,7 +76,7 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
         request_timeout_ms = 30000  # Kafka default is 30 seconds
         super().__init__(
             batch_size=batch_size_bytes,
-            bootstrap_servers=f"{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_HOSTNAME, 'localhost')}:{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_PORT, '9092')}",
+            bootstrap_servers=get_bootstrap_servers(),
             client_id=service_name,
             compression_type='gzip' if compress else None,
             delivery_timeout_ms=request_timeout_ms + linger_ms,
@@ -103,7 +130,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
     It also provides a uniform API that encapsulates the details of how datastreams are implemented in Artie,
     so that the implementation can be easily switched out if needed without affecting the rest of the codebase.
     """
-    def __init__(self, topics: str|list[str]|tuple[str], service_name: str, fetch_min_bytes=1, certfpath=None, keyfpath=None, fetch_max_bytes=10*1024*1024, consumer_group_id=None):
+    def __init__(self, topics: str|list[str]|tuple[str], service_name: str, fetch_min_bytes=1, certfpath=None, keyfpath=None, fetch_max_bytes=10*1024*1024, consumer_group_id=None, auto_offset_reset='latest'):
         """
         Args
         ----
@@ -124,6 +151,8 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
                 If None (the default), consumer groups will be disabled for this subscriber. Consumer groups allow multiple subscribers
                 to share the workload of processing messages from the same topic, while still ensuring that each message
                 is only processed by one subscriber in the group.
+        auto_offset_reset: What to do when there is no initial offset in Kafka or if the current offset does not exist.
+                'earliest' will move to the oldest available message, 'latest' (the default) will move to the most recent.
 
         Usage
         -----
@@ -142,11 +171,14 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
             client_id=service_name,
             group_id=consumer_group_id,
             allow_auto_create_topics=True,
-            bootstrap_servers=f"{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_HOSTNAME, 'localhost')}:{os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_PORT, '9092')}",
+            auto_offset_reset=auto_offset_reset,
+            bootstrap_servers=get_bootstrap_servers(),
             fetch_min_bytes=fetch_min_bytes,
             fetch_max_bytes=fetch_max_bytes,
+            security_protocol='SSL' if (certfpath and keyfpath) else 'PLAINTEXT',
             ssl_certfile=certfpath,
             ssl_keyfile=keyfpath,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )
 
     def __enter__(self):

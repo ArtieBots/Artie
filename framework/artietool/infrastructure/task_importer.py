@@ -470,6 +470,21 @@ def _import_expected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) ->
         expected_outputs.append(e)
     return expected_outputs
 
+def _import_unexpected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) -> List[test_job.UnexpectedOutput]:
+    if 'unexpected-outputs' not in config:
+        return []
+    unexpected_outputs_def = config['unexpected-outputs']
+    unexpected_outputs = []
+    for unexpected_output in unexpected_outputs_def:
+        _validate_dict(unexpected_output, 'what', keyerrmsg=f"Missing 'what' key in 'unexpected-outputs' in {fpath}")
+        # 'where' is optional for unexpected-outputs, defaults to CLI
+        where = _replace_variables(unexpected_output.get('where', '${CLI}'), fpath, key_value_pairs)
+        what = _replace_variables(unexpected_output['what'], fpath, key_value_pairs)
+        is_cli = unexpected_output.get('where', '${CLI}').strip() == "${CLI}"
+        e = test_job.UnexpectedOutput(what, where, cli=is_cli)
+        unexpected_outputs.append(e)
+    return unexpected_outputs
+
 def _import_unit_test_job(job_def: Dict, fpath: str) -> test_job.CLITest:
     _validate_dict(job_def, 'steps', keyerrmsg=f"Missing 'steps' section in 'single-container-cli-suite' definition in {fpath}")
     _validate_dict(job_def, 'docker-image-under-test', keyerrmsg=f"Missing 'docker-image-under-test' in {fpath}")
@@ -538,7 +553,18 @@ def _import_integration_test_job(job_def: Dict, fpath: str) -> docker_compose_te
         test_name = _replace_variables(sdef['test-name'], fpath, {"CLI": cli_image})
         cli_cmd = _replace_variables(sdef['cmd-to-run-in-cli'], fpath, {"CLI": cli_image})
         expected_outputs = _import_expected_outputs(sdef, fpath, {'CLI': cli_image})
-        cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs, network=network))
+        unexpected_outputs = _import_unexpected_outputs(sdef, fpath, {'CLI': cli_image})
+
+        # Parse optional setup-cmds and teardown-cmds
+        setup_cmds = []
+        if 'setup-cmds' in sdef:
+            setup_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['setup-cmds']]
+
+        teardown_cmds = []
+        if 'teardown-cmds' in sdef:
+            teardown_cmds = [_replace_variables(cmd, fpath, {"CLI": cli_image}) for cmd in sdef['teardown-cmds']]
+
+        cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs, network=network, setup_cmds=setup_cmds, teardown_cmds=teardown_cmds, unexpected_outputs=unexpected_outputs))
     return docker_compose_test_suite_job.DockerComposeTestSuiteJob(cli_test_steps, compose_fname, compose_docker_image_variables, network)
 
 def _import_hardware_test_job(job_def: Dict, fpath: str) -> hardware_test_job.HardwareTestJob:
