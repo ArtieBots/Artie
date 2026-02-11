@@ -140,7 +140,7 @@ class HWTest:
         self.expected_results = expected_results
 
 class CLITest:
-    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str=None, expected_outputs: List[ExpectedOutput]=None, need_to_access_cluster=False, network=None, setup_cmds: List[str]=None, teardown_cmds: List[str]=None, unexpected_outputs: List[UnexpectedOutput]=None, parallel_cmds: List[ParallelCommand]=None) -> None:
+    def __init__(self, test_name: str, cli_image: str, cmd_to_run_in_cli: str=None, expected_outputs: List[ExpectedOutput]=None, need_to_access_cluster=False, network=None, setup_cmds: List[str]=None, teardown_cmds: List[str]=None, unexpected_outputs: List[UnexpectedOutput]=None, parallel_cmds: List[ParallelCommand]=None, environment: Dict[str, str]=None) -> None:
         self.test_name = test_name
         self.cli_image = cli_image
         self.cmd_to_run_in_cli = cmd_to_run_in_cli
@@ -152,7 +152,7 @@ class CLITest:
         self.network = network
         self.setup_cmds = setup_cmds or []
         self.teardown_cmds = teardown_cmds or []
-
+        self.environment = environment or {}
         # Validate that we have either cmd_to_run_in_cli OR parallel_cmds, but not both
         if cmd_to_run_in_cli and parallel_cmds:
             raise ValueError(f"Test {test_name} cannot have both 'cmd-to-run-in-cli' and 'parallel-cmds'")
@@ -332,6 +332,10 @@ class CLITest:
         cli_img = self._evaluated_cli_image(args)
         kwargs = {'network_mode': 'host'} if self.network is None else {'network': self.network}
 
+        # Add environment variables
+        if self.environment:
+            kwargs['environment'] = self.environment
+
         # Add kubeconfig if we need it
         if self.need_to_access_cluster:
             bind = {'bind': '/mnt/kube_config', 'mode': 'ro'}
@@ -373,6 +377,10 @@ class CLITest:
         cli_img = self._evaluated_cli_image(args)
         kwargs = {'network_mode': 'host'} if self.network is None else {'network': self.network}
 
+        # Add environment variables
+        if self.environment:
+            kwargs['environment'] = self.environment
+
         # Add kubeconfig if we need it
         if self.need_to_access_cluster:
             bind = {'bind': '/mnt/kube_config', 'mode': 'ro'}
@@ -393,6 +401,10 @@ class CLITest:
         common.info(f"Running {len(self.teardown_cmds)} teardown command(s) for test {self.test_name}...")
         cli_img = self._evaluated_cli_image(args)
         kwargs = {'network_mode': 'host'} if self.network is None else {'network': self.network}
+
+        # Add environment variables
+        if self.environment:
+            kwargs['environment'] = self.environment
 
         # Add kubeconfig if we need it
         if self.need_to_access_cluster:
