@@ -51,12 +51,15 @@ ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 # listener for clients (producers/consumers) to connect to (using PUBSUB_BROKER_PORT),
 # and we also need a CONTROLLER listener for inter-broker communication
 # and controller election (using CONTROLLER_PORT).
-ENV KAFKA_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
+# Bind to 0.0.0.0 to accept connections from any network interface (Docker network, localhost, etc.)
+ENV KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
 
 # The advertised listeners that Kafka will tell clients to connect to.
 # This is important for when the Kafka broker is running in a container,
 # because the internal hostname and port may be different from what clients
 # need to use to connect from outside the container.
+# For Docker Compose, this will be overridden with the container name.
+# Default to localhost for local development.
 ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT}
 
 # Same thing for this, but for some reason you only have to specify "CONTROLLER"
