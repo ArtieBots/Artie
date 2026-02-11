@@ -203,6 +203,9 @@ class CLITest:
             where = e.evaluated_where(args)
             if where in pids:
                 e.pid = pids[e.evaluated_where(args)]
+            elif where == "artie-cli":
+                # We don't have a PID for the CLI container yet. We'll handle that later when we run the CLI command.
+                continue
             else:
                 raise KeyError(f"Cannot find a Docker ID corresponding to a Docker container that is expected to be running in this test. Offending container: {where}; available PIDs: {pids}")
 
