@@ -33,8 +33,8 @@ def list_topics(timeout_s=10) -> list[str]:
     """
     bootstrap_servers = get_bootstrap_servers()
     alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
-    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers)
-    metadata = admin_client.list_topics(timeout=timeout_s)
+    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000)
+    metadata = admin_client.list_topics()
     return list(metadata.topics.keys())
 
 class ArtieStreamPublisher(kafka.KafkaProducer):
