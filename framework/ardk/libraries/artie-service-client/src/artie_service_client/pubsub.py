@@ -6,6 +6,7 @@ The datastream is published at a certain frequency and can be subscribed to by o
 This module also tries to provide a uniform API that encapsulates the details of how datastreams are implemented in Artie,
 so that the implementation can be easily switched out if needed without affecting the rest of the codebase.
 """
+from artie_util import artie_logging as alog
 from artie_util import constants
 import json
 import kafka
@@ -30,7 +31,9 @@ def list_topics(timeout_s=10) -> list[str]:
     Returns:
         A list of topic names
     """
-    admin_client = kafka.KafkaAdminClient(bootstrap_servers=get_bootstrap_servers())
+    bootstrap_servers = get_bootstrap_servers()
+    alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
+    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers)
     metadata = admin_client.list_topics(timeout=timeout_s)
     return list(metadata.topics.keys())
 

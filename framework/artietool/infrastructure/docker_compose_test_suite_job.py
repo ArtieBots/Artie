@@ -1,3 +1,4 @@
+from typing import Dict
 from typing import List
 from typing import Tuple
 from . import dependency
@@ -5,6 +6,7 @@ from . import test_job
 from .. import common
 from .. import docker
 import os
+import yaml
 
 class DockerComposeTestSuiteJob(test_job.TestJob):
     def __init__(self, steps: List[test_job.CLITest], compose_fname: str, compose_docker_image_variables: List[Tuple[str, str|dependency.Dependency]], docker_network_name: str) -> None:
@@ -24,6 +26,62 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
             else:
                 compose_variables[k] = v
         self.compose_variables = compose_variables
+
+    def _extract_cli_environment_from_compose(self) -> Dict[str, str]:
+        """
+        Extract environment variables from the compose file that should be passed to CLI containers.
+        Looks for common Artie environment variables in any service and extracts them.
+        """
+        compose_fpath = os.path.join(self.compose_dpath, self.compose_fname)
+        if not os.path.exists(compose_fpath):
+            common.warning(f"Compose file {compose_fpath} not found, cannot extract environment variables")
+            return {}
+
+        try:
+            with open(compose_fpath, 'r') as f:
+                compose_config = yaml.safe_load(f)
+        except Exception as e:
+            common.warning(f"Failed to parse compose file {compose_fpath}: {e}")
+            return {}
+
+        # Environment variables we want to extract for CLI
+        target_env_vars = [
+            'ARTIE_PUBSUB_BROKER_HOSTNAME',
+            'ARTIE_PUBSUB_BROKER_PORT',
+            'ARTIE_SERVICE_BROKER_HOSTNAME',
+            'ARTIE_SERVICE_BROKER_PORT',
+        ]
+
+        extracted_env = {}
+
+        # Look through all services to find the target environment variables
+        services = compose_config.get('services', {})
+        for service_name, service_config in services.items():
+            env_list = service_config.get('environment', [])
+
+            # Environment can be either a list or a dict
+            if isinstance(env_list, list):
+                for env_item in env_list:
+                    if isinstance(env_item, str):
+                        # Format: "KEY=VALUE"
+                        if '=' in env_item:
+                            key, value = env_item.split('=', 1)
+                            if key in target_env_vars:
+                                extracted_env[key] = value
+                    elif isinstance(env_item, dict):
+                        # Format: {KEY: VALUE}
+                        for key, value in env_item.items():
+                            if key in target_env_vars:
+                                extracted_env[key] = str(value)
+            elif isinstance(env_list, dict):
+                for key, value in env_list.items():
+                    if key in target_env_vars:
+                        extracted_env[key] = str(value)
+
+        if extracted_env:
+            common.info(f"Extracted environment variables for CLI from compose file: {', '.join(extracted_env.keys())}")
+
+        return extracted_env
 
     def clean(self, args):
         """
@@ -60,8 +118,14 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
         docker.add_network(self.docker_network_name)
         self._set_compose_variables(args)
         self._dut_pids = docker.compose(self.project_name, self.compose_dpath, self.compose_fname, args.test_timeout_s, envs=self.compose_variables)
+
+        # Extract environment variables from compose file and set them on all CLI tests
+        cli_environment = self._extract_cli_environment_from_compose()
         for step in self.steps:
             step.link_pids_to_expected_outs(args, self._dut_pids)
+            # Merge extracted environment with any existing environment in the test
+            # Test-specific environment takes precedence
+            step.environment = {**cli_environment, **step.environment}
 
     def teardown(self, args):
         """
