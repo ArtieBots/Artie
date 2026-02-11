@@ -9,10 +9,9 @@ so that the implementation can be easily switched out if needed without affectin
 from artie_util import constants
 import json
 import kafka
-import kafka.admin
 import os
 
-def get_bootstrap_servers():
+def get_bootstrap_servers() -> str:
     """
     Get the Kafka bootstrap servers from environment variables.
     Returns a string in the format "hostname:port".
@@ -21,7 +20,7 @@ def get_bootstrap_servers():
     port = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_BROKER_PORT, '9092')
     return f"{hostname}:{port}"
 
-def list_topics(timeout_s=10):
+def list_topics(timeout_s=10) -> list[str]:
     """
     List all topics in the pubsub broker.
 
@@ -30,11 +29,8 @@ def list_topics(timeout_s=10):
 
     Returns:
         A list of topic names
-
-    Raises:
-        Exception: If the operation fails
     """
-    admin_client = kafka.admin.AdminClient(bootstrap_servers=get_bootstrap_servers())
+    admin_client = kafka.KafkaAdminClient(bootstrap_servers=get_bootstrap_servers())
     metadata = admin_client.list_topics(timeout=timeout_s)
     return list(metadata.topics.keys())
 
