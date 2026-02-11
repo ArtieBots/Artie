@@ -41,7 +41,7 @@ steps:
       - test-name: list-topics
         cmd-to-run-in-cli: "artie-cli service list-topics --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "topics"
+          - what: "Topics: "
             where: artie-cli
 
       # Test 2: Attempt to subscribe to a non-existent topic and verify it creates the topic (Kafka auto-creates topics by default)

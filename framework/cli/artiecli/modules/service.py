@@ -33,12 +33,8 @@ def _cmd_query(args):
 
 def _cmd_list_topics(args):
     """List all topics in the pubsub broker."""
-    try:
-        topics = pubsub.list_topics()
-        common.format_print_result({"topics": topics}, "service", "list-topics", args.artie_id)
-    except Exception as e:
-        common.format_print_result({"error": str(e)}, "service", "list-topics", args.artie_id)
-        sys.exit(1)
+    topics = pubsub.list_topics()
+    common.format_print_result(f"Topics: {str(topics)}", "service", "list-topics", args.artie_id)
 
 def _cmd_publish(args):
     """Publish a message to a topic."""
