@@ -62,7 +62,6 @@ class ExpectedOutput:
         Return whether the what can be found in the where. Ignores requests to check for CLI containers.
         """
         if self.cli:
-            common.info(f"Skipping check for expected output '{self.what}' in CLI container for test {test_name}")
             return None
 
         common.info(f"Checking {test_name}'s DUT {self.pid} for output...")
