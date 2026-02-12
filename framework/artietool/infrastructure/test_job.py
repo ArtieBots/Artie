@@ -62,9 +62,10 @@ class ExpectedOutput:
         Return whether the what can be found in the where. Ignores requests to check for CLI containers.
         """
         if self.cli:
+            common.info(f"Skipping check for expected output '{self.what}' in CLI container for test {test_name}")
             return None
 
-        common.info(f"Checking {test_name}'s DUT(s) for output...")
+        common.info(f"Checking {test_name}'s DUT {self.pid} for output...")
         container = docker.get_container(self.pid)
         if container is None:
             return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Could not find container corresponding to {self.evaluated_where(args)}")
@@ -90,7 +91,7 @@ class ExpectedOutput:
         """
         Same as check, but uses logs to do the checking, instead of the where and is typically used for CLI containers.
         """
-        common.info(f"Checking {test_name}'s DUT(s) for output in logs...")
+        common.info(f"Checking {test_name}'s DUT(s) for '{self.what}' in logs...")
         if self.what in logs:
             return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
         else:
@@ -169,11 +170,14 @@ class CLITest:
 
         try:
             # Launch the CLI command
+            common.debug(f"Running CLI command for test {self.test_name}...")
             res = self._run_cli(args)
             if res.status != result.TestStatuses.SUCCESS:
+                common.error(f"CLI command failed for test {self.test_name}: {res.msg if res.msg else res.exception}")
                 return res
 
             # Check the DUT(s) output(s)
+            common.debug(f"Checking DUT(s) for expected outputs for test {self.test_name}...")
             results = self._check_duts(args)
             results = [r for r in results if r is not None and r.status != result.TestStatuses.SUCCESS]
 
@@ -205,7 +209,7 @@ class CLITest:
                 e.pid = pids[e.evaluated_where(args)]
             elif where == "artie-cli":
                 # We don't have a PID for the CLI container yet. We'll handle that later when we run the CLI command.
-                continue
+                e.cli = True
             else:
                 raise KeyError(f"Cannot find a Docker ID corresponding to a Docker container that is expected to be running in this test. Offending container: {where}; available PIDs: {pids}")
 
@@ -237,8 +241,10 @@ class CLITest:
         Return None if success or a failing TestResult otherwise.
         """
         if self.parallel_cmds:
+            common.debug(f"Running parallel CLI commands for test {self.test_name}...")
             return self._run_parallel_cmds(args)
         else:
+            common.debug(f"Running single CLI command for test {self.test_name}...")
             return self._run_single_cmd(args)
 
     def _run_single_cmd(self, args) -> result.TestResult:
@@ -252,6 +258,7 @@ class CLITest:
         # Check expected outputs
         expected_cli_out = self._find_expected_cli_out(args)
         if expected_cli_out is not None:
+            common.info(f"Checking CLI output for expected output '{expected_cli_out.what}'...")
             res = expected_cli_out.check_in_logs(args, logs, self.test_name, self.producing_task_name)
             if res.status != result.TestStatuses.SUCCESS:
                 return res
@@ -259,6 +266,7 @@ class CLITest:
         # Check unexpected outputs
         for unexpected_out in self.unexpected_outputs:
             if unexpected_out.cli:
+                common.info(f"Checking CLI output for unexpected output '{unexpected_out.what}'...")
                 res = unexpected_out.check_in_logs(args, logs, self.test_name, self.producing_task_name)
                 if res.status != result.TestStatuses.SUCCESS:
                     return res

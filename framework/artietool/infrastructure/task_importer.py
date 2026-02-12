@@ -465,7 +465,8 @@ def _import_expected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) ->
         _validate_dict(expected_output, 'where', keyerrmsg=f"Missing 'where' key in 'expected-outputs' in {fpath}")
         what = _replace_variables(expected_output['what'], fpath, key_value_pairs)
         where = _replace_variables(expected_output['where'], fpath, key_value_pairs)
-        is_cli = expected_output['where'].strip() == "${CLI}"
+        # Check if 'where' refers to CLI: either ${CLI} before replacement, or equals CLI image after replacement
+        is_cli = (expected_output['where'].strip() == "${CLI}" or (isinstance(where, str) and 'CLI' in key_value_pairs and where == key_value_pairs['CLI']))
         e = test_job.ExpectedOutput(what, where, cli=is_cli)
         expected_outputs.append(e)
     return expected_outputs
@@ -480,7 +481,9 @@ def _import_unexpected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) 
         # 'where' is optional for unexpected-outputs, defaults to CLI
         where = _replace_variables(unexpected_output.get('where', '${CLI}'), fpath, key_value_pairs)
         what = _replace_variables(unexpected_output['what'], fpath, key_value_pairs)
-        is_cli = unexpected_output.get('where', '${CLI}').strip() == "${CLI}"
+        # Check if 'where' refers to CLI: either ${CLI} before replacement, or equals CLI image after replacement
+        where_raw = unexpected_output.get('where', '${CLI}').strip()
+        is_cli = (where_raw == "${CLI}" or (isinstance(where, str) and 'CLI' in key_value_pairs and where == key_value_pairs['CLI']))
         e = test_job.UnexpectedOutput(what, where, cli=is_cli)
         unexpected_outputs.append(e)
     return unexpected_outputs
