@@ -48,22 +48,22 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
         Args
         ----
 
-        topic: The topic to publish the datastream on. This should typically be in the format <simple interface name>:<interface version>:<id> (e.g. "my-service:sensor-imu-v1:imu-1").
-        service_name: The name of the service publishing the datastream. This is used as the client ID for the Kafka producer and should typically be the same as the simple name of the service (e.g. "my-service").
-        compress: Whether to compress the data before publishing. This is useful for large datastreams or datastreams with high batching that would otherwise take up a lot of bandwidth. Compression is done using gzip.
-        encrypt: Whether to encrypt the data before publishing. Defaults to True. Disabling will provide a performance boost, but the datastream will not be encrypted and should not be used for sensitive data.
+        - topic: The topic to publish the datastream on. This should typically be in the format <simple interface name>:<interface version>:<id> (e.g. "my-service:sensor-imu-v1:imu-1").
+        - service_name: The name of the service publishing the datastream. This is used as the client ID for the Kafka producer and should typically be the same as the simple name of the service (e.g. "my-service").
+        - compress: Whether to compress the data before publishing. This is useful for large datastreams or datastreams with high batching that would otherwise take up a lot of bandwidth. Compression is done using gzip.
+        - encrypt: Whether to encrypt the data before publishing. Defaults to True. Disabling will provide a performance boost, but the datastream will not be encrypted and should not be used for sensitive data.
                  If encryption is enabled, the certfpath and keyfpath parameters must be provided and point to the appropriate certificate and key files for the service.
-        certfpath: The path to the certificate file to use for encryption. This is only used if encrypt is True.
-        keyfpath: The path to the key file to use for encryption. This is only used if encrypt is True.
-        batch_size_bytes: The batch size in bytes. The publisher will wait `linger_ms` to accumulate a batch of messages
+        - certfpath: The path to the certificate file to use for encryption. This is only used if encrypt is True.
+        - keyfpath: The path to the key file to use for encryption. This is only used if encrypt is True.
+        - batch_size_bytes: The batch size in bytes. The publisher will wait `linger_ms` to accumulate a batch of messages
                   that is at least this size before publishing. If the batch size is not reached after `linger_ms`,
                   the publisher will publish whatever messages it has accumulated. Tune `batch_size_bytes` and `linger_ms`
                   together to achieve the desired tradeoff between latency and throughput. If you want a snappy response,
                   disable linger_ms and set batch_size_bytes to the largest size you expect a single message to be.
                   On the other hand, if you want to maximize throughput and don't care about latency,
                   set a large batch_size_bytes and a large linger_ms - particularly if you enable encryption.
-        linger_ms: The linger time in milliseconds. See `batch_size_bytes` for more explanation.
-        max_request_size_bytes: The maximum request size in bytes. This is the maximum size of a single message that can be published.
+        - linger_ms: The linger time in milliseconds. See `batch_size_bytes` for more explanation.
+        - max_request_size_bytes: The maximum request size in bytes. This is the maximum size of a single message that can be published.
                   If a batch exceeds this size, it will be rejected by the Kafka producer.
                   Tune this together with batch_size_bytes and linger_ms to achieve the desired performance.
 
@@ -134,23 +134,23 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         Args
         ----
 
-        topics: Either a single topic or a list/tuple of topics to subscribe to.
+        - topics: Either a single topic or a list/tuple of topics to subscribe to.
                 The topics should typically be in the format <simple interface name>:<interface version>:<id>
                 (e.g. "my-service:sensor-imu-v1:imu-1"). Topics can also be subscribed to later using the subscribe method.
-        service_name: The name of the service subscribing to the datastream. This is used as the client ID
+        - service_name: The name of the service subscribing to the datastream. This is used as the client ID
                 for the Kafka consumer and should typically be the same as the simple name of the service (e.g. "my-service").
-        fetch_min_bytes: The minimum amount of data the subscriber will fetch in a single request.
+        - fetch_min_bytes: The minimum amount of data the subscriber will fetch in a single request.
                 This is useful to tune together with the publish batch size and linger time of the publisher to achieve
                 the desired tradeoff between latency and throughput.
-        certfpath: The path to the certificate file to use for decryption. This is only used if the stream is encrypted.
-        keyfpath: The path to the key file to use for decryption. This is only used if the stream is encrypted.
-        fetch_max_bytes: The maximum amount of data the subscriber will fetch in a single request.
+        - certfpath: The path to the certificate file to use for decryption. This is only used if the stream is encrypted.
+        - keyfpath: The path to the key file to use for decryption. This is only used if the stream is encrypted.
+        - fetch_max_bytes: The maximum amount of data the subscriber will fetch in a single request.
                 This should typically be set to the same value as the max_request_size_bytes parameter of the publisher to ensure that messages are not rejected by the consumer for being too large.
-        consumer_group_id: The name of the consumer group for this subscriber to join.
+        - consumer_group_id: The name of the consumer group for this subscriber to join.
                 If None (the default), consumer groups will be disabled for this subscriber. Consumer groups allow multiple subscribers
                 to share the workload of processing messages from the same topic, while still ensuring that each message
                 is only processed by one subscriber in the group.
-        auto_offset_reset: What to do when there is no initial offset in Kafka or if the current offset does not exist.
+        - auto_offset_reset: What to do when there is no initial offset in Kafka or if the current offset does not exist.
                 'earliest' will move to the oldest available message, 'latest' (the default) will move to the most recent.
 
         Usage
@@ -185,6 +185,25 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def read(self, timeout_s=None):
+        """
+        Read a single message from the subscribed topics. This will block until a message is received or the timeout is reached.
+        Returns the message value, which will be a dictionary since we use a JSON deserializer.
+        """
+        msg = next(self.poll(timeout_ms=timeout_s*1000).values())[0]
+        return msg.value
+
+    def read_batch(self, timeout_s=None):
+        """
+        Read a batch of messages from the subscribed topics. This will block until at least one message is received or the timeout is reached.
+        Returns a list of message values, which will be dictionaries since we use a JSON deserializer.
+        Returns whatever was received when the timeout is reached, even if it's an empty list.
+        """
+        msgs = []
+        for msg in self.poll(timeout_ms=timeout_s*1000).values():
+            msgs.extend(msg)
+        return [m.value for m in msgs]
 
     def subscribe(self, topics: str|list[str]|tuple[str]):
         """

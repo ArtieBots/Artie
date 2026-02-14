@@ -13,6 +13,7 @@ import blueprints.api_interface_driver as api_interface_driver
 import blueprints.api_interface_servo as api_interface_servo
 import blueprints.api_interface_statusled as api_interface_statusled
 import blueprints.api_interface_service as api_interface_service
+import blueprints.api_interface_imu as api_interface_imu
 
 # Initialization (must be at the top level for gunicorn to see it)
 app = flask.Flask(__name__)
@@ -25,6 +26,7 @@ app.register_blueprint(api_interface_driver.driver_api)
 app.register_blueprint(api_interface_servo.servo_api)
 app.register_blueprint(api_interface_statusled.statusled_api)
 app.register_blueprint(api_interface_service.service_api)
+app.register_blueprint(api_interface_imu.imu_api)
 
 # Generate our self-signed certificate (if not already present)
 # These are used for RPC encryption between the API server and the Artie services.
