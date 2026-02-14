@@ -4,11 +4,9 @@ from artie_tooling import errors
 from artie_util import constants
 from rpyc.utils.registry import TCPRegistryClient
 import argparse
+import datetime
 import json
 import os
-import rpyc
-import sys
-import time
 
 def _connect_registrar(args) -> TCPRegistryClient:
     registrar = TCPRegistryClient(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_HOSTNAME, "localhost"), int(os.environ.get(constants.ArtieEnvVariables.ARTIE_SERVICE_BROKER_PORT, 18864)))
@@ -38,130 +36,40 @@ def _cmd_list_topics(args):
 
 def _cmd_publish(args):
     """Publish a message to a topic."""
+    # Parse the message data as JSON
     try:
-        # Parse the message data as JSON
-        try:
-            data = json.loads(args.data)
-        except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON data: {args.data}")
+        data = json.loads(args.data)
+    except json.JSONDecodeError:
+        raise ValueError(f"Invalid JSON data: {args.data}")
 
-        # Create a publisher with optional encryption
-        encrypt = bool(args.cert and args.key)
-        publisher = pubsub.ArtieStreamPublisher(
-            topic=args.topic,
-            service_name="artie-cli",
-            certfpath=args.cert if encrypt else None,
-            keyfpath=args.key if encrypt else None,
-            encrypt=encrypt,
-        )
+    # Create a publisher with optional encryption
+    encrypt = bool(args.cert and args.key)
 
-        # Publish the message
+    # Publish the message
+    with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
         publisher.publish_blocking(data, timeout_s=10)
-        publisher.close()
 
-        common.format_print_result({
-            "success": True,
-            "topic": args.topic,
-        }, "service", "publish", args.artie_id)
-    except Exception as e:
-        common.format_print_result({"error": str(e)}, "service", "publish", args.artie_id)
-        sys.exit(1)
+    common.format_print_result({"success": True, "topic": args.topic}, "service", "publish", args.artie_id)
 
 def _cmd_subscribe(args):
     """Subscribe to a topic and print messages."""
-    try:
-        # Determine consumer group ID
-        if args.consumer_group:
-            consumer_group_id = args.consumer_group
-        else:
-            # Use a unique group ID if not specified
-            consumer_group_id = f"artie-cli-{os.getpid()}-{int(time.time())}"
+    # Determine consumer group ID
+    if args.consumer_group:
+        consumer_group_id = args.consumer_group
+    else:
+        # Use a unique group ID if not specified
+        consumer_group_id = f"artie-cli-{os.getpid()}-{int(datetime.datetime.now().timestamp())}"
 
-        # Create a subscriber with optional encryption
-        subscriber = pubsub.ArtieStreamSubscriber(
-            topics=args.topic,
-            service_name="artie-cli",
-            consumer_group_id=consumer_group_id,
-            certfpath=args.cert if (args.cert and args.key) else None,
-            keyfpath=args.key if (args.cert and args.key) else None,
-            auto_offset_reset='earliest',
-        )
-
-        # Print subscription confirmation
-        print(f"Subscribed to topic: {args.topic}")
-        if args.consumer_group:
-            print(f"Consumer group: {args.consumer_group}")
-        print(f"Waiting for messages (timeout: {args.timeout}s)...")
-        print("---")
-
+    # Create a subscriber with optional encryption
+    with pubsub.ArtieStreamSubscriber(topics=args.topic, service_name="artie-cli", consumer_group_id=consumer_group_id, certfpath=args.cert if (args.cert and args.key) else None, keyfpath=args.key if (args.cert and args.key) else None, auto_offset_reset='earliest') as subscriber:
         # Read messages
         messages_received = 0
-        start_time = time.time()
-
-        for message in subscriber:
-            messages_received += 1
-            output = {
-                "topic": message.topic,
-                "partition": message.partition,
-                "offset": message.offset,
-                "timestamp": message.timestamp,
-                "value": message.value
-            }
-            print(json.dumps(output, indent=2))
-
-            # Check if we should stop based on count or timeout
-            if args.count and messages_received >= args.count:
-                break
-            if time.time() - start_time >= args.timeout:
-                break
-
-        subscriber.close()
-        print(f"\n--- Received {messages_received} message(s) ---")
-
-    except Exception as e:
-        common.format_print_result({"error": str(e)}, "service", "subscribe", args.artie_id)
-        sys.exit(1)
-
-def _cmd_call(args):
-    """Call an RPC method on a service."""
-    try:
-        # Query the service to get its address
-        registrar = _connect_registrar(args)
-        results = registrar.discover(args.service_name)
-
-        if not results:
-            common.format_print_result({"error": f"Service '{args.service_name}' not found"}, "service", "call", args.artie_id)
-            sys.exit(1)
-
-        # Connect to the first result
-        host, port = results[0]
-        connection = common.connect(host, port, ipv6=args.ipv6)
-
-        # Parse arguments as JSON if provided
-        method_args = []
-        method_kwargs = {}
-        if args.args:
-            try:
-                parsed = json.loads(args.args)
-                if isinstance(parsed, list):
-                    method_args = parsed
-                elif isinstance(parsed, dict):
-                    method_kwargs = parsed
-                else:
-                    method_args = [parsed]
-            except json.JSONDecodeError:
-                # Treat as a single string argument
-                method_args = [args.args]
-
-        # Call the method
-        method = getattr(connection, args.method)
-        result = method(*method_args, **method_kwargs)
-
-        common.format_print_result({"result": result}, "service", "call", args.artie_id)
-
-    except Exception as e:
-        common.format_print_result({"error": str(e)}, "service", "call", args.artie_id)
-        sys.exit(1)
+        while messages_received < (args.count if args.count is not None else float('inf')):
+            batch = subscriber.read_batch(timeout_s=args.timeout)
+            if batch:
+                for msg in batch:
+                    common.format_print_result({"topic": msg.topic, "data": msg.value}, "service", "subscribe", args.artie_id)
+                    messages_received += 1
 
 def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(title="service", description="The service module's subcommands")
@@ -203,10 +111,3 @@ def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentPar
     subscribe_parser.add_argument("--cert", type=str, default=None, help="Path to certificate file for encryption (optional)")
     subscribe_parser.add_argument("--key", type=str, default=None, help="Path to key file for encryption (optional)")
     subscribe_parser.set_defaults(cmd=_cmd_subscribe)
-
-    ## Call (RPC)
-    call_parser = subparsers.add_parser("call", parents=[option_parser], help="Call an RPC method on a service")
-    call_parser.add_argument("service_name", type=str, help="The name of the service to call")
-    call_parser.add_argument("method", type=str, help="The name of the method to call")
-    call_parser.add_argument("--args", type=str, default=None, help="Arguments for the method as JSON (optional)")
-    call_parser.set_defaults(cmd=_cmd_call)
