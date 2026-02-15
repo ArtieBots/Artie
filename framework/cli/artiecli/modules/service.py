@@ -46,10 +46,14 @@ def _cmd_publish(args):
     encrypt = bool(args.cert and args.key)
 
     # Publish the message
-    with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
-        publisher.publish_blocking(data, timeout_s=10)
+    try:
+        with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
+            publisher.publish_blocking(data, timeout_s=10)
+    except Exception as e:
+        common.format_print_result(f"Error: {e}", "service", "publish", args.artie_id)
+        return
 
-    common.format_print_result({"success": True, "topic": args.topic}, "service", "publish", args.artie_id)
+    common.format_print_result(f"Success. Topic: {args.topic}", "service", "publish", args.artie_id)
 
 def _cmd_subscribe(args):
     """Subscribe to a topic and print messages."""
@@ -61,15 +65,18 @@ def _cmd_subscribe(args):
         consumer_group_id = f"artie-cli-{os.getpid()}-{int(datetime.datetime.now().timestamp())}"
 
     # Create a subscriber with optional encryption
-    with pubsub.ArtieStreamSubscriber(topics=args.topic, service_name="artie-cli", consumer_group_id=consumer_group_id, certfpath=args.cert if (args.cert and args.key) else None, keyfpath=args.key if (args.cert and args.key) else None, auto_offset_reset='earliest') as subscriber:
-        # Read messages
-        messages_received = 0
-        while messages_received < (args.count if args.count is not None else float('inf')):
-            batch = subscriber.read_batch(timeout_s=args.timeout)
-            if batch:
-                for msg in batch:
-                    common.format_print_result({"topic": msg.topic, "data": msg.value}, "service", "subscribe", args.artie_id)
-                    messages_received += 1
+    try:
+        with pubsub.ArtieStreamSubscriber(topics=args.topic, service_name="artie-cli", consumer_group_id=consumer_group_id, certfpath=args.cert if (args.cert and args.key) else None, keyfpath=args.key if (args.cert and args.key) else None, auto_offset_reset='earliest') as subscriber:
+            # Read messages
+            messages_received = 0
+            while messages_received < (args.count if args.count is not None else float('inf')):
+                batch = subscriber.read_batch(timeout_s=args.timeout)
+                if batch:
+                    for msg in batch:
+                        common.format_print_result({"topic": msg.topic, "data": msg.value}, "service", "subscribe", args.artie_id)
+                        messages_received += 1
+    except Exception as e:
+        common.format_print_result(f"Error: {e}", "service", "subscribe", args.artie_id)
 
 def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentParser):
     subparsers = parser.add_subparsers(title="service", description="The service module's subcommands")

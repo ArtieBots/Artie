@@ -55,16 +55,14 @@ steps:
       - test-name: subscribe-with-invalid-cert
         cmd-to-run-in-cli: "artie-cli service subscribe test-topic --cert /nonexistent/cert.pem --key /nonexistent/key.pem --count 0 --timeout 5 --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "Error"
+          - what: "Error: "
             where: artie-cli
 
       # Test 4: Publish a message to a topic
       - test-name: publish-single-message
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-1 ''{"message": "hello", "value": 42}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
-          - what: '"success": true'
-            where: artie-cli
-          - what: '"topic": "test-topic-1"'
+          - what: "Success. Topic: test-topic-1"
             where: artie-cli
 
       # Test 5: Subscribe to a topic and verify message is received
