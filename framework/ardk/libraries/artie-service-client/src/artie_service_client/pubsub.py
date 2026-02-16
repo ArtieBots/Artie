@@ -101,12 +101,12 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
     def topic(self):
         return self._topic
 
-    def flush(self):
+    def flush(self, timeout=None):
         """
         Flush the producer to ensure all messages are sent.
         This is useful to call before shutting down the service to ensure all data is published.
         """
-        super().flush()
+        super().flush(timeout=timeout)
 
     def publish(self, data: dict):
         """
@@ -205,13 +205,25 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
             msgs.extend(msg)
         return [m.value for m in msgs]
 
-    def subscribe(self, topics: str|list[str]|tuple[str]):
+    def subscribe(self, topics: str|list[str]|tuple[str], pattern=None, listener=None):
         """
         Subscribe to a new topic or topics. This can be called multiple times to subscribe to additional topics.
         The topics should typically be in the format <simple interface name>:<interface version>:<id>
         (e.g. "my-service:sensor-imu-v1:imu-1").
+
+        Args:
+            - topics: The topic or topics to subscribe to.
+            - pattern: An optional regex pattern to subscribe to topics.
+              This is mutually exclusive with the `topics` parameter - you must specify one or the other, but not both.
+              If you want to subscribe to specific topics and also use a pattern, you can call this method twice -
+              once with the specific topics and once with the pattern.
+            - listener: An optional listener to receive notifications about partition assignment and revocation.
+              This is only used if you are using consumer groups and want to be notified about partition assignments.
+              The listener should be an instance of kafka.coordinator.assignors.AbstractPartitionAssignor.AssignmentListener.
+              This is provided for compatibility with the underlying KafkaConsumer API, but is not commonly used in typical Artie services.
+
         """
-        super().subscribe(topics)
+        super().subscribe(topics, pattern=pattern, listener=listener)
 
     def unsubscribe_all(self):
         """
@@ -219,11 +231,16 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         """
         return super().unsubscribe()
 
-    def unsubscribe(self, topics: str|list[str]|tuple[str]):
+    def unsubscribe(self, topics: str|list[str]|tuple[str]=None):
         """
         Unsubscribe from a topic or topics.
         The topics should typically be in the format <simple interface name>:<interface version>:<id>
+
+        If `topics` is None (the default), this will unsubscribe from all topics, which is the same as calling `unsubscribe_all()`.
         """
+        if topics is None:
+            return self.unsubscribe_all()
+
         # Save our current topic list:
         current_topics = set(self.subscription())
 
