@@ -529,14 +529,14 @@ def remove_network(network_name: str):
     network.reload()
     for container in network.containers:
         common.warning(f"A container ({container.name}) is still using network {network_name}. Attempting to stop the container.")
-        container.stop()
-        if container.status == "running":
-            common.warning(f"Container {container.name} did not stop. Attempting to kill.")
+        container.stop(timeout=10)
+        container.reload()
+        if container.status != "exited":
+            common.warning(f"Container {container.name} did not stop successfully. Attempting to kill it.")
             container.kill()
-            if container.status == "running":
-                container.wait(timeout=10)
-                if container.status == "running":
-                    common.error(f"Container {container.name} cannot be stopped or killed. Attempting to remove network, but will likely fail.")
+            container.reload()
+            if container.status != "exited":
+                common.warning(f"Container {container.name} did not kill successfully. It may still be using the network, which may cause problems.")
 
     network.remove()
 

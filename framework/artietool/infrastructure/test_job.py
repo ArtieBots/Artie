@@ -439,9 +439,14 @@ class TestJob(job.Job):
         self.steps = steps
 
     def __call__(self, args) -> result.JobResult:
-        self.setup(args)
-        results = self._run_steps(args)
-        self.teardown(args)
+        results = []
+        try:
+            self.setup(args)
+            results += self._run_steps(args)
+            self.teardown(args)
+        except Exception as e:
+            common.error(f"Exception while running test job {self.name}: {e}")
+            results += [result.TestResult("Exception in test job", self.parent_task.name, TestStatuses.FAIL, exception=e)]
 
         # Check success
         success = True

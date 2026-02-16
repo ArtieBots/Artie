@@ -135,7 +135,11 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
             common.info(f"--skip-teardown detected. You will need to manually clean up the Docker containers.")
             return
 
-        super().teardown(args)
-        common.info(f"Tearing down. Stopping docker containers...")
-        docker.compose_down(self.project_name, self.compose_dpath, self.compose_fname, envs=self.compose_variables)
-        docker.remove_network(self.docker_network_name)
+        try:
+            super().teardown(args)
+            common.info(f"Tearing down. Stopping docker containers...")
+            docker.compose_down(self.project_name, self.compose_dpath, self.compose_fname, envs=self.compose_variables)
+            docker.remove_network(self.docker_network_name)
+        except Exception as e:
+            common.error(f"Error during teardown of Docker compose project {self.project_name}. You will likely have to manually clean up the Docker containers and network. Additionally, we cannot run further tests: {e}")
+            raise e  # Reraise the exception so that we don't continue running more tests when the environment is likely still contaminated
