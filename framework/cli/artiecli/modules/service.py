@@ -73,8 +73,7 @@ def _cmd_subscribe(args):
                 batch = subscriber.read_batch(timeout_s=args.timeout)
                 if batch:
                     for msg in batch:
-                        print(f"MESSAGE RECEIVED ON TOPIC {args.topic}: {msg}")
-                        common.format_print_result({"topic": args.topic, "data": msg['value']}, "service", "subscribe", args.artie_id)
+                        common.format_print_result({"topic": args.topic, "data": str(msg)}, "service", "subscribe", args.artie_id)
                         messages_received += 1
     except Exception as e:
         common.format_print_result(f"Error: {e}", "service", "subscribe", args.artie_id)
