@@ -71,9 +71,9 @@ steps:
           - 'artie-cli service publish test-topic-2 ''{"message": "test data", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
         cmd-to-run-in-cli: "artie-cli service subscribe test-topic-2 --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: '"message": "test data"'
+          - what: "'message': 'test data'"
             where: artie-cli
-          - what: '"seq": 1'
+          - what: "'seq': 1"
             where: artie-cli
 
       # Test 6: Multiple subscribers to the same topic (both should receive all messages)
@@ -84,14 +84,14 @@ steps:
         parallel-cmds:
           - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"message": "broadcast"'
-              - what: '"seq": 1'
-              - what: '"seq": 2'
+              - what: "'message': 'broadcast'"
+              - what: "'seq': 1"
+              - what: "'seq': 2"
           - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"message": "broadcast"'
-              - what: '"seq": 1'
-              - what: '"seq": 2'
+              - what: "'message': 'broadcast'"
+              - what: "'seq': 1"
+              - what: "'seq': 2"
 
       # Test 7: Multiple subscribers in the same consumer group (messages should be load balanced)
       - test-name: consumer-group-load-balancing
@@ -103,10 +103,10 @@ steps:
         parallel-cmds:
           - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"message":'
+              - what: "'message':"
           - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"message":'
+              - what: "'message':"
 
       # Test 8: Publish to multiple topics and verify subscribers receive from correct topics
       - test-name: multiple-topics-routing
@@ -116,34 +116,34 @@ steps:
         parallel-cmds:
           - cmd: "artie-cli service subscribe test-topic-5a --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"topic": "5a"'
-              - what: '"data": "alpha"'
+              - what: "'topic': '5a'"
+              - what: "'data': 'alpha'"
             unexpected-outputs:
-              - what: '"topic": "5b"'
+              - what: "'topic': '5b'"
           - cmd: "artie-cli service subscribe test-topic-5b --count 1 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
-              - what: '"topic": "5b"'
-              - what: '"data": "beta"'
+              - what: "'topic': '5b'"
+              - what: "'data': 'beta'"
             unexpected-outputs:
-              - what: '"topic": "5a"'
+              - what: "'topic': '5a'"
 
       # Test 9: Verify messages of various sizes can be published and received
       - test-name: message-sizes-small
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "small", "data": "x"}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
-          - what: '"success": true'
+          - what: "'success': true"
             where: artie-cli
 
       - test-name: message-sizes-medium
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "medium", "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
-          - what: '"success": true'
+          - what: "'success': true"
             where: artie-cli
 
       - test-name: message-sizes-large
         cmd-to-run-in-cli: "bash -c 'DATA=$(python3 -c \"print('{\\\"size\\\": \\\"large\\\", \\\"data\\\": \\\"' + 'x'*5000 + '\\\"}')\" ); artie-cli service publish test-topic-6 \"$DATA\" --integration-test --artie-profile /integration_test_profile.json'"
         expected-outputs:
-          - what: '"success": true'
+          - what: "'success': true"
             where: artie-cli
 
       # Test 10: Verify throughput with multiple messages
@@ -156,16 +156,16 @@ steps:
           - 'artie-cli service publish test-topic-7 ''{"seq": 5}'' --integration-test --artie-profile /integration_test_profile.json'
         cmd-to-run-in-cli: "artie-cli service subscribe test-topic-7 --count 5 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: '"seq": 1'
+          - what: "'seq': 1"
             where: artie-cli
-          - what: '"seq": 5'
+          - what: "'seq': 5"
             where: artie-cli
 
       # Test 11: Use IMU CLI module to interact with sensor service via API
       - test-name: imu-list-sensors
         cmd-to-run-in-cli: "artie-cli imu list --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: '"imu-1"'
+          - what: "'imu-1'"
             where: artie-cli
 
       - test-name: imu-whoami
@@ -185,13 +185,13 @@ steps:
           - "artie-cli imu on imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         cmd-to-run-in-cli: "artie-cli imu get-data imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: '"imu_id": "imu-1"'
+          - what: "'imu_id': 'imu-1'"
             where: artie-cli
-          - what: '"accelerometer"'
+          - what: "'accelerometer'"
             where: artie-cli
-          - what: '"gyroscope"'
+          - what: "'gyroscope'"
             where: artie-cli
-          - what: '"magnetometer"'
+          - what: "'magnetometer'"
             where: artie-cli
         teardown-cmds:
           - "artie-cli imu off imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
@@ -202,11 +202,11 @@ steps:
           - "artie-cli imu start-stream imu-1 --freq-hz 10 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         cmd-to-run-in-cli: "artie-cli service subscribe example-sensor-service:sensor-imu-v1:imu-1 --count 3 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: '"accelerometer"'
+          - what: "'accelerometer'"
             where: artie-cli
-          - what: '"gyroscope"'
+          - what: "'gyroscope'"
             where: artie-cli
-          - what: '"timestamp"'
+          - what: "'timestamp'"
             where: artie-cli
         teardown-cmds:
           - "artie-cli imu stop-stream imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
