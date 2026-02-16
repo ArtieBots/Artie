@@ -440,6 +440,7 @@ class TestJob(job.Job):
 
     def __call__(self, args) -> result.JobResult:
         results = []
+        common.info(f"******* Starting test job {self.name} *******")
         try:
             self.setup(args)
             results += self._run_steps(args)
@@ -464,6 +465,7 @@ class TestJob(job.Job):
         """
         results = []
         for i, t in enumerate(self.steps):
+            common.info(f"::::::::::: Running test {i+1}/{len(self.steps)}: {t.test_name} :::::::::::")
             try:
                 test_result = common.manage_timeout(t, args.test_timeout_s, args)
                 results.append(test_result)
