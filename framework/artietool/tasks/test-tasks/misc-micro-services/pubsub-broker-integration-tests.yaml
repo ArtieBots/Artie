@@ -81,13 +81,14 @@ steps:
         setup-cmds:
           - 'artie-cli service publish test-topic-3 ''{"message": "broadcast", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
           - 'artie-cli service publish test-topic-3 ''{"message": "broadcast", "seq": 2}'' --integration-test --artie-profile /integration_test_profile.json'
+          - "sleep 2"
         parallel-cmds:
-          - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+          - cmd: "artie-cli service subscribe test-topic-3 --consumer-group test-group-sub1 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
               - what: "'message': 'broadcast'"
               - what: "'seq': 1"
               - what: "'seq': 2"
-          - cmd: "artie-cli service subscribe test-topic-3 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
+          - cmd: "artie-cli service subscribe test-topic-3 --consumer-group test-group-sub2 --count 2 --timeout 10 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
               - what: "'message': 'broadcast'"
               - what: "'seq': 1"
