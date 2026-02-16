@@ -285,20 +285,24 @@ class CLITest:
         def run_cmd_thread(idx: int, parallel_cmd: ParallelCommand):
             """Run a single command in a thread and store its output."""
             try:
+                common.info(f"Running parallel command {idx+1}/{len(self.parallel_cmds)}: {parallel_cmd.cmd}")
                 logs = self._try_ntimes(args, 5, parallel_cmd.cmd)
                 results[idx] = logs
+                common.debug(f"Finished parallel command {idx+1}/{len(self.parallel_cmds)}. Results collected: {logs[:1000]}...")
             except Exception as e:
                 exceptions[idx] = e
 
         # Start all commands in parallel
         threads = []
         for idx, parallel_cmd in enumerate(self.parallel_cmds):
+            common.debug(f"Starting thread for parallel command {idx+1}/{len(self.parallel_cmds)}...")
             thread = threading.Thread(target=run_cmd_thread, args=(idx, parallel_cmd))
             thread.start()
             threads.append(thread)
 
         # Wait for all threads to complete
         for thread in threads:
+            common.debug(f"Waiting for thread {thread.name} to finish...")
             thread.join()
 
         # Check if any thread had an exception
@@ -313,22 +317,14 @@ class CLITest:
             # Check expected outputs
             for expected_out in parallel_cmd.expected_outputs:
                 if expected_out.what not in logs:
-                    return result.TestResult(
-                        self.test_name,
-                        self.producing_task_name,
-                        result.TestStatuses.FAIL,
-                        msg=f"Expected output '{expected_out.what}' not found in parallel command {idx+1}"
-                    )
+                    common.debug(f"Expected output '{expected_out.what}' not found in parallel command {idx+1}")
+                    return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.FAIL, msg=f"Expected output '{expected_out.what}' not found in parallel command {idx+1}")
 
             # Check unexpected outputs
             for unexpected_out in parallel_cmd.unexpected_outputs:
                 if unexpected_out.what in logs:
-                    return result.TestResult(
-                        self.test_name,
-                        self.producing_task_name,
-                        result.TestStatuses.FAIL,
-                        msg=f"Unexpected output '{unexpected_out.what}' found in parallel command {idx+1}"
-                    )
+                    common.debug(f"Unexpected output '{unexpected_out.what}' found in parallel command {idx+1}")
+                    return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.FAIL, msg=f"Unexpected output '{unexpected_out.what}' found in parallel command {idx+1}")
 
         return result.TestResult(self.test_name, self.producing_task_name, result.TestStatuses.SUCCESS)
 
@@ -353,9 +349,9 @@ class CLITest:
             try:
                 logs = docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
                 return logs
-            except Exception:
+            except Exception as e:
                 if i != n - 1:
-                    common.warning(f"Got an exception while trying to run CLI. Will try {n - (i+1)} more times.")
+                    common.warning(f"Got an exception while trying to run CLI. Will try {n - (i+1)} more times. Exception: {e}")
                     time.sleep(1)
                 else:
                     raise
