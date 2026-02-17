@@ -65,4 +65,9 @@ ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT}
 # Same thing for this, but for some reason you only have to specify "CONTROLLER"
 ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 
+# Default number of partitions for auto-created topics.
+# Multiple partitions allow for parallel consumption by multiple consumers in the same consumer group.
+# This should be set to at least the expected number of concurrent consumers for load balancing.
+ENV KAFKA_NUM_PARTITIONS=3
+
 # TODO Figure out TLS
