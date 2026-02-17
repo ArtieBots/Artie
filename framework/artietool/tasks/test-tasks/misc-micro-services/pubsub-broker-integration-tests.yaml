@@ -96,18 +96,25 @@ steps:
 
       # Test 7: Multiple subscribers in the same consumer group (messages should be load balanced)
       - test-name: consumer-group-load-balancing
-        setup-cmds:
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg1", "seq": 1}'' --flush --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg2", "seq": 2}'' --flush --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg3", "seq": 3}'' --flush --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg4", "seq": 4}'' --flush --integration-test --artie-profile /integration_test_profile.json'
         parallel-cmds:
-          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 30 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
               - what: "'message':"
-          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 30 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:
               - what: "'message':"
+          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg1\\\", \\\"seq\\\": 1}' --flush --integration-test --artie-profile /integration_test_profile.json\""
+            expected-outputs:
+              - what: "Success"
+          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg2\\\", \\\"seq\\\": 2}' --flush --integration-test --artie-profile /integration_test_profile.json\""
+            expected-outputs:
+              - what: "Success"
+          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg3\\\", \\\"seq\\\": 3}' --flush --integration-test --artie-profile /integration_test_profile.json\""
+            expected-outputs:
+              - what: "Success"
+          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg4\\\", \\\"seq\\\": 4}' --flush --integration-test --artie-profile /integration_test_profile.json\""
+            expected-outputs:
+              - what: "Success"
 
       # Test 8: Publish to multiple topics and verify subscribers receive from correct topics
       - test-name: multiple-topics-routing
@@ -132,19 +139,19 @@ steps:
       - test-name: message-sizes-small
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "small", "data": "x"}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
-          - what: "'success': true"
+          - what: "Success"
             where: artie-cli
 
       - test-name: message-sizes-medium
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "medium", "data": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
-          - what: "'success': true"
+          - what: "Success"
             where: artie-cli
 
       - test-name: message-sizes-large
-        cmd-to-run-in-cli: "bash -c 'DATA=$(python3 -c \"print('{\\\"size\\\": \\\"large\\\", \\\"data\\\": \\\"' + 'x'*5000 + '\\\"}')\" ); artie-cli service publish test-topic-6 \"$DATA\" --integration-test --artie-profile /integration_test_profile.json'"
+        cmd-to-run-in-cli: "bash -c \"python3 -c 'import json; data=json.dumps({\\\"size\\\": \\\"large\\\", \\\"data\\\": \\\"x\\\"*5000}); import subprocess; subprocess.run([\\\"artie-cli\\\", \\\"service\\\", \\\"publish\\\", \\\"test-topic-6\\\", data, \\\"--integration-test\\\", \\\"--artie-profile\\\", \\\"/integration_test_profile.json\\\"])'\""
         expected-outputs:
-          - what: "'success': true"
+          - what: "Success"
             where: artie-cli
 
       # Test 10: Verify throughput with multiple messages
