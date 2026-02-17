@@ -50,7 +50,7 @@ def _cmd_publish(args):
         with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
             publisher.publish_blocking(data, timeout_s=10)
             if args.flush:
-                publisher.flush(timeout_s=10)
+                publisher.flush(timeout=10)
     except Exception as e:
         common.format_print_result(f"Error: {e}", "service", "publish", args.artie_id)
         return
