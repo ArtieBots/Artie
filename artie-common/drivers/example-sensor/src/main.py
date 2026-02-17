@@ -11,7 +11,6 @@ from artie_service_client import artie_service
 from artie_service_client import interfaces
 import argparse
 import os
-import queue
 import rpyc
 import threading
 
@@ -26,7 +25,7 @@ class ExampleSensorService(
     ):
     def __init__(self, port: int, certfpath: str, keyfpath: str, ipv6=False):
         super().__init__(SERVICE_NAME, port)
-        self._q = queue.Queue()
+        self._stop_event = threading.Event()
         self._imu_state = {"imu-1": "off"}
         self._publish_thread: threading.Thread = None
         self._certfpath = certfpath
@@ -183,13 +182,14 @@ class ExampleSensorService(
 
     def _start_stream(self, imu_id: str, freq_hz=None):
         alog.info(f"Starting stream for IMU with ID {imu_id} at frequency {freq_hz} Hz...")
-        self._publish_thread = threading.Thread(target=datastream.stream, args=(self._q, self._certfpath, self._keyfpath, SERVICE_NAME, imu_id, freq_hz))
+        self._stop_event.clear()
+        self._publish_thread = threading.Thread(target=datastream.stream, args=(self._stop_event, self._certfpath, self._keyfpath, SERVICE_NAME, imu_id, freq_hz))
         self._publish_thread.start()
 
     def _stop_stream(self, imu_id: str):
         alog.info(f"Stopping stream for IMU with ID {imu_id}...")
         if self._publish_thread is not None:
-            self._q.put('quit')
+            self._stop_event.set()
             self._publish_thread.join()
             self._publish_thread = None
 
