@@ -9,7 +9,7 @@ import queue
 import time
 
 def stream( q: queue.Queue, certfpath: str, keyfpath: str, service_simple_name: str, imu_id: str, freq_hz=1.0):
-    topic_name = f"{service_simple_name}:sensor-imu-v1:{imu_id}"
+    topic_name = f"{service_simple_name}.sensor-imu-v1.{imu_id}"
     alog.info(f"Starting datastream for topic {topic_name} with frequency {freq_hz} Hz")
     with pubsub.ArtieStreamPublisher(topic_name, service_simple_name, encrypt=True, certfpath=certfpath, keyfpath=keyfpath) as publisher:
         while True:

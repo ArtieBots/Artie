@@ -31,9 +31,10 @@ Core concepts from Kafka that we will be using include:
 - **Topic discovery**: Topics can be discovered at runtime based on the interfaces that services register
   with the Artie Service Broker. When a service registers an interface, the Pub/Sub Broker will automatically create a corresponding topic for that interface. The interfaces are documented in
   [the interface specifications folder](../../../../docs/specifications/service-interfaces/README.md)
-  The topic names will typically follow the format `<simple service name>:<interface name>:<sensor id>`
+  The topic names will typically follow the format `<simple service name>.<interface name>.<sensor id>`
   with optional additional qualifiers for things like different sensor data if the sensor supports multiple data types.
-  See the appropriate interface and the service that implements it for complete documentation.
+  See the appropriate interface and the service that implements it for complete documentation. Keep in mind
+  that the topic name must contain only ASCII alphanumeric characters, dots, underscores, and hyphens.
 - **Message format**: Messages published to topics will be in a format that corresponds to the data model
   defined by the interface associated with that topic. This will typically be a JSON object.
 - **Encryption**: The Pub/Sub Broker will support encryption for messages published to topics.
