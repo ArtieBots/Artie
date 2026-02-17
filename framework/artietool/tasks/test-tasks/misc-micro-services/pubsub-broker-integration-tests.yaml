@@ -193,13 +193,13 @@ steps:
           - "artie-cli imu on imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         cmd-to-run-in-cli: "artie-cli imu get-data imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
-          - what: "'imu_id': 'imu-1'"
+          - what: '"imu_id": "imu-1"'
             where: artie-cli
-          - what: "'accelerometer'"
+          - what: '"accelerometer"'
             where: artie-cli
-          - what: "'gyroscope'"
+          - what: '"gyroscope"'
             where: artie-cli
-          - what: "'magnetometer'"
+          - what: '"magnetometer"'
             where: artie-cli
         teardown-cmds:
           - "artie-cli imu off imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
@@ -208,7 +208,7 @@ steps:
         setup-cmds:
           - "artie-cli imu on imu-1 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
           - "artie-cli imu start-stream imu-1 --freq-hz 10 --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
-        cmd-to-run-in-cli: "artie-cli service subscribe example-sensor-service:sensor-imu-v1:imu-1 --count 3 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
+        cmd-to-run-in-cli: "artie-cli service subscribe example-sensor-service.sensor-imu-v1.imu-1 --count 3 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:
           - what: "'accelerometer'"
             where: artie-cli
