@@ -97,10 +97,10 @@ steps:
       # Test 7: Multiple subscribers in the same consumer group (messages should be load balanced)
       - test-name: consumer-group-load-balancing
         setup-cmds:
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg1", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg2", "seq": 2}'' --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg3", "seq": 3}'' --integration-test --artie-profile /integration_test_profile.json'
-          - 'artie-cli service publish test-topic-4 ''{"message": "msg4", "seq": 4}'' --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg1", "seq": 1}'' --flush --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg2", "seq": 2}'' --flush --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg3", "seq": 3}'' --flush --integration-test --artie-profile /integration_test_profile.json'
+          - 'artie-cli service publish test-topic-4 ''{"message": "msg4", "seq": 4}'' --flush --integration-test --artie-profile /integration_test_profile.json'
         parallel-cmds:
           - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 15 --integration-test --artie-profile /integration_test_profile.json"
             expected-outputs:

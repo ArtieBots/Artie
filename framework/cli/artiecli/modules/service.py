@@ -49,6 +49,8 @@ def _cmd_publish(args):
     try:
         with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
             publisher.publish_blocking(data, timeout_s=10)
+            if args.flush:
+                publisher.flush(timeout_s=10)
     except Exception as e:
         common.format_print_result(f"Error: {e}", "service", "publish", args.artie_id)
         return
@@ -107,6 +109,7 @@ def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentPar
     publish_parser.add_argument("data", type=str, help="The message data as a JSON string")
     publish_parser.add_argument("--cert", type=str, default=None, help="Path to certificate file for encryption (optional)")
     publish_parser.add_argument("--key", type=str, default=None, help="Path to key file for encryption (optional)")
+    publish_parser.add_argument("--flush", action='store_true', help="Whether to flush the publisher after publishing the message (default: False)")
     publish_parser.set_defaults(cmd=_cmd_publish)
 
     ## Subscribe
