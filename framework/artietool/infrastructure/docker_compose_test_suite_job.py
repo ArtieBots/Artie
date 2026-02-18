@@ -2,6 +2,7 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 from . import dependency
+from . import result
 from . import test_job
 from .. import common
 from .. import docker
@@ -83,6 +84,42 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
 
         return extracted_env
 
+    def _get_logs(self, container_id: str) -> str:
+        """
+        Fetch logs from a Docker container using its ID.
+        """
+        container = docker.get_container(container_id)
+        if container is None:
+            raise ValueError(f"Container with ID {container_id} not found when trying to fetch logs.")
+
+        lines = []
+        try:
+            for line in container.logs(stream=True, follow=True):
+                lines.append(line.decode())
+        except docker.docker_errors.NotFound:
+            raise ValueError(f"Container with ID {container_id} closed unexpectedly while reading its logs.")
+
+        return "".join(lines)
+
+    def log_failures(self, args):
+        """
+        If the test failed, fetch logs from the Docker containers to help with debugging.
+        """
+        common.info(f"Test failed, fetching logs from Docker containers for debugging...")
+
+        # Make a directory inside the artifacts directory for this test to store the logs
+        logs_dir = os.path.join(args.artifact_folder, "docker_logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        for dut_name, pid in self._dut_pids.items():
+            try:
+                logs = self._get_logs(pid)
+                log_file_path = os.path.join(logs_dir, f"{dut_name}_{pid}.log")
+                with open(log_file_path, "w") as log_file:
+                    log_file.write(logs)
+                common.info(f"Logs from {dut_name} (container ID: {pid}) saved to {log_file_path}")
+            except Exception as e:
+                common.error(f"Error fetching logs from Docker container {dut_name} (container ID: {pid}): {e}")
+
     def clean(self, args):
         """
         Clean up any Docker containers created by this job. This runs even if the job failed during setup or execution.
@@ -127,7 +164,7 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
             # Test-specific environment takes precedence
             step.environment = {**cli_environment, **step.environment}
 
-    def teardown(self, args):
+    def teardown(self, args, results: list[result.TestResult]):
         """
         Shutdown any Docker containers still at large.
         """
@@ -136,7 +173,9 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
             return
 
         try:
-            super().teardown(args)
+            if results and any(r.status.value == result.TestStatuses.FAIL.value for r in results):
+                self.log_failures(args)
+            super().teardown(args, results)
             common.info(f"Tearing down. Stopping docker containers...")
             docker.compose_down(self.project_name, self.compose_dpath, self.compose_fname, envs=self.compose_variables)
             docker.remove_network(self.docker_network_name)

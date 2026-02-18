@@ -11,6 +11,7 @@ import re
 import shutil
 import string
 import subprocess
+import threading
 import time
 
 try:
@@ -46,6 +47,26 @@ class DockerManifest:
 
     def __repr__(self) -> str:
         return str(self)
+
+class DockerRunner:
+    """
+    A class for running Docker containers that periodically checks for
+    a stop signal and stops the container if it receives one. This is useful for running Docker
+    containers as part of a TestJob and ensuring that they are cleaned up properly even if the test fails or is interrupted.
+    """
+    def __init__(self, client: docker.DockerClient, image: str, cmd: str, **kwargs) -> None:
+        self.client = client
+        self.image = image
+        self.cmd = cmd
+        self.kwargs = kwargs
+        self.container = None
+        self.stop_event = threading.Event()
+
+    def __call__(self):
+        self.container = self.client.containers.run(self.image, command=self.cmd, remove=True, stdout=True, stderr=True, detach=True, **self.kwargs)
+        self.stop_event.wait()
+        if self.container:
+            self.container.stop(timeout=10)
 
 def _get_cidfile_path():
     """
@@ -658,7 +679,8 @@ def run_docker_container(image_name, cmd: str|None, timeout_s=30, log_to_stdout=
     """
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     common.info(f"Running command: {cmd} ; using kwargs: {kwargs}")
-    stdout = common.manage_timeout(client.containers.run, timeout_s, image=image_name, command=cmd, remove=True, stdout=True, stderr=True, **kwargs)
+    runner = DockerRunner(client, image=image_name, cmd=cmd, **kwargs)
+    stdout = common.manage_timeout(runner, timeout_s)
 
     if log_to_stdout and stdout is not None:
         common.info(f"Docker output: {stdout.decode()}")

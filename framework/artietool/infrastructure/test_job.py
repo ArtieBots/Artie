@@ -153,6 +153,7 @@ class CLITest:
         self.setup_cmds = setup_cmds or []
         self.teardown_cmds = teardown_cmds or []
         self.environment = environment or {}
+        self.stop_event = threading.Event()
         # Validate that we have either cmd_to_run_in_cli OR parallel_cmds, but not both
         if cmd_to_run_in_cli and parallel_cmds:
             raise ValueError(f"Test {test_name} cannot have both 'cmd-to-run-in-cli' and 'parallel-cmds'")
@@ -197,6 +198,12 @@ class CLITest:
                 self._run_teardown_cmds(args)
             except Exception as e:
                 common.error(f"Teardown command failed for test {self.test_name}: {e}")
+
+    def kill_child_threads(self):
+        """
+        Kill any child threads that this test has spawned.
+        """
+        common.kill_managed_threads()
 
     def link_pids_to_expected_outs(self, args, pids: Dict[str, str]):
         """
@@ -350,7 +357,7 @@ class CLITest:
                 logs = docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
                 return logs
             except Exception as e:
-                if i != n - 1:
+                if i != n - 1 and not self.stop_event.is_set():
                     common.warning(f"Got an exception while trying to run CLI. Will try {n - (i+1)} more times. Exception: {e}")
                     time.sleep(1)
                 else:
@@ -440,7 +447,7 @@ class TestJob(job.Job):
         try:
             self.setup(args)
             results += self._run_steps(args)
-            self.teardown(args)
+            self.teardown(args, results)
         except Exception as e:
             common.error(f"Exception while running test job {self.name}: {e}")
             results += [result.TestResult("Exception in test job", self.parent_task.name, TestStatuses.FAIL, exception=e)]
@@ -465,7 +472,17 @@ class TestJob(job.Job):
             try:
                 test_result = common.manage_timeout(t, args.test_timeout_s, args)
                 results.append(test_result)
+                common.info(f"Finished test: {t.test_name} with result: {test_result.status.name}")
             except Exception as e:
+                common.error(f"Exception while running test {t.test_name}: {e}")
+
+                # At this point, we may have child threads from test steps that are managing
+                # timeouts themselves. We need to kill those threads to prevent them from continuing to run and potentially
+                # interfering with future tests.
+                if hasattr(t, "kill_child_threads"):
+                    common.info(f"Killing child threads of test {t.test_name} to prevent interference with future tests...")
+                    t.kill_child_threads()
+
                 # Log exception if --enable-error-tracing
                 if args.enable_error_tracing:
                     common.error(f"Error running test {t.test_name}: {''.join(traceback.format_exception(e))}")
@@ -499,7 +516,7 @@ class TestJob(job.Job):
         """
         pass
 
-    def teardown(self, args):
+    def teardown(self, args, results: list[result.TestResult]):
         """
         Clean up after ourselves. Should be overridden by the subclass.
         Note that subclasses should honor the --skip-teardown arg.

@@ -1,6 +1,7 @@
 from typing import Dict
 from typing import List
 from . import dependency
+from . import result
 from . import test_job
 from .. import common
 from .. import docker
@@ -33,7 +34,7 @@ class SingleContainerCLISuiteJob(test_job.TestJob):
         common.info("Waiting for DUT to come online...")
         time.sleep(min(args.test_timeout_s / 3, 10))
 
-    def teardown(self, args):
+    def teardown(self, args, results: list[result.TestResult]):
         """
         Shutdown any Docker containers still at large.
         """
@@ -41,7 +42,7 @@ class SingleContainerCLISuiteJob(test_job.TestJob):
             common.info(f"--skip-teardown detected. You will need to manually clean up the Docker containers.")
             return
 
-        super().teardown(args)
+        super().teardown(args, results)
         common.info(f"Tearing down. Stopping docker container...")
         try:
             self._dut_container.stop()

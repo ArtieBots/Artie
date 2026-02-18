@@ -64,6 +64,7 @@ class Task:
             r = j(args)
             artifact.add_artifacts_from_result(args, r)
             results.append(r)
+        common.info(f"Finished running Task {self.name} with results: {results}")
         return result.TaskResult(self.name, results)
 
     def cached(self, args) -> bool:
