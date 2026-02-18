@@ -37,7 +37,7 @@ def list_topics(timeout_s=10) -> list[str]:
     metadata = admin_client.list_topics()
     return metadata
 
-class ArtieStreamPublisher(kafka.KafkaProducer):
+class ArtieStreamPublisher:
     """
     This class is a wrapper around the KafkaProducer that provides convenience functions for publishing datastreams in Artie services.
     It also provides a uniform API that encapsulates the details of how datastreams are implemented in Artie,
@@ -72,8 +72,9 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
         if encrypt and (certfpath is None or keyfpath is None):
             raise ValueError("If encryption is enabled, certfpath and keyfpath must be provided.")
 
+        self._topic = topic
         request_timeout_ms = 30000  # Kafka default is 30 seconds
-        super().__init__(
+        self._producer = kafka.KafkaProducer(
             batch_size=batch_size_bytes,
             bootstrap_servers=get_bootstrap_servers(),
             client_id=service_name,
@@ -88,14 +89,13 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
             ssl_keyfile=keyfpath if encrypt else None,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
-        self._topic = topic
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.flush()
-        self.close()
+        self._producer.close()
 
     @property
     def topic(self):
@@ -106,24 +106,24 @@ class ArtieStreamPublisher(kafka.KafkaProducer):
         Flush the producer to ensure all messages are sent.
         This is useful to call before shutting down the service to ensure all data is published.
         """
-        super().flush(timeout=timeout)
+        self._producer.flush(timeout=timeout)
 
     def publish(self, data: dict):
         """
         Publish data. The data should be JSON-serializable. Typically, this format is
         specified by the interface that the datastream is associated with.
         """
-        self.send(self._topic, value=data)
+        self._producer.send(self._topic, value=data)
 
     def publish_blocking(self, data: dict, timeout_s=None):
         """
         Publish data and block until the publish is successful. The data should be JSON-serializable. Typically, this format is
         specified by the interface that the datastream is associated with.
         """
-        future = self.send(self._topic, value=data)
+        future = self._producer.send(self._topic, value=data)
         future.get(timeout=timeout_s)
 
-class ArtieStreamSubscriber(kafka.KafkaConsumer):
+class ArtieStreamSubscriber:
     """
     This class is a wrapper around the KafkaConsumer that provides convenience functions for consuming datastreams in Artie services.
     It also provides a uniform API that encapsulates the details of how datastreams are implemented in Artie,
@@ -165,7 +165,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         if isinstance(topics, str):
             topics = [topics]
 
-        super().__init__(
+        self._consumer = kafka.KafkaConsumer(
             *topics,
             client_id=service_name,
             group_id=consumer_group_id,
@@ -184,14 +184,18 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+        self._consumer.close()
+
+    def __iter__(self):
+        """Allow iteration over the subscriber to receive messages."""
+        return iter(self._consumer)
 
     def read(self, timeout_s=None):
         """
         Read a single message from the subscribed topics. This will block until a message is received or the timeout is reached.
         Returns the message value, which will be a dictionary since we use a JSON deserializer.
         """
-        msg = next(self.poll(timeout_ms=timeout_s*1000).values())[0]
+        msg = next(self._consumer.poll(timeout_ms=timeout_s*1000).values())[0]
         return msg.value
 
     def read_batch(self, timeout_s=None):
@@ -201,7 +205,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
         Returns whatever was received when the timeout is reached, even if it's an empty list.
         """
         msgs = []
-        for msg in self.poll(timeout_ms=timeout_s*1000).values():
+        for msg in self._consumer.poll(timeout_ms=timeout_s*1000).values():
             msgs.extend(msg)
         return [m.value for m in msgs]
 
@@ -223,13 +227,13 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
               This is provided for compatibility with the underlying KafkaConsumer API, but is not commonly used in typical Artie services.
 
         """
-        super().subscribe(topics, pattern=pattern, listener=listener)
+        self._consumer.subscribe(topics, pattern=pattern, listener=listener)
 
     def unsubscribe_all(self):
         """
         Unsubscribe from all topics.
         """
-        return super().unsubscribe()
+        return self._consumer.unsubscribe()
 
     def unsubscribe(self, topics: str|list[str]|tuple[str]=None):
         """
@@ -242,7 +246,7 @@ class ArtieStreamSubscriber(kafka.KafkaConsumer):
             return self.unsubscribe_all()
 
         # Save our current topic list:
-        current_topics = set(self.subscription())
+        current_topics = set(self._consumer.subscription())
 
         # Remove the topics we want to unsubscribe from:
         if isinstance(topics, str):
