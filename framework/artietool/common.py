@@ -27,6 +27,9 @@ except ModuleNotFoundError:
 # The name of our logger
 LOGGER_NAME = 'artietool'
 
+# Global list of threads that we have spawned and want to be able to kill if needed
+_MANAGED_THREADS = []
+
 class Colors:
     OKGREEN = '\033[92m'
     WARNING = '\033[93m'
@@ -37,13 +40,33 @@ class PropagatingThread(threading.Thread):
     """
     A Thread subclass that can properly handle exceptions.
     Taken from Stack Overflow: https://stackoverflow.com/questions/2829329/catch-a-threads-exception-in-the-caller-thread
+
+    Please make sure that the target function of this thread
+    has a `stop_event` attribute that is a `threading.Event`,
+    and that the function checks this event periodically and exits if it's set,
+    so that we can signal to the thread to stop if we need to.
     """
     def run(self):
+        if self._target and not hasattr(self._target, 'stop_event'):
+            raise ValueError("The target function of a PropagatingThread must have a 'stop_event' attribute that is a threading.Event, so that we can signal to the thread to stop if needed.")
+
         self.exc = None
         try:
             self.ret = self._target(*self._args, **self._kwargs)
         except BaseException as e:
             self.exc = e
+
+    def kill(self, timeout_s=10):
+        """
+        Kill this thread. Note that this is not a graceful shutdown, so use with caution.
+        """
+        if self.is_alive():
+            # The target function should be checking for a threading.Event.
+            # We set that event here to signal to the thread that it should stop what it's doing and exit.
+            if hasattr(self._target, 'stop_event'):
+                self._target.stop_event.set()
+
+        self.join(timeout=timeout_s)
 
     def join(self, timeout=None):
         super().join(timeout)
@@ -217,10 +240,22 @@ def host_platform() -> str:
     # Return amd64 or arm64 if possible, otherwise just pass the raw.lower() value through
     return lookup.get(p, p)
 
+def kill_managed_threads(timeout_s=10):
+    """
+    Kill any threads that we have spawned and added to the _MANAGED_THREADS list.
+    """
+    for t in _MANAGED_THREADS:
+        if t.is_alive():
+            warning(f"Killing thread {t.name} that is still alive...")
+            t.kill(timeout_s=timeout_s)
+
 def manage_timeout(func, timeout_s: int, *args, **kwargs):
     """
     Runs `func` with `args` and `kwargs` to completion, or until `timeout_s` seconds
     has elapsed, at which point it raises a TimeoutError.
+
+    Note that `func` should be designed to be run in a thread and must have a `stop_event` attribute that is a `threading.Event`,
+    and should check this event periodically and exit if it's set, so that we can signal to the thread to stop if needed.
     """
     class TimeoutWrapper:
         def __init__(self, func, timeout_s) -> None:
@@ -238,6 +273,7 @@ def manage_timeout(func, timeout_s: int, *args, **kwargs):
 
     wrapper = TimeoutWrapper(func, timeout_s)
     t = PropagatingThread(target=wrapper, args=args, kwargs=kwargs, daemon=True)
+    _MANAGED_THREADS.append(t)
     t.start()
     t.join(timeout=timeout_s)
     if t.is_alive():
@@ -251,6 +287,7 @@ def manage_timeout(func, timeout_s: int, *args, **kwargs):
             name = type(func)
         # Timeout. But let's wait a little longer to hopefully allow the thread to complete so the resources
         # such as Docker containers get cleaned up.
+        warning(f"Function {name} timed out after {timeout_s} seconds. Waiting a little longer for it to hopefully finish cleaning up resources...")
         t.join(timeout=10)
         raise TimeoutError(f"Trying to run function {name} failed with a timeout.")
     return wrapper.ret

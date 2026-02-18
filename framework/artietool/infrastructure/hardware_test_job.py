@@ -349,14 +349,14 @@ class HardwareTestJob(test_job.TestJob):
         # Define a k8s job on the single test step we have
         self._single_step.create_job_def(args)
 
-    def teardown(self, args):
+    def teardown(self, args, results: list[result.TestResult]):
         """
         """
         if args.skip_teardown:
             common.info(f"--skip-teardown detected. There may be a k8s job and configmaps on the cluster that need to be cleaned up manually.")
             return
 
-        super().teardown(args)
+        super().teardown(args, results)
         self._single_step.cleanup_job(args)
 
     def combine(self, other) -> None:
