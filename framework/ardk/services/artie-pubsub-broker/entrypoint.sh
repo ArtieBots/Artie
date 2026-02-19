@@ -37,6 +37,9 @@ keytool -importcert \
 
 echo "SSL certificates generated and configured for Kafka broker."
 
+# Create directory for Kafka configuration
+mkdir -p /etc/kafka/kraft
+
 # Create Kafka server.properties directly to avoid issues with the configure script
 echo "Creating Kafka server.properties..."
 cat > /etc/kafka/kraft/server.properties << EOF
@@ -77,10 +80,10 @@ EOF
 # Format storage if this is the first run
 if [ ! -d "/tmp/kafka-logs" ]; then
     echo "Formatting KRaft storage..."
-    export KAFKA_CLUSTER_ID=${KAFKA_CLUSTER_ID:-$(kafka-storage.sh random-uuid)}
-    kafka-storage.sh format -t "$KAFKA_CLUSTER_ID" -c /etc/kafka/kraft/server.properties
+    export KAFKA_CLUSTER_ID=${KAFKA_CLUSTER_ID:-$(/opt/kafka/bin/kafka-storage.sh random-uuid)}
+    /opt/kafka/bin/kafka-storage.sh format -t "$KAFKA_CLUSTER_ID" -c /etc/kafka/kraft/server.properties
 fi
 
 # Start Kafka
 echo "Starting Kafka server..."
-exec kafka-server-start.sh /etc/kafka/kraft/server.properties
+exec /opt/kafka/bin/kafka-server-start.sh /etc/kafka/kraft/server.properties
