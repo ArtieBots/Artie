@@ -62,12 +62,12 @@ class APIClient:
         for i in range(self.nretries):
             try:
                 r = self.session.get(uri, params=params)
+                return r
             except requests.RequestException as e:
                 time.sleep(delay_s)
                 if i == self.nretries - 1:
                     print(f"Error connecting: {e}")
                     raise e
-        return r
 
     def post(self, endpoint: str, body=None, params=None, https=True) -> requests.Response:
         """
@@ -90,9 +90,9 @@ class APIClient:
         for i in range(self.nretries):
             try:
                 r = requests.post(uri, json=body, params=params, verify=False)
+                return r
             except Exception as e:
                 time.sleep(delay_s)
                 if i == self.nretries - 1:
                     print(f"Error connecting: {e}")
                     raise e
-        return r
