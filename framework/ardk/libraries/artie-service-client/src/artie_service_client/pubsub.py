@@ -11,6 +11,7 @@ from artie_util import constants
 import json
 import kafka
 import os
+import ssl
 
 def get_bootstrap_servers() -> str:
     """
@@ -34,14 +35,17 @@ def list_topics(timeout_s=10) -> list[str]:
     bootstrap_servers = get_bootstrap_servers()
     alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
 
+    # Create SSL context that accepts self-signed certificates
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
     # Configure admin client with SSL support for self-signed certificates
-    # Note: We don't use client certificates here since listing topics doesn't require authentication
     admin_client = kafka.KafkaAdminClient(
         bootstrap_servers=bootstrap_servers,
         request_timeout_ms=timeout_s*1000,
         security_protocol='SSL',
-        ssl_check_hostname=False,  # Allow self-signed certs
-        ssl_cafile=None  # Don't require CA verification
+        ssl_context=ssl_context
     )
     metadata = admin_client.list_topics()
     return metadata
@@ -83,6 +87,15 @@ class ArtieStreamPublisher:
 
         self._topic = topic
         request_timeout_ms = 30000  # Kafka default is 30 seconds
+
+        # Create SSL context for self-signed certificates if encryption is enabled
+        ssl_context = None
+        if encrypt:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
+
         self._producer = kafka.KafkaProducer(
             batch_size=batch_size_bytes,
             bootstrap_servers=get_bootstrap_servers(),
@@ -94,10 +107,7 @@ class ArtieStreamPublisher:
             max_request_size=max_request_size_bytes,
             request_timeout_ms=request_timeout_ms,
             security_protocol='SSL' if encrypt else 'PLAINTEXT',
-            ssl_certfile=certfpath if encrypt else None,
-            ssl_keyfile=keyfpath if encrypt else None,
-            ssl_check_hostname=False if encrypt else None,  # Allow self-signed certs
-            ssl_cafile=None,  # Don't require CA verification for self-signed certs
+            ssl_context=ssl_context,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
 
@@ -176,6 +186,15 @@ class ArtieStreamSubscriber:
         if isinstance(topics, str):
             topics = [topics]
 
+        # Create SSL context for self-signed certificates if encryption is enabled
+        ssl_context = None
+        encrypt = (certfpath and keyfpath)
+        if encrypt:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
+
         self._consumer = kafka.KafkaConsumer(
             *topics,
             client_id=service_name,
@@ -185,11 +204,8 @@ class ArtieStreamSubscriber:
             bootstrap_servers=get_bootstrap_servers(),
             fetch_min_bytes=fetch_min_bytes,
             fetch_max_bytes=fetch_max_bytes,
-            security_protocol='SSL' if (certfpath and keyfpath) else 'PLAINTEXT',
-            ssl_certfile=certfpath,
-            ssl_keyfile=keyfpath,
-            ssl_check_hostname=False if (certfpath and keyfpath) else None,  # Allow self-signed certs
-            ssl_cafile=None,  # Don't require CA verification for self-signed certs
+            security_protocol='SSL' if encrypt else 'PLAINTEXT',
+            ssl_context=ssl_context,
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )
 
