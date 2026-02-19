@@ -53,6 +53,7 @@ listeners=${KAFKA_LISTENERS:-SSL://0.0.0.0:9092,CONTROLLER://localhost:9093}
 advertised.listeners=${KAFKA_ADVERTISED_LISTENERS:-SSL://localhost:9092}
 listener.security.protocol.map=${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:-SSL:SSL,CONTROLLER:PLAINTEXT}
 controller.listener.names=${KAFKA_CONTROLLER_LISTENER_NAMES:-CONTROLLER}
+inter.broker.listener.name=SSL
 
 # Log configuration
 log.dirs=/tmp/kafka-logs
