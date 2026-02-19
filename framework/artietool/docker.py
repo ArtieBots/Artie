@@ -60,13 +60,35 @@ class DockerRunner:
         self.cmd = cmd
         self.kwargs = kwargs
         self.container = None
-        self.stop_event = threading.Event()
+        self.stop_event = False
+        self.container_output = None
 
     def __call__(self):
-        self.container = self.client.containers.run(self.image, command=self.cmd, remove=True, stdout=True, stderr=True, detach=True, **self.kwargs)
-        self.stop_event.wait()
+        common.info(f"Starting Docker container with image {self.image} and command {self.cmd}...")
+        self.container = self.client.containers.run(self.image, command=self.cmd, stdout=True, stderr=True, detach=True, **self.kwargs)
+        common.info(f"Started Docker container with image {self.image} with ID {self.container.id}. Waiting for it to finish or for a stop signal...")
+
+        while not self.stop_event:
+            time.sleep(1)
+            self.container.reload()  # Refresh the container's status
+            if self.container.status.lower() in ("exited", "dead"):
+                common.info(f"Docker container with image {self.image} and ID {self.container.id} has finished with status {self.container.status}.")
+                break
+
         if self.container:
-            self.container.stop(timeout=10)
+            try:
+                common.info(f"Stop signal received or container finished. Stopping container {self.image} - {self.container.id}...")
+                self.container.stop(timeout=10)
+                self.container_output = self.container.logs(stdout=True, stderr=True)
+                self.container.remove(force=True)
+                common.info(f"Container {self.image} - {self.container.id} stopped.")
+            except docker_errors.NotFound:
+                common.debug(f"Container with ID {self.container.id} not found when trying to stop it. It may have already stopped on its own, which is fine.")
+            except docker_errors.APIError as e:
+                common.warning(f"Got an exception while trying to stop Docker container with ID {self.container.id}. Exception: {e}")
+
+    def get_container_output(self):
+        return self.container_output
 
 def _get_cidfile_path():
     """
@@ -680,7 +702,8 @@ def run_docker_container(image_name, cmd: str|None, timeout_s=30, log_to_stdout=
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     common.info(f"Running command: {cmd} ; using kwargs: {kwargs}")
     runner = DockerRunner(client, image=image_name, cmd=cmd, **kwargs)
-    stdout = common.manage_timeout(runner, timeout_s)
+    common.manage_timeout(runner, timeout_s)
+    stdout = runner.get_container_output()
 
     if log_to_stdout and stdout is not None:
         common.info(f"Docker output: {stdout.decode()}")

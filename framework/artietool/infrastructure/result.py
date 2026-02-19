@@ -65,6 +65,9 @@ class JobResult:
         self.error = error
         self.artifacts = artifacts if artifacts is not None else []
 
+    def __repr__(self):
+        return str(self)
+
     def __str__(self):
         """
         Returns a summary of this Result.
@@ -120,6 +123,9 @@ class TaskResult:
             elif hasattr(r, 'status') and r.status == TestStatuses.FAIL:
                 self.success = False
 
+    def __repr__(self):
+        return str(self)
+
     def __str__(self) -> str:
         s = ""
         s += f"{self.name}:"
@@ -141,14 +147,17 @@ class TaskResult:
         return ret
 
 class ErrorTaskResult:
-    def __init__(self, name: str, error: Exception) -> None:
+    def __init__(self, name: str, error: Exception, partial_results=None) -> None:
         """
         The result of running a task when that task fails catastrophically, and fails to return a result itself.
         """
         self.name = name
         self.error = error
         self.success = False
-        self.job_results = []
+        self.job_results = partial_results if partial_results is not None else []
+
+    def __repr__(self):
+        return str(self)
 
     def __str__(self):
         """
@@ -163,6 +172,12 @@ class ErrorTaskResult:
         s = ""
         if self.error:
             s += os.linesep + "    Error: " + str(self.error)
+
+        if self.job_results:
+            s += os.linesep + "    Partial results before failure:"
+            for j in self.job_results:
+                s += os.linesep + f"{j}"
+
         return s
 
     def to_verbose_str(self) -> str:

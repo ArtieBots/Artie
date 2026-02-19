@@ -42,15 +42,17 @@ class PropagatingThread(threading.Thread):
     Taken from Stack Overflow: https://stackoverflow.com/questions/2829329/catch-a-threads-exception-in-the-caller-thread
 
     Please make sure that the target function of this thread
-    has a `stop_event` attribute that is a `threading.Event`,
-    and that the function checks this event periodically and exits if it's set,
+    has a `stop_event` attribute that is a boolean
+    and that the function checks this attribute periodically and exits if it's set,
     so that we can signal to the thread to stop if we need to.
     """
     def run(self):
-        if self._target and not hasattr(self._target, 'stop_event'):
-            raise ValueError("The target function of a PropagatingThread must have a 'stop_event' attribute that is a threading.Event, so that we can signal to the thread to stop if needed.")
-
         self.exc = None
+        self.ret = None
+
+        if self._target and not hasattr(self._target, 'stop_event'):
+            raise ValueError("The target function of a PropagatingThread must have a 'stop_event' attribute that is a boolean, so that we can signal to the thread to stop if needed.")
+
         try:
             self.ret = self._target(*self._args, **self._kwargs)
         except BaseException as e:
@@ -61,10 +63,10 @@ class PropagatingThread(threading.Thread):
         Kill this thread. Note that this is not a graceful shutdown, so use with caution.
         """
         if self.is_alive():
-            # The target function should be checking for a threading.Event.
+            # The target function should be checking for a boolean stop_event.
             # We set that event here to signal to the thread that it should stop what it's doing and exit.
             if hasattr(self._target, 'stop_event'):
-                self._target.stop_event.set()
+                self._target.stop_event = True
 
         self.join(timeout=timeout_s)
 
@@ -254,14 +256,24 @@ def manage_timeout(func, timeout_s: int, *args, **kwargs):
     Runs `func` with `args` and `kwargs` to completion, or until `timeout_s` seconds
     has elapsed, at which point it raises a TimeoutError.
 
-    Note that `func` should be designed to be run in a thread and must have a `stop_event` attribute that is a `threading.Event`,
-    and should check this event periodically and exit if it's set, so that we can signal to the thread to stop if needed.
+    Note that `func` should be designed to be run in a thread and must have a `stop_event` attribute that is a boolean,
+    and should check this attribute periodically and exit if it's set, so that we can signal to the thread to stop if needed.
     """
     class TimeoutWrapper:
         def __init__(self, func, timeout_s) -> None:
             self.func = func
             self.timeout_s = timeout_s
             self.ret = None
+            self._stop_event = False
+
+        @property
+        def stop_event(self):
+            return self._stop_event
+
+        @stop_event.setter
+        def stop_event(self, value):
+            self._stop_event = value
+            self.func.stop_event = value
 
         def __call__(self, *args, **kwargs):
             try:
@@ -270,6 +282,9 @@ def manage_timeout(func, timeout_s: int, *args, **kwargs):
                 # Docker exceptions are not pickleable and so can't be propagated across the
                 # test task boundary into the infrastructure module. It just hangs if you try.
                 raise Exception(f"Container failed to start: {e}")
+
+    if not hasattr(func, 'stop_event'):
+        raise ValueError("The function passed to manage_timeout must have a 'stop_event' attribute that is a boolean, so that we can signal to it to stop if needed.")
 
     wrapper = TimeoutWrapper(func, timeout_s)
     t = PropagatingThread(target=wrapper, args=args, kwargs=kwargs, daemon=True)
