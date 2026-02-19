@@ -50,6 +50,7 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
         target_env_vars = [
             'ARTIE_PUBSUB_BROKER_HOSTNAME',
             'ARTIE_PUBSUB_BROKER_PORT',
+            'ARTIE_PUBSUB_USE_SSL',
             'ARTIE_SERVICE_BROKER_HOSTNAME',
             'ARTIE_SERVICE_BROKER_PORT',
         ]

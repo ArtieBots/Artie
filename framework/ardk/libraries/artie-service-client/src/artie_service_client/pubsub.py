@@ -82,19 +82,22 @@ class ArtieStreamPublisher:
 
         """
         # Check args
-        if encrypt and (certfpath is None or keyfpath is None):
-            raise ValueError("If encryption is enabled, certfpath and keyfpath must be provided.")
-
         self._topic = topic
         request_timeout_ms = 30000  # Kafka default is 30 seconds
 
-        # Create SSL context for self-signed certificates if encryption is enabled
+        # Check if SSL should be used based on environment variable or explicit encrypt parameter
+        use_ssl_env = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
+        use_ssl = encrypt or use_ssl_env
+
+        # Create SSL context for self-signed certificates if SSL is enabled
         ssl_context = None
-        if encrypt:
+        if use_ssl:
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
+            # Load client certificates only if provided (for mutual TLS)
+            if certfpath is not None and keyfpath is not None:
+                ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
 
         self._producer = kafka.KafkaProducer(
             batch_size=batch_size_bytes,
@@ -186,14 +189,19 @@ class ArtieStreamSubscriber:
         if isinstance(topics, str):
             topics = [topics]
 
-        # Create SSL context for self-signed certificates if encryption is enabled
+        # Check if SSL should be used based on environment variable or if certificates are provided
+        use_ssl_env = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
+        use_ssl = use_ssl_env or (certfpath is not None and keyfpath is not None)
+
+        # Create SSL context for self-signed certificates if SSL is enabled
         ssl_context = None
-        encrypt = (certfpath and keyfpath)
-        if encrypt:
+        if use_ssl:
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
+            # Load client certificates only if provided (for mutual TLS)
+            if certfpath is not None and keyfpath is not None:
+                ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
 
         self._consumer = kafka.KafkaConsumer(
             *topics,
@@ -204,7 +212,7 @@ class ArtieStreamSubscriber:
             bootstrap_servers=get_bootstrap_servers(),
             fetch_min_bytes=fetch_min_bytes,
             fetch_max_bytes=fetch_max_bytes,
-            security_protocol='SSL' if encrypt else 'PLAINTEXT',
+            security_protocol='SSL' if use_ssl else 'PLAINTEXT',
             ssl_context=ssl_context,
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )

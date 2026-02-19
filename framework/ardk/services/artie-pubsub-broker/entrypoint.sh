@@ -74,7 +74,7 @@ ssl.keystore.type=PKCS12
 ssl.truststore.location=/etc/kafka/secrets/kafka.truststore.p12
 ssl.truststore.password=changeit
 ssl.truststore.type=PKCS12
-ssl.client.auth=none
+ssl.client.auth=requested
 ssl.endpoint.identification.algorithm=
 EOF
 
