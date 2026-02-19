@@ -1,6 +1,6 @@
 """
 This module contains convenience functions for publishing datastreams in Artie services
-and consuming from datastream. A datastream is a stream of data published by a service on a particular topic.
+and consuming from datastreams. A datastream is a stream of data published by a service on a particular topic.
 The datastream is published at a certain frequency and can be subscribed to by other services.
 
 This module also tries to provide a uniform API that encapsulates the details of how datastreams are implemented in Artie,
@@ -13,7 +13,7 @@ import kafka
 import os
 import ssl
 
-def get_bootstrap_servers() -> str:
+def _get_bootstrap_servers() -> str:
     """
     Get the Kafka bootstrap servers from environment variables.
     Returns a string in the format "hostname:port".
@@ -24,7 +24,7 @@ def get_bootstrap_servers() -> str:
 
 def list_topics(timeout_s=10) -> list[str]:
     """
-    List all topics in the pubsub broker.
+    List all topics currently in the pubsub broker.
 
     Args:
         timeout_s: Timeout in seconds for the list_topics operation (default: 10)
@@ -32,7 +32,7 @@ def list_topics(timeout_s=10) -> list[str]:
     Returns:
         A list of topic names
     """
-    bootstrap_servers = get_bootstrap_servers()
+    bootstrap_servers = _get_bootstrap_servers()
     alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
 
     # Create SSL context that accepts self-signed certificates
@@ -41,14 +41,9 @@ def list_topics(timeout_s=10) -> list[str]:
     ssl_context.verify_mode = ssl.CERT_NONE
 
     # Configure admin client with SSL support for self-signed certificates
-    admin_client = kafka.KafkaAdminClient(
-        bootstrap_servers=bootstrap_servers,
-        request_timeout_ms=timeout_s*1000,
-        security_protocol='SSL',
-        ssl_context=ssl_context
-    )
-    metadata = admin_client.list_topics()
-    return metadata
+    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000, security_protocol='SSL', ssl_context=ssl_context)
+    topics = admin_client.list_topics()
+    return topics
 
 class ArtieStreamPublisher:
     """
@@ -89,19 +84,9 @@ class ArtieStreamPublisher:
         use_ssl_env = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
         use_ssl = encrypt or use_ssl_env
 
-        # Create SSL context for self-signed certificates if SSL is enabled
-        ssl_context = None
-        if use_ssl:
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            # Load client certificates only if provided (for mutual TLS)
-            if certfpath is not None and keyfpath is not None:
-                ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
-
         self._producer = kafka.KafkaProducer(
             batch_size=batch_size_bytes,
-            bootstrap_servers=get_bootstrap_servers(),
+            bootstrap_servers=_get_bootstrap_servers(),
             client_id=service_name,
             compression_type='gzip' if compress else None,
             delivery_timeout_ms=request_timeout_ms + linger_ms,
@@ -109,8 +94,12 @@ class ArtieStreamPublisher:
             linger_ms=linger_ms,
             max_request_size=max_request_size_bytes,
             request_timeout_ms=request_timeout_ms,
-            security_protocol='SSL' if encrypt else 'PLAINTEXT',
-            ssl_context=ssl_context,
+            security_protocol='SSL' if use_ssl else 'PLAINTEXT',
+            # SSL configuration for self-signed certificates (use individual params, not ssl_context)
+            ssl_check_hostname=False if use_ssl else None,
+            ssl_cafile=None if use_ssl else None,  # Don't verify CA for self-signed certs
+            ssl_certfile=certfpath if (use_ssl and certfpath) else None,  # Client cert for mTLS
+            ssl_keyfile=keyfpath if (use_ssl and keyfpath) else None,  # Client key for mTLS
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
 
@@ -193,27 +182,21 @@ class ArtieStreamSubscriber:
         use_ssl_env = os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
         use_ssl = use_ssl_env or (certfpath is not None and keyfpath is not None)
 
-        # Create SSL context for self-signed certificates if SSL is enabled
-        ssl_context = None
-        if use_ssl:
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            # Load client certificates only if provided (for mutual TLS)
-            if certfpath is not None and keyfpath is not None:
-                ssl_context.load_cert_chain(certfile=certfpath, keyfile=keyfpath)
-
         self._consumer = kafka.KafkaConsumer(
             *topics,
             client_id=service_name,
             group_id=consumer_group_id,
             allow_auto_create_topics=True,
             auto_offset_reset=auto_offset_reset,
-            bootstrap_servers=get_bootstrap_servers(),
+            bootstrap_servers=_get_bootstrap_servers(),
             fetch_min_bytes=fetch_min_bytes,
             fetch_max_bytes=fetch_max_bytes,
             security_protocol='SSL' if use_ssl else 'PLAINTEXT',
-            ssl_context=ssl_context,
+            # SSL configuration for self-signed certificates (use individual params, not ssl_context)
+            ssl_check_hostname=False if use_ssl else None,
+            ssl_cafile=None if use_ssl else None,  # Don't verify CA for self-signed certs
+            ssl_certfile=certfpath if (use_ssl and certfpath) else None,  # Client cert for mTLS
+            ssl_keyfile=keyfpath if (use_ssl and keyfpath) else None,  # Client key for mTLS
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )
 
