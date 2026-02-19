@@ -1,5 +1,10 @@
 FROM apache/kafka:4.1.1
 
+# Install openssl for certificate generation
+USER root
+RUN microdnf install -y openssl && microdnf clean all
+USER kafka
+
 # Artie configuration stuff
 ENV ARTIE_RUN_MODE=production
 ARG GIT_TAG=unversioned
@@ -47,12 +52,11 @@ ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:${CONTROLLER_PORT}
 # the number of replicas in the StatefulSet.
 ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 
-# The listeners that Kafka will bind to. We need at least a PLAINTEXT
-# listener for clients (producers/consumers) to connect to (using PUBSUB_BROKER_PORT),
-# and we also need a CONTROLLER listener for inter-broker communication
-# and controller election (using CONTROLLER_PORT).
+# The listeners that Kafka will bind to. We use SSL for client connections
+# (producers/consumers) on PUBSUB_BROKER_PORT, and CONTROLLER for inter-broker
+# communication and controller election on CONTROLLER_PORT.
 # Bind to 0.0.0.0 to accept connections from any network interface (Docker network, localhost, etc.)
-ENV KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
+ENV KAFKA_LISTENERS=SSL://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
 
 # The advertised listeners that Kafka will tell clients to connect to.
 # This is important for when the Kafka broker is running in a container,
@@ -60,7 +64,7 @@ ENV KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://local
 # need to use to connect from outside the container.
 # For Docker Compose, this will be overridden with the container name.
 # Default to localhost for local development.
-ENV KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:${PUBSUB_BROKER_PORT}
+ENV KAFKA_ADVERTISED_LISTENERS=SSL://localhost:${PUBSUB_BROKER_PORT}
 
 # Same thing for this, but for some reason you only have to specify "CONTROLLER"
 ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
@@ -70,4 +74,11 @@ ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 # This should be set to at least the expected number of concurrent consumers for load balancing.
 ENV KAFKA_NUM_PARTITIONS=3
 
-# TODO Figure out TLS
+# Security protocol mapping - SSL listener uses SSL protocol
+ENV KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=SSL:SSL,CONTROLLER:PLAINTEXT
+
+# Copy and set up the entrypoint script that generates SSL certificates
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

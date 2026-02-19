@@ -33,7 +33,16 @@ def list_topics(timeout_s=10) -> list[str]:
     """
     bootstrap_servers = get_bootstrap_servers()
     alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
-    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000)
+
+    # Configure admin client with SSL support for self-signed certificates
+    # Note: We don't use client certificates here since listing topics doesn't require authentication
+    admin_client = kafka.KafkaAdminClient(
+        bootstrap_servers=bootstrap_servers,
+        request_timeout_ms=timeout_s*1000,
+        security_protocol='SSL',
+        ssl_check_hostname=False,  # Allow self-signed certs
+        ssl_cafile=None  # Don't require CA verification
+    )
     metadata = admin_client.list_topics()
     return metadata
 
@@ -87,6 +96,8 @@ class ArtieStreamPublisher:
             security_protocol='SSL' if encrypt else 'PLAINTEXT',
             ssl_certfile=certfpath if encrypt else None,
             ssl_keyfile=keyfpath if encrypt else None,
+            ssl_check_hostname=False if encrypt else None,  # Allow self-signed certs
+            ssl_cafile=None,  # Don't require CA verification for self-signed certs
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
 
@@ -177,6 +188,8 @@ class ArtieStreamSubscriber:
             security_protocol='SSL' if (certfpath and keyfpath) else 'PLAINTEXT',
             ssl_certfile=certfpath,
             ssl_keyfile=keyfpath,
+            ssl_check_hostname=False if (certfpath and keyfpath) else None,  # Allow self-signed certs
+            ssl_cafile=None,  # Don't require CA verification for self-signed certs
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )
 
