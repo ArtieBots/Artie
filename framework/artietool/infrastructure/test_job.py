@@ -517,6 +517,10 @@ class TestJob(job.Job):
                 test_result = common.manage_timeout(t, args.test_timeout_s, args)
                 results.append(test_result)
                 common.info(f"Finished test: {t.test_name} with result: {test_result.status.name}")
+                if test_result.status != TestStatuses.SUCCESS and args.fail_fast:
+                    common.info(f"--fail-fast enabled and test {t.test_name} failed. Marking rest of this task's tests as DID_NOT_RUN.")
+                    results = self._mark_remaining_tests_as_did_not_run(results, i)
+                    break
             except Exception as e:
                 common.error(f"Exception while running test {t.test_name}: {e}")
 
@@ -539,14 +543,12 @@ class TestJob(job.Job):
                 # Mark all remaining tests as DID_NOT_RUN if user is not using --force-completion
                 if args.force_completion:
                     common.info("--force-completion argument detected. Running rest of tests in this task.")
-                elif not args.force_completion and i + 1 < len(self.steps):
+                elif i + 1 < len(self.steps):
                     common.info("Marking rest of this task's tests as DID_NOT_RUN. Use --force-completion flag to change this behavior.")
-                    for remaining_test in self.steps[i+1:]:
-                        results.append(result.TestResult(remaining_test.test_name, producing_task_name=self.parent_task.name, status=TestStatuses.DID_NOT_RUN))
+                    results = self._mark_remaining_tests_as_did_not_run(results, i)
                     return results
                 else:
-                    common.info(f"Finished test: {t.test_name}")
-                    return results
+                    common.debug(f"Finished test {t.test_name} with an exception, but there are no more tests to run in this task, so we're not marking any additional tests as DID_NOT_RUN.")
         return results
 
     def link(self, parent, index: int):
@@ -566,3 +568,11 @@ class TestJob(job.Job):
         Note that subclasses should honor the --skip-teardown arg.
         """
         pass
+
+    def _mark_remaining_tests_as_did_not_run(self, results: List[result.TestResult], current_index: int) -> list[result.TestResult]:
+        """
+        Mark all tests after the current_index in results as DID_NOT_RUN.
+        """
+        for remaining_test in self.steps[current_index+1:]:
+            results.append(result.TestResult(remaining_test.test_name, producing_task_name=self.parent_task.name, status=TestStatuses.DID_NOT_RUN))
+        return results
