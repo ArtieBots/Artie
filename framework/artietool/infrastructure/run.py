@@ -21,7 +21,7 @@ class TaskWrapper:
             res = self._func(args)
         except Exception as e:
             name = multiprocessing.current_process().name
-            res = result.ErrorTaskResult(name=name, error=e)
+            res = result.ErrorTaskResult(name=name, error=e, partial_results=self._func.results if hasattr(self._func, 'results') else None)
             if args.enable_error_tracing:
                 common.error(f"Error running task {name}: {''.join(traceback.format_exception(e))}")
         common.info("Putting result onto queue")

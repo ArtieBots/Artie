@@ -51,6 +51,7 @@ class Task:
         self.cli_args = cli_args
         self.jobs = jobs
         self._link_jobs()
+        self.results = []
 
     def __repr__(self) -> str:
         return self.name
@@ -59,13 +60,12 @@ class Task:
         return self.name
 
     def __call__(self, args) -> result.TaskResult:
-        results = []
         for j in self.jobs:
             r = j(args)
             artifact.add_artifacts_from_result(args, r)
-            results.append(r)
-        common.info(f"Finished running Task {self.name} with results: {results}")
-        return result.TaskResult(self.name, results)
+            self.results.append(r)
+        common.info(f"Finished running Task {self.name}")
+        return result.TaskResult(self.name, self.results)
 
     def cached(self, args) -> bool:
         """

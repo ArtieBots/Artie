@@ -153,12 +153,21 @@ class CLITest:
         self.setup_cmds = setup_cmds or []
         self.teardown_cmds = teardown_cmds or []
         self.environment = environment or {}
-        self.stop_event = threading.Event()
+        self._stop_event = False
         # Validate that we have either cmd_to_run_in_cli OR parallel_cmds, but not both
         if cmd_to_run_in_cli and parallel_cmds:
             raise ValueError(f"Test {test_name} cannot have both 'cmd-to-run-in-cli' and 'parallel-cmds'")
         if not cmd_to_run_in_cli and not parallel_cmds:
             raise ValueError(f"Test {test_name} must have either 'cmd-to-run-in-cli' or 'parallel-cmds'")
+
+    @property
+    def stop_event(self):
+        return self._stop_event
+
+    @stop_event.setter
+    def stop_event(self, value: bool):
+        common.info(f"Setting stop_event for CLI test {self.test_name} to {value}")
+        self._stop_event = value
 
     def __call__(self, args) -> result.TestResult:
         # Run setup commands
@@ -174,6 +183,10 @@ class CLITest:
             res = self._run_cli(args)
             if res.status != result.TestStatuses.SUCCESS:
                 common.error(f"CLI command failed for test {self.test_name}: {res.msg if res.msg else res.exception}")
+                try:
+                    self._run_teardown_cmds(args)
+                except Exception as e:
+                    common.error(f"Teardown command failed for test {self.test_name} after CLI failure: {e}")
                 return res
 
             # Check the DUT(s) output(s)
@@ -189,17 +202,28 @@ class CLITest:
                 common.error(f"Error in test {self.test_name}: {r.to_verbose_str()}")
 
             if results:
+                try:
+                    self._run_teardown_cmds(args)
+                except Exception as e:
+                    common.error(f"Teardown command failed for test {self.test_name} after DUT check failure: {e}")
                 return results[0]
 
-            return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.SUCCESS)
-        finally:
-            # Always run teardown commands, even if test failed
             try:
                 self._run_teardown_cmds(args)
             except Exception as e:
-                common.error(f"Teardown command failed for test {self.test_name}: {e}")
+                common.error(f"Teardown command failed for test {self.test_name} after successful DUT check: {e}")
+                return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.FAIL, exception=e)
 
-    def kill_child_threads(self):
+            return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.SUCCESS)
+        except Exception as e:
+            common.error(f"Exception while running test {self.test_name}: {e}")
+            try:
+                self._run_teardown_cmds(args)
+            except Exception as e:
+                common.error(f"Teardown command failed for test {self.test_name} after exception: {e}")
+            return result.TestResult(self.test_name, producing_task_name=self.producing_task_name, status=TestStatuses.FAIL, exception=e)
+
+    def _kill_child_threads(self):
         """
         Kill any child threads that this test has spawned.
         """
@@ -357,11 +381,14 @@ class CLITest:
                 logs = docker.run_docker_container(cli_img, cmd, timeout_s=args.test_timeout_s, log_to_stdout=args.docker_logs, **kwargs)
                 return logs
             except Exception as e:
-                if i != n - 1 and not self.stop_event.is_set():
+                if i != n - 1 and not self.stop_event:
                     common.warning(f"Got an exception while trying to run CLI. Will try {n - (i+1)} more times. Exception: {e}")
                     time.sleep(1)
+                elif self.stop_event:
+                    common.warning(f"Got an exception while trying to run CLI. Would normally try {n - (i+1)} more times, but this test has been told to stop. Exception: {e}")
+                    raise e
                 else:
-                    raise
+                    raise e
 
     def _check_duts(self, args) -> List[result.TestResult]:
         """
@@ -442,15 +469,32 @@ class TestJob(job.Job):
         self.steps = steps
 
     def __call__(self, args) -> result.JobResult:
+        failed = False
         results = []
         common.info(f"******* Starting test job {self.name} *******")
+
+        # Try to run the setups
         try:
             self.setup(args)
-            results += self._run_steps(args)
+        except Exception as e:
+            common.error(f"Exception during setup of test job {self.name}: {e}")
+            results += [result.TestResult("Exception during setup", self.parent_task.name, TestStatuses.FAIL, exception=e)]
+            failed = True
+
+        # Try to run the steps, but only if setup didn't fail.
+        if not failed:
+            try:
+                results += self._run_steps(args)
+            except Exception as e:
+                common.error(f"Exception while running test job {self.name}: {e}")
+                results += [result.TestResult("Exception in test job", self.parent_task.name, TestStatuses.FAIL, exception=e)]
+
+        # Try to run teardowns, regardless of what has happened so far.
+        try:
             self.teardown(args, results)
         except Exception as e:
-            common.error(f"Exception while running test job {self.name}: {e}")
-            results += [result.TestResult("Exception in test job", self.parent_task.name, TestStatuses.FAIL, exception=e)]
+            common.error(f"Exception during teardown of test job {self.name}: {e}")
+            results += [result.TestResult("Exception during teardown", self.parent_task.name, TestStatuses.FAIL, exception=e)]
 
         # Check success
         success = True
@@ -481,7 +525,7 @@ class TestJob(job.Job):
                 # interfering with future tests.
                 if hasattr(t, "kill_child_threads"):
                     common.info(f"Killing child threads of test {t.test_name} to prevent interference with future tests...")
-                    t.kill_child_threads()
+                    t._kill_child_threads()
 
                 # Log exception if --enable-error-tracing
                 if args.enable_error_tracing:

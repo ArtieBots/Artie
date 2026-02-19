@@ -6,6 +6,7 @@ from . import result
 from . import test_job
 from .. import common
 from .. import docker
+import datetime
 import os
 import yaml
 
@@ -92,14 +93,12 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
         if container is None:
             raise ValueError(f"Container with ID {container_id} not found when trying to fetch logs.")
 
-        lines = []
         try:
-            for line in container.logs(stream=True, follow=True):
-                lines.append(line.decode())
+            logs = container.logs()
         except docker.docker_errors.NotFound:
             raise ValueError(f"Container with ID {container_id} closed unexpectedly while reading its logs.")
 
-        return "".join(lines)
+        return logs.decode('utf-8')
 
     def log_failures(self, args):
         """
@@ -112,8 +111,10 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
         os.makedirs(logs_dir, exist_ok=True)
         for dut_name, pid in self._dut_pids.items():
             try:
+                common.info(f"Fetching logs from {dut_name} (container ID: {pid})...")
                 logs = self._get_logs(pid)
-                log_file_path = os.path.join(logs_dir, f"{dut_name}_{pid}.log")
+                timestamp = datetime.datetime.now().strftime("%y-%b-%d-%H.%M.%S")
+                log_file_path = os.path.join(logs_dir, f"{timestamp}_{dut_name}_{pid}.log")
                 with open(log_file_path, "w") as log_file:
                     log_file.write(logs)
                 common.info(f"Logs from {dut_name} (container ID: {pid}) saved to {log_file_path}")
@@ -173,10 +174,10 @@ class DockerComposeTestSuiteJob(test_job.TestJob):
             return
 
         try:
+            common.debug(f"Tearing down Docker compose project {self.project_name} with compose file {self.compose_fname} at {self.compose_dpath}...")
             if results and any(r.status.value == result.TestStatuses.FAIL.value for r in results):
                 self.log_failures(args)
             super().teardown(args, results)
-            common.info(f"Tearing down. Stopping docker containers...")
             docker.compose_down(self.project_name, self.compose_dpath, self.compose_fname, envs=self.compose_variables)
             docker.remove_network(self.docker_network_name)
         except Exception as e:
