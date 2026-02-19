@@ -49,6 +49,7 @@ services:
       - ARTIE_LOG_LEVEL=DEBUG
       - ARTIE_PUBSUB_BROKER_HOSTNAME=pubsub-itest-broker
       - ARTIE_PUBSUB_BROKER_PORT=9092
+      - ARTIE_PUBSUB_USE_SSL=true
 
   artie-test-sensor-service:
     command: python -m src.main --port 18865
@@ -73,6 +74,7 @@ services:
       - ARTIE_SERVICE_BROKER_PORT=18864
       - ARTIE_PUBSUB_BROKER_HOSTNAME=pubsub-itest-broker
       - ARTIE_PUBSUB_BROKER_PORT=9092
+      - ARTIE_PUBSUB_USE_SSL=true
 
   artie-api-server:
     container_name: pubsub-itest-api-server
@@ -97,3 +99,4 @@ services:
       - ARTIE_LOG_LEVEL=DEBUG
       - ARTIE_PUBSUB_BROKER_HOSTNAME=pubsub-itest-broker
       - ARTIE_PUBSUB_BROKER_PORT=9092
+      - ARTIE_PUBSUB_USE_SSL=true
