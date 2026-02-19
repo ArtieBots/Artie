@@ -1,10 +1,5 @@
 FROM apache/kafka:4.1.1
 
-# Install openssl for certificate generation
-USER root
-RUN microdnf install -y openssl && microdnf clean all
-USER kafka
-
 # Artie configuration stuff
 ENV ARTIE_RUN_MODE=production
 ARG GIT_TAG=unversioned
@@ -78,6 +73,8 @@ ENV KAFKA_NUM_PARTITIONS=3
 ENV KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=SSL:SSL,CONTROLLER:PLAINTEXT
 
 # Copy and set up the entrypoint script that generates SSL certificates
+# Run as root to allow certificate generation and let the original entrypoint handle user switching
+USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
