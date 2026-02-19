@@ -78,6 +78,15 @@ ssl.client.auth=none
 ssl.endpoint.identification.algorithm=
 EOF
 
+# Create client configuration for healthchecks
+cat > /etc/kafka/client.properties << EOF
+security.protocol=SSL
+ssl.truststore.location=/etc/kafka/secrets/kafka.truststore.p12
+ssl.truststore.password=changeit
+ssl.truststore.type=PKCS12
+ssl.endpoint.identification.algorithm=
+EOF
+
 # Format storage if this is the first run
 if [ ! -d "/tmp/kafka-logs" ]; then
     echo "Formatting KRaft storage..."
