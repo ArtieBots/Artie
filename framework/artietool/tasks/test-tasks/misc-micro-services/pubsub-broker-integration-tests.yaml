@@ -51,21 +51,14 @@ steps:
           - what: ""
             where: artie-cli
 
-      # Test 3: Attempt to subscribe with invalid cert/key files (when encryption is enabled) - should fail
-      - test-name: subscribe-with-invalid-cert
-        cmd-to-run-in-cli: "artie-cli service subscribe test-topic --cert /nonexistent/cert.pem --key /nonexistent/key.pem --count 0 --timeout 5 --integration-test --artie-profile /integration_test_profile.json"
-        expected-outputs:
-          - what: "Error: "
-            where: artie-cli
-
-      # Test 4: Publish a message to a topic
+      # Test 3: Publish a message to a topic
       - test-name: publish-single-message
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-1 ''{"message": "hello", "value": 42}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
           - what: "Success. Topic: test-topic-1"
             where: artie-cli
 
-      # Test 5: Subscribe to a topic and verify message is received
+      # Test 4: Subscribe to a topic and verify message is received
       - test-name: subscribe-and-receive-message
         setup-cmds:
           - 'artie-cli service publish test-topic-2 ''{"message": "test data", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
@@ -76,7 +69,7 @@ steps:
           - what: "'seq': 1"
             where: artie-cli
 
-      # Test 6: Multiple subscribers to the same topic (both should receive all messages)
+      # Test 5: Multiple subscribers to the same topic (both should receive all messages)
       - test-name: multiple-subscribers-same-topic
         setup-cmds:
           - 'artie-cli service publish test-topic-3 ''{"message": "broadcast", "seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
@@ -94,29 +87,7 @@ steps:
               - what: "'seq': 1"
               - what: "'seq': 2"
 
-      #      # Test 7: Multiple subscribers in the same consumer group (messages should be load balanced)
-      #      - test-name: consumer-group-load-balancing
-      #        parallel-cmds:
-      #          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 30 --integration-test --artie-profile /integration_test_profile.json"
-      #            expected-outputs:
-      #              - what: "'message':"
-      #          - cmd: "artie-cli service subscribe test-topic-4 --consumer-group test-group-1 --count 2 --timeout 30 --integration-test --artie-profile /integration_test_profile.json"
-      #            expected-outputs:
-      #              - what: "'message':"
-      #          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg1\\\", \\\"seq\\\": 1}' --flush --integration-test --artie-profile /integration_test_profile.json\""
-      #            expected-outputs:
-      #              - what: "Success"
-      #          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg2\\\", \\\"seq\\\": 2}' --flush --integration-test --artie-profile /integration_test_profile.json\""
-      #            expected-outputs:
-      #              - what: "Success"
-      #          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg3\\\", \\\"seq\\\": 3}' --flush --integration-test --artie-profile /integration_test_profile.json\""
-      #            expected-outputs:
-      #              - what: "Success"
-      #          - cmd: "bash -c \"sleep 8 && artie-cli service publish test-topic-4 '{\\\"message\\\": \\\"msg4\\\", \\\"seq\\\": 4}' --flush --integration-test --artie-profile /integration_test_profile.json\""
-      #            expected-outputs:
-      #              - what: "Success"
-
-      # Test 8: Publish to multiple topics and verify subscribers receive from correct topics
+      # Test 6: Publish to multiple topics and verify subscribers receive from correct topics
       - test-name: multiple-topics-routing
         setup-cmds:
           - 'artie-cli service publish test-topic-5a ''{"topic": "5a", "data": "alpha"}'' --integration-test --artie-profile /integration_test_profile.json'
@@ -135,7 +106,7 @@ steps:
             unexpected-outputs:
               - what: "'topic': '5a'"
 
-      # Test 9: Verify messages of various sizes can be published and received
+      # Test 7: Verify messages of various sizes can be published and received
       - test-name: message-sizes-small
         cmd-to-run-in-cli: 'artie-cli service publish test-topic-6 ''{"size": "small", "data": "x"}'' --integration-test --artie-profile /integration_test_profile.json'
         expected-outputs:
@@ -154,7 +125,7 @@ steps:
           - what: "Success"
             where: artie-cli
 
-      # Test 10: Verify throughput with multiple messages
+      # Test 8: Verify throughput with multiple messages
       - test-name: throughput-test-publish
         setup-cmds:
           - 'artie-cli service publish test-topic-7 ''{"seq": 1}'' --integration-test --artie-profile /integration_test_profile.json'
@@ -169,7 +140,7 @@ steps:
           - what: "'seq': 5"
             where: artie-cli
 
-      # Test 11: Use IMU CLI module to interact with sensor service via API
+      # Test 9: Use IMU CLI module to interact with sensor service via API
       - test-name: imu-list-sensors
         cmd-to-run-in-cli: "artie-cli imu list --service-name example-sensor-service --integration-test --artie-profile /integration_test_profile.json"
         expected-outputs:

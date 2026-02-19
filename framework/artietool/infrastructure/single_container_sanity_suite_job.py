@@ -12,6 +12,7 @@ class SanityTest:
         self.cmd_to_run_in_dut = cmd_to_run_in_dut
         self.platform = common.host_platform()
         self.producing_task_name = None  # Filled in by Job
+        self.stop_event = False  # Unused in SanityTest objects
 
     def __call__(self, args) -> result.TestResult:
         if issubclass(type(self.docker_image_under_test), dependency.Dependency):
