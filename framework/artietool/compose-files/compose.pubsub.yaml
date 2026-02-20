@@ -18,7 +18,6 @@ services:
       - LOG_COLLECTOR_PORT=5170
       - METRICS_SERVER_PORT=8090
       - ARTIE_LOG_LEVEL=DEBUG
-      - KAFKA_ADVERTISED_LISTENERS=SSL://pubsub-itest-broker:9092
       - KAFKA_NUM_PARTITIONS=3
       - ARTIE_PUBSUB_USE_SSL=false
     healthcheck:
