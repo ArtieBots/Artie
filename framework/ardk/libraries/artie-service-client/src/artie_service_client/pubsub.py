@@ -36,9 +36,12 @@ def list_topics(timeout_s=10) -> list[str]:
     alog.info(f"Connecting to Kafka broker at {bootstrap_servers} to list topics...")
 
     # Create SSL context that accepts self-signed certificates
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
+    if os.getenv(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true':
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+    else:
+        ssl_context = None
 
     # Configure admin client with SSL support for self-signed certificates
     admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000, security_protocol='SSL', ssl_context=ssl_context)
