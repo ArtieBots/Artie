@@ -43,7 +43,7 @@ def _cmd_publish(args):
         raise ValueError(f"Invalid JSON data: {args.data}")
 
     # Create a publisher with optional encryption
-    encrypt = bool(args.cert and args.key)
+    encrypt = (args.cert and args.key) or os.environ.get(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
 
     # Publish the message
     try:
