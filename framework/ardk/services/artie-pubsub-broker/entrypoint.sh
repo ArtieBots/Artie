@@ -72,9 +72,9 @@ node.id=${KAFKA_NODE_ID:-1}
 controller.quorum.voters=${KAFKA_CONTROLLER_QUORUM_VOTERS:-1@localhost:9093}
 
 # Listeners
-listeners=${KAFKA_LISTENERS:-${BROKER_LISTENER},CONTROLLER://localhost:9093}
-advertised.listeners=${KAFKA_ADVERTISED_LISTENERS:-${ADVERTISED_LISTENER}}
-listener.security.protocol.map=${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:-${PROTOCOL_MAP}}
+listeners=${BROKER_LISTENER},CONTROLLER://localhost:9093
+advertised.listeners=${ADVERTISED_LISTENER}
+listener.security.protocol.map=${PROTOCOL_MAP}
 controller.listener.names=${KAFKA_CONTROLLER_LISTENER_NAMES:-CONTROLLER}
 inter.broker.listener.name=${INTER_BROKER_PROTOCOL}
 

@@ -47,20 +47,6 @@ ENV KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:${CONTROLLER_PORT}
 # the number of replicas in the StatefulSet.
 ENV KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
 
-# The listeners that Kafka will bind to. We use SSL for client connections
-# (producers/consumers) on PUBSUB_BROKER_PORT, and CONTROLLER for inter-broker
-# communication and controller election on CONTROLLER_PORT.
-# Bind to 0.0.0.0 to accept connections from any network interface (Docker network, localhost, etc.)
-ENV KAFKA_LISTENERS=SSL://0.0.0.0:${PUBSUB_BROKER_PORT},CONTROLLER://localhost:${CONTROLLER_PORT}
-
-# The advertised listeners that Kafka will tell clients to connect to.
-# This is important for when the Kafka broker is running in a container,
-# because the internal hostname and port may be different from what clients
-# need to use to connect from outside the container.
-# For Docker Compose, this will be overridden with the container name.
-# Default to localhost for local development.
-ENV KAFKA_ADVERTISED_LISTENERS=SSL://localhost:${PUBSUB_BROKER_PORT}
-
 # Same thing for this, but for some reason you only have to specify "CONTROLLER"
 ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 
@@ -68,9 +54,6 @@ ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 # Multiple partitions allow for parallel consumption by multiple consumers in the same consumer group.
 # This should be set to at least the expected number of concurrent consumers for load balancing.
 ENV KAFKA_NUM_PARTITIONS=3
-
-# Security protocol mapping - SSL listener uses SSL protocol
-ENV KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=SSL:SSL,CONTROLLER:PLAINTEXT
 
 # Copy and set up the entrypoint script that generates SSL certificates
 # Run as root to allow certificate generation and let the original entrypoint handle user switching
