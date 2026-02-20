@@ -57,7 +57,7 @@ def imu_whoami(service: str):
 
     try:
         s = asc.ServiceConnection(service)
-        name = s.imu_whoami(imu_id)
+        name = str(s.imu_whoami(imu_id))
         return {
             "service": service,
             "which": imu_id,
@@ -237,7 +237,7 @@ def imu_get_data(service: str):
 
     try:
         s = asc.ServiceConnection(service)
-        data = s.imu_get_data(imu_id)
+        data = dict(s.imu_get_data(imu_id))
         return {
             "service": service,
             "which": imu_id,

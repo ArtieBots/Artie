@@ -63,7 +63,7 @@ class DriverServer(
         Return the status of this service's submodules.
         """
         status = self._fw_submodule.status() | self._led_submodule.status() | self._lcd_submodule.status() | self._servo_submodule.status()
-        alog.info(f"Received request for status. Status: {status}")
+        alog.test(f"Received request for status. Status: {status}", tests=['logging-integration-tests:status'])
         return {k: str(v) for k, v in status.items()}
 
     @rpyc.exposed
