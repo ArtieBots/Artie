@@ -17,7 +17,7 @@ def list_leds(service: str):
     # Get the service and list LEDs
     try:
         s = asc.ServiceConnection(service)
-        led_names = s.led_list()
+        led_names = list(s.led_list())
         return {
             "service": service,
             "led-names": led_names
