@@ -44,7 +44,7 @@ def list_topics(timeout_s=10) -> list[str]:
         ssl_context = None
 
     # Configure admin client with SSL support for self-signed certificates
-    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000, security_protocol='SSL', ssl_context=ssl_context)
+    admin_client = kafka.KafkaAdminClient(bootstrap_servers=bootstrap_servers, request_timeout_ms=timeout_s*1000, security_protocol='SSL' if ssl_context else 'PLAINTEXT', ssl_context=ssl_context)
     topics = admin_client.list_topics()
     return topics
 
