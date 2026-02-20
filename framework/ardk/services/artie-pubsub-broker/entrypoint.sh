@@ -42,16 +42,20 @@ if [ "$USE_SSL" = "true" ]; then
     echo "SSL certificates generated and configured for Kafka broker."
 
     # Set SSL listener configuration
+    # Use hostname for advertised listener if available, otherwise localhost
+    HOSTNAME=${HOSTNAME:-localhost}
     BROKER_LISTENER="SSL://0.0.0.0:9092"
-    ADVERTISED_LISTENER="SSL://localhost:9092"
+    ADVERTISED_LISTENER="SSL://${HOSTNAME}:9092"
     PROTOCOL_MAP="SSL:SSL,CONTROLLER:PLAINTEXT"
     INTER_BROKER_PROTOCOL="SSL"
 else
     echo "SSL is disabled. Kafka will use PLAINTEXT."
 
     # Set PLAINTEXT listener configuration
+    # Use hostname for advertised listener if available, otherwise localhost
+    HOSTNAME=${HOSTNAME:-localhost}
     BROKER_LISTENER="PLAINTEXT://0.0.0.0:9092"
-    ADVERTISED_LISTENER="PLAINTEXT://localhost:9092"
+    ADVERTISED_LISTENER="PLAINTEXT://${HOSTNAME}:9092"
     PROTOCOL_MAP="PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
     INTER_BROKER_PROTOCOL="PLAINTEXT"
 fi
