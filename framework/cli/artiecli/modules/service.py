@@ -40,14 +40,15 @@ def _cmd_publish(args):
     try:
         data = json.loads(args.data)
     except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON data: {args.data}")
+        common.format_print_result(f"Error: Data must be a valid JSON string. Failed to parse: {args.data}", "service", "publish", args.artie_id)
+        return
 
-    # Create a publisher with optional encryption
+    # Encrypt if both cert and key are provided, or if the environment variable is set to true
     encrypt = (args.cert and args.key) or os.environ.get(constants.ArtieEnvVariables.ARTIE_PUBSUB_USE_SSL, 'false').lower() == 'true'
 
     # Publish the message
     try:
-        with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert if encrypt else None, keyfpath=args.key if encrypt else None, encrypt=encrypt) as publisher:
+        with pubsub.ArtieStreamPublisher(topic=args.topic, service_name="artie-cli", certfpath=args.cert, keyfpath=args.key, encrypt=encrypt) as publisher:
             publisher.publish_blocking(data, timeout_s=10)
             if args.flush:
                 publisher.flush(timeout=10)
@@ -55,6 +56,7 @@ def _cmd_publish(args):
         common.format_print_result(f"Error: {e}", "service", "publish", args.artie_id)
         return
 
+    # Print the result
     common.format_print_result(f"Success. Topic: {args.topic}", "service", "publish", args.artie_id)
 
 def _cmd_subscribe(args):

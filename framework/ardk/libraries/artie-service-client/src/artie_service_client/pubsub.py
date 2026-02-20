@@ -63,9 +63,10 @@ class ArtieStreamPublisher:
         - service_name: The name of the service publishing the datastream. This is used as the client ID for the Kafka producer and should typically be the same as the simple name of the service (e.g. "my-service").
         - compress: Whether to compress the data before publishing. This is useful for large datastreams or datastreams with high batching that would otherwise take up a lot of bandwidth. Compression is done using gzip.
         - encrypt: Whether to encrypt the data before publishing. Defaults to True. Disabling will provide a performance boost, but the datastream will not be encrypted and should not be used for sensitive data.
-                 If encryption is enabled, the certfpath and keyfpath parameters must be provided and point to the appropriate certificate and key files for the service.
-        - certfpath: The path to the certificate file to use for encryption. This is only used if encrypt is True.
-        - keyfpath: The path to the key file to use for encryption. This is only used if encrypt is True.
+                   If the Artie environment variable ARTIE_PUBSUB_USE_SSL is set to true,
+                   encryption will be enabled regardless of this parameter.
+        - certfpath: The path to the client certificate file to use for encryption. This is only used if encrypt is True.
+        - keyfpath: The path to the client key file to use for encryption. This is only used if encrypt is True.
         - batch_size_bytes: The batch size in bytes. The publisher will wait `linger_ms` to accumulate a batch of messages
                   that is at least this size before publishing. If the batch size is not reached after `linger_ms`,
                   the publisher will publish whatever messages it has accumulated. Tune `batch_size_bytes` and `linger_ms`
@@ -100,8 +101,8 @@ class ArtieStreamPublisher:
             security_protocol='SSL' if use_ssl else 'PLAINTEXT',
             ssl_check_hostname=False,
             ssl_cafile=None,
-            ssl_certfile=certfpath if (use_ssl and certfpath) else None,  # Client cert for mTLS
-            ssl_keyfile=keyfpath if (use_ssl and keyfpath) else None,  # Client key for mTLS
+            ssl_certfile=certfpath,
+            ssl_keyfile=keyfpath,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
 

@@ -4,42 +4,16 @@
 USE_SSL=${ARTIE_PUBSUB_USE_SSL:-false}
 
 if [ "$USE_SSL" = "true" ]; then
-    echo "SSL is enabled. Generating SSL certificates for Kafka broker..."
+    echo "SSL is enabled. Kafka will use SSL for encryption."
 
-    # Generate SSL certificates for Kafka broker using keytool (no openssl needed)
-    mkdir -p /etc/kafka/secrets
-
-    # Generate keystore with self-signed certificate using PKCS12 format (modern standard)
-    keytool -genkeypair \
-        -alias kafka \
-        -keyalg RSA \
-        -keysize 2048 \
-        -keystore /etc/kafka/secrets/kafka.keystore.p12 \
-        -storepass changeit \
-        -keypass changeit \
-        -dname "CN=kafka-broker, OU=Artie, O=Artie, L=Unknown, ST=Unknown, C=US" \
-        -validity 365 \
-        -storetype PKCS12 \
-        -noprompt
-
-    # Export the certificate from keystore
-    keytool -exportcert \
-        -alias kafka \
-        -keystore /etc/kafka/secrets/kafka.keystore.p12 \
-        -storepass changeit \
-        -file /etc/kafka/secrets/kafka.crt \
-        -noprompt
-
-    # Create truststore and import the certificate (also PKCS12)
-    keytool -importcert \
-        -alias CARoot \
-        -keystore /etc/kafka/secrets/kafka.truststore.p12 \
-        -storepass changeit \
-        -file /etc/kafka/secrets/kafka.crt \
-        -storetype PKCS12 \
-        -noprompt
-
-    echo "SSL certificates generated and configured for Kafka broker."
+    # See: https://kafka.apache.org/42/security/encryption-and-authentication-using-ssl/
+    #
+    # SSL certs will need to be mounted at /etc/kafka/secrets with the following filenames:
+    # - kafka.keystore.p12: The keystore containing the broker's SSL certificate and private key in PKCS12 format
+    # - kafka.truststore.p12: The truststore containing the CA certificate(s) that the broker will use to verify client certificates, also in PKCS12 format
+    #
+    # Additionally, in each client that connects to the broker, you will neeed to
+    # add the CA certificate(s) to the client's truststore.
 
     # Set SSL listener configuration
     # Use hostname for advertised listener if available, otherwise localhost
@@ -103,7 +77,6 @@ ssl.truststore.location=/etc/kafka/secrets/kafka.truststore.p12
 ssl.truststore.password=changeit
 ssl.truststore.type=PKCS12
 ssl.client.auth=requested
-ssl.endpoint.identification.algorithm=
 EOF
 fi
 
