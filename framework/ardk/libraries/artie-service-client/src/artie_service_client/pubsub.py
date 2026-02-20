@@ -95,11 +95,12 @@ class ArtieStreamPublisher:
             max_request_size=max_request_size_bytes,
             request_timeout_ms=request_timeout_ms,
             security_protocol='SSL' if use_ssl else 'PLAINTEXT',
-            # SSL configuration for self-signed certificates (use individual params, not ssl_context)
+            # SSL configuration for self-signed certificates
             ssl_check_hostname=False if use_ssl else None,
-            ssl_cafile=None if use_ssl else None,  # Don't verify CA for self-signed certs
+            ssl_cafile='' if use_ssl else None,  # Empty string disables CA verification for self-signed certs
             ssl_certfile=certfpath if (use_ssl and certfpath) else None,  # Client cert for mTLS
             ssl_keyfile=keyfpath if (use_ssl and keyfpath) else None,  # Client key for mTLS
+            ssl_cert_reqs=ssl.CERT_NONE if use_ssl else None,  # Explicitly disable certificate verification
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
         )
 
@@ -192,11 +193,12 @@ class ArtieStreamSubscriber:
             fetch_min_bytes=fetch_min_bytes,
             fetch_max_bytes=fetch_max_bytes,
             security_protocol='SSL' if use_ssl else 'PLAINTEXT',
-            # SSL configuration for self-signed certificates (use individual params, not ssl_context)
+            # SSL configuration for self-signed certificates
             ssl_check_hostname=False if use_ssl else None,
-            ssl_cafile=None if use_ssl else None,  # Don't verify CA for self-signed certs
+            ssl_cafile='' if use_ssl else None,  # Empty string disables CA verification for self-signed certs
             ssl_certfile=certfpath if (use_ssl and certfpath) else None,  # Client cert for mTLS
             ssl_keyfile=keyfpath if (use_ssl and keyfpath) else None,  # Client key for mTLS
+            ssl_cert_reqs=ssl.CERT_NONE if use_ssl else None,  # Explicitly disable certificate verification
             value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         )
 
