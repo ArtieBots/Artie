@@ -55,9 +55,6 @@ ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 # This should be set to at least the expected number of concurrent consumers for load balancing.
 ENV KAFKA_NUM_PARTITIONS=3
 
-# Copy and set up the entrypoint script that generates SSL certificates
-# Run as root to allow certificate generation and let the original entrypoint handle user switching
-USER root
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
