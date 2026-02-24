@@ -15,8 +15,8 @@ class CMakeBuild(build_ext):
         except OSError:
             raise RuntimeError("CMake must be installed to build artie-can")
 
-        # Build C library with CMake
-        build_dir = os.path.join(self.build_temp, 'cmake_build')
+        # Define the build directory
+        build_dir = self.build_temp
         os.makedirs(build_dir, exist_ok=True)
 
         # Configure
@@ -28,7 +28,7 @@ class CMakeBuild(build_ext):
             '-DBUILD_TESTS=OFF',
         ]
 
-        configure_cmd = ['cmake', '..'] + cmake_args
+        configure_cmd = ['cmake', '../..'] + cmake_args
         subprocess.check_call(configure_cmd, cwd=build_dir)
 
         # Build
