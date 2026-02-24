@@ -1,0 +1,29 @@
+# Build directories
+build/
+cmake_build/
+dist/
+*.egg-info/
+__pycache__/
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+
+# C build artifacts
+*.o
+*.so
+*.a
+*.dylib
+*.dll
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

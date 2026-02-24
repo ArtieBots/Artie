@@ -30,6 +30,114 @@ Raspberry Pi devices will need something like the following in their config.txt 
 which says to enable the MCP2515 CAN controller on the first CAN interface (can0) with a 16 MHz oscillator
 and an interrupt on GPIO 25.
 
+## Building
+
+### Building the C Library
+
+```bash
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+### Building the Python Package
+
+The Python package will automatically build the C library during installation:
+
+```bash
+pip install .
+```
+
+Or for development:
+
+```bash
+pip install -e .
+```
+
+## Usage
+
+### Python Example
+
+```python
+from artie_can import ArtieCAN, BackendType, Priority
+
+# Initialize CAN with mock backend for testing
+with ArtieCAN(node_address=0x01, backend=BackendType.MOCK) as can:
+    # Send a real-time message
+    can.rtacp_send(target_addr=0x02, data=b"Hello", priority=Priority.HIGH)
+
+    # Publish to a topic
+    can.psacp_publish(topic=0x10, data=b"Sensor data", priority=Priority.MED_LOW)
+
+    # Send RPC
+    can.rpcacp_call(target_addr=0x02, procedure_id=5, payload=b"\x01\x02\x03")
+```
+
+### C Example
+
+```c
+#include "artie_can.h"
+
+int main() {
+    artie_can_context_t ctx;
+
+    // Initialize with SocketCAN backend
+    if (artie_can_init(&ctx, 0x01, ARTIE_CAN_BACKEND_SOCKETCAN) != 0) {
+        return -1;
+    }
+
+    // Send RTACP message
+    artie_can_rtacp_msg_t msg;
+    msg.frame_type = ARTIE_CAN_RTACP_MSG;
+    msg.priority = ARTIE_CAN_PRIORITY_HIGH;
+    msg.sender_addr = 0x01;
+    msg.target_addr = 0x02;
+    msg.data_len = 5;
+    memcpy(msg.data, "Hello", 5);
+
+    artie_can_rtacp_send(&ctx, &msg, false);
+
+    // Close
+    artie_can_close(&ctx);
+    return 0;
+}
+```
+
+## Architecture
+
+The library is organized into several layers:
+
+1. **Protocol Layer**: Implements RTACP, RPCACP, PSACP, and BWACP protocols
+2. **Core Layer**: Context management and initialization
+3. **Backend Layer**: Hardware abstraction (SocketCAN, MCP2515, Mock)
+4. **Utility Layer**: CRC calculation, byte stuffing
+
+## Supported Protocols
+
+- **RTACP** (Real-Time Artie CAN Protocol): Strict real-time message delivery (< 150us)
+- **RPCACP** (Remote Procedure Call Artie CAN Protocol): Synchronous and asynchronous RPCs
+- **PSACP** (Pub/Sub Artie CAN Protocol): Topic-based publish/subscribe messaging
+- **BWACP** (Block Write Artie CAN Protocol): Large data transfers (firmware updates, etc.)
+
+## Implementation Status
+
+- ✅ Core API and context management
+- ✅ RTACP implementation (basic, single-frame)
+- ✅ RPCACP implementation (basic, single-frame)
+- ✅ PSACP implementation (basic, single-frame)
+- ✅ BWACP implementation (basic)
+- ✅ Mock backend
+- ✅ SocketCAN backend
+- ⚠️ MCP2515 backend (stub only)
+- ✅ Python bindings
+- ✅ Build system integration
+- 🔲 Multi-frame message handling (needs improvement)
+- 🔲 Comprehensive error handling
+- 🔲 Unit tests
+- 🔲 Integration tests
+
 ## Mechanical and Electrical Design
 
 TODO
