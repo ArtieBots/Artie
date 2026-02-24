@@ -27,6 +27,7 @@ steps:
       - "${REPO_ROOT}/framework/ardk/libraries/artie-gpio"
       - "${REPO_ROOT}/framework/ardk/libraries/artie-service-client"
       - "${REPO_ROOT}/framework/ardk/libraries/artie-tooling"
+      - "${REPO_ROOT}/framework/ardk/libraries/artie-can"
   - job: docker-build
     artifacts:
       - docker-image-arm64
@@ -42,6 +43,7 @@ steps:
       - "${REPO_ROOT}/framework/ardk/libraries/artie-gpio"
       - "${REPO_ROOT}/framework/ardk/libraries/artie-service-client"
       - "${REPO_ROOT}/framework/ardk/libraries/artie-tooling"
+      - "${REPO_ROOT}/framework/ardk/libraries/artie-can"
   - job: docker-manifest
     artifacts:
       - docker-image

@@ -7,7 +7,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libusb-0.1-4 \
     libusb-1.0-0 \
     libftdi1 \
-    openssl
+    openssl \
+    cmake \
+    build-essential
 RUN pip install \
     rpyc \
     kafka-python
@@ -41,3 +43,9 @@ COPY ./tmp/artie-service-client /tmp/artie-service-client/
 WORKDIR /tmp/artie-service-client
 RUN pip install .
 RUN rm -rf /tmp/artie-service-client
+
+# Build artie-can lib
+COPY ./tmp/artie-can /tmp/artie-can/
+WORKDIR /tmp/artie-can
+RUN pip install .
+RUN rm -rf /tmp/artie-can
