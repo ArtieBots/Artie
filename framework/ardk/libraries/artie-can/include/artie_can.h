@@ -82,6 +82,15 @@ typedef enum {
 } artie_can_backend_type_t;
 
 /**
+ * @brief Mock backend configuration
+ */
+typedef struct {
+    char host[256];     /**< Host to connect to (for client) or bind to (for server) */
+    uint16_t port;      /**< Port number */
+    bool is_server;     /**< True if this is a server, false if client */
+} artie_can_mock_config_t;
+
+/**
  * @brief Backend interface structure
  */
 typedef struct {
@@ -246,6 +255,15 @@ typedef struct {
  * @return 0 on success, negative error code on failure
  */
 int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type);
+
+/**
+ * @brief Initialize the Artie CAN context with mock backend configuration
+ * @param ctx Context to initialize
+ * @param node_address This node's CAN address (0-63)
+ * @param mock_config Mock backend configuration
+ * @return 0 on success, negative error code on failure
+ */
+int artie_can_init_mock(artie_can_context_t *ctx, uint8_t node_address, const artie_can_mock_config_t *mock_config);
 
 /**
  * @brief Initialize with custom backend

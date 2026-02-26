@@ -4,19 +4,36 @@ CLI code for CAN bus interfaces.
 from .. import common
 import argparse
 import json
+import os
+
+def _get_can_context(args):
+    """Helper to create CAN context with appropriate backend configuration"""
+    from artie_can import ArtieCAN, BackendType
+
+    backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
+
+    # Get mock TCP configuration from environment or args
+    mock_host = os.environ.get('ARTIE_CAN_MOCK_HOST', getattr(args, 'mock_host', 'localhost'))
+    mock_port = int(os.environ.get('ARTIE_CAN_MOCK_PORT', getattr(args, 'mock_port', 5555)))
+    mock_server = os.environ.get('ARTIE_CAN_MOCK_SERVER', '').lower() == 'true' or getattr(args, 'mock_server', False)
+
+    return ArtieCAN(
+        node_address=args.node_address,
+        backend=backend,
+        mock_host=mock_host,
+        mock_port=mock_port,
+        mock_server=mock_server
+    )
 
 def _cmd_can_send_rtacp(args):
     """Send an RTACP message"""
     try:
-        from artie_can import ArtieCAN, BackendType, Priority
-
-        # Determine backend
-        backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
+        from artie_can import Priority
 
         # Convert hex string to bytes
         data = bytes.fromhex(args.data) if args.data else b""
 
-        with ArtieCAN(node_address=args.node_address, backend=backend) as can:
+        with _get_can_context(args) as can:
             can.rtacp_send(
                 target_addr=args.target,
                 data=data,
@@ -33,12 +50,7 @@ def _cmd_can_send_rtacp(args):
 def _cmd_can_receive_rtacp(args):
     """Receive RTACP messages"""
     try:
-        from artie_can import ArtieCAN, BackendType
-
-        # Determine backend
-        backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
-
-        with ArtieCAN(node_address=args.node_address, backend=backend) as can:
+        with _get_can_context(args) as can:
             print(f"Listening for RTACP messages (timeout: {args.timeout}ms)...")
 
             sender, target, data = can.rtacp_receive(timeout_ms=args.timeout)
@@ -53,15 +65,12 @@ def _cmd_can_receive_rtacp(args):
 def _cmd_can_publish(args):
     """Publish to a topic"""
     try:
-        from artie_can import ArtieCAN, BackendType, Priority
-
-        # Determine backend
-        backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
+        from artie_can import Priority
 
         # Convert hex string to bytes
         data = bytes.fromhex(args.data) if args.data else b""
 
-        with ArtieCAN(node_address=args.node_address, backend=backend) as can:
+        with _get_can_context(args) as can:
             can.psacp_publish(
                 topic=args.topic,
                 data=data,
@@ -78,12 +87,7 @@ def _cmd_can_publish(args):
 def _cmd_can_subscribe(args):
     """Subscribe to topics"""
     try:
-        from artie_can import ArtieCAN, BackendType
-
-        # Determine backend
-        backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
-
-        with ArtieCAN(node_address=args.node_address, backend=backend) as can:
+        with _get_can_context(args) as can:
             print(f"Listening for published messages (timeout: {args.timeout}ms)...")
 
             sender, topic, data = can.psacp_receive(timeout_ms=args.timeout)
@@ -98,15 +102,12 @@ def _cmd_can_subscribe(args):
 def _cmd_can_rpc_call(args):
     """Call an RPC"""
     try:
-        from artie_can import ArtieCAN, BackendType, Priority
-
-        # Determine backend
-        backend = BackendType.MOCK if args.mock else BackendType.SOCKETCAN
+        from artie_can import Priority
 
         # Convert hex string to bytes
         payload = bytes.fromhex(args.payload) if args.payload else b""
 
-        with ArtieCAN(node_address=args.node_address, backend=backend) as can:
+        with _get_can_context(args) as can:
             can.rpcacp_call(
                 target_addr=args.target,
                 procedure_id=args.procedure_id,
@@ -157,6 +158,9 @@ def fill_subparser(parser: argparse.ArgumentParser, parent: argparse.ArgumentPar
     group = option_parser.add_argument_group("CAN Module", "CAN Module Options")
     group.add_argument("--node-address", type=lambda x: int(x, 0), default=0x01, help="This node's CAN address (0-63, default: 0x01)")
     group.add_argument("--mock", action="store_true", help="Use mock backend for testing")
+    group.add_argument("--mock-host", type=str, default="localhost", help="Mock backend TCP host (default: localhost, or from ARTIE_CAN_MOCK_HOST env)")
+    group.add_argument("--mock-port", type=int, default=5555, help="Mock backend TCP port (default: 5555, or from ARTIE_CAN_MOCK_PORT env)")
+    group.add_argument("--mock-server", action="store_true", help="Mock backend server mode (default: client, or set ARTIE_CAN_MOCK_SERVER=true)")
 
     # Info command
     info_parser = subparsers.add_parser("info", parents=[option_parser], help="Display CAN bus information")
