@@ -719,7 +719,7 @@ def stop_docker_container(image_id):
     """
     subprocess.run(f"docker stop {image_id}".split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-def start_docker_container(image_name: str|DockerImageName, cmd: str|None, **kwargs):
+def start_docker_container(image_name: str|DockerImageName, cmd: str|None, remove=True, **kwargs):
     """
     Starts a Docker container with the given command executed inside the container
     and returns a `Container` object from the `docker` package after detaching from it.
@@ -729,6 +729,7 @@ def start_docker_container(image_name: str|DockerImageName, cmd: str|None, **kwa
     - image_name: The name of the Docker image to run as a container
     - cmd: The command to run inside the Docker container
     - log_to_stdout: If given, we log the Docker logs to the console.
+    - remove: If `True`, we remove the container after it exits.
     - kwargs: Keyword arguments for docker.run() command. See https://docker-py.readthedocs.io/en/stable/containers.html#docker.models.containers.ContainerCollection.run
     """
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)

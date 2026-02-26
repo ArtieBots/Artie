@@ -1,0 +1,37 @@
+name: can-integration-test
+networks:
+  can-itest:
+    external: true
+
+services:
+  # CAN server node - listens for messages
+  can-server:
+    container_name: can-itest-server
+    image: ${ARTIE_CLI_TEST_IMAGE}
+    command: >
+      sh -c "
+        echo 'Starting CAN server on port 5555...' &&
+        artie-cli can rtacp-receive
+          --node-address 0x02
+          --mock
+          --mock-host 0.0.0.0
+          --mock-port 5555
+          --mock-server
+          --timeout 30000
+      "
+    networks:
+      - can-itest
+    expose:
+      - 5555
+    environment:
+      - ARTIE_RUN_MODE=integration
+      - ARTIE_LOG_LEVEL=DEBUG
+      - ARTIE_CAN_MOCK_HOST=0.0.0.0
+      - ARTIE_CAN_MOCK_PORT=5555
+      - ARTIE_CAN_MOCK_SERVER=true
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 sh -c '</dev/tcp/localhost/5555' || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 5s

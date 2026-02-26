@@ -1,0 +1,39 @@
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Test artifacts (don't copy old test results)
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+.hypothesis/
+
+# Build artifacts (will rebuild in container)
+build/
+cmake_build/
+dist/
+*.egg-info/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Examples (not needed for tests)
+examples/__pycache__/
+
+# Don't exclude tests directory - we need it!
+# Don't exclude src directory - we need it!

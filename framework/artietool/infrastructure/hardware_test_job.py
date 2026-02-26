@@ -47,6 +47,18 @@ from .. import kube
 import os
 import time
 
+class HWTest:
+    """
+    A HWTest is a list of CLI commands to run inside the one Kubernetes hw test job and the output we expect.
+
+    Unlike other tests, this does not run as a sub-job. Instead, a single HWTestSuiteJob is created from
+    the information in each of these instances.
+    """
+    def __init__(self, test_name: str, cmds_to_run_in_cli: str, expected_results: dict[str, str]) -> None:
+        self.test_name = test_name
+        self.cmds_to_run_in_cli = cmds_to_run_in_cli
+        self.expected_results = expected_results
+
 class CollectedHardwareTestSteps:
     """
     The logic that we run inside the single hardware test job.

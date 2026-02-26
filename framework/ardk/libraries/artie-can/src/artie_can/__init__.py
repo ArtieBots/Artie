@@ -176,12 +176,24 @@ class BWACPMessage(ctypes.Structure):
     ]
 
 
+class MockConfig(ctypes.Structure):
+    """Mock backend configuration structure"""
+    _fields_ = [
+        ("host", ctypes.c_char * 256),
+        ("port", ctypes.c_uint16),
+        ("is_server", ctypes.c_bool),
+    ]
+
+
 # ===== Function Definitions =====
 
 if _lib is not None:
     # Core functions
     _lib.artie_can_init.argtypes = [ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.c_int]
     _lib.artie_can_init.restype = ctypes.c_int
+
+    _lib.artie_can_init_mock.argtypes = [ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.POINTER(MockConfig)]
+    _lib.artie_can_init_mock.restype = ctypes.c_int
 
     _lib.artie_can_close.argtypes = [ctypes.POINTER(CANContext)]
     _lib.artie_can_close.restype = ctypes.c_int
@@ -253,13 +265,17 @@ class ArtieCAN:
     This class provides a Pythonic interface to the Artie CAN library.
     """
 
-    def __init__(self, node_address: int, backend: BackendType = BackendType.SOCKETCAN):
+    def __init__(self, node_address: int, backend: BackendType = BackendType.SOCKETCAN,
+                 mock_host: str = "localhost", mock_port: int = 5555, mock_server: bool = False):
         """
         Initialize Artie CAN context
 
         Args:
             node_address: This node's CAN address (0-63)
             backend: Backend type to use
+            mock_host: Host for mock TCP backend (only used if backend is MOCK)
+            mock_port: Port for mock TCP backend (only used if backend is MOCK)
+            mock_server: If True, act as server; if False, act as client (only used if backend is MOCK)
         """
         if _lib is None:
             raise ArtieCANException("Artie CAN library not found")
@@ -268,7 +284,19 @@ class ArtieCAN:
             raise ValueError("Node address must be 0-63")
 
         self._ctx = CANContext()
-        result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value)
+
+        if backend == BackendType.MOCK and (mock_host != "localhost" or mock_port != 5555):
+            # Use TCP mock backend with custom configuration
+            mock_config = MockConfig()
+            mock_config.host = mock_host.encode('utf-8')
+            mock_config.port = mock_port
+            mock_config.is_server = mock_server
+
+            result = _lib.artie_can_init_mock(ctypes.byref(self._ctx), node_address, ctypes.byref(mock_config))
+        else:
+            # Use standard backend initialization
+            result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value)
+
         if result != 0:
             raise ArtieCANException(f"Failed to initialize CAN context: {result}")
 
