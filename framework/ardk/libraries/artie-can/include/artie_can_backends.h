@@ -23,9 +23,14 @@ int artie_can_backend_socketcan_init(artie_can_backend_t *backend);
 int artie_can_backend_mcp2515_init(artie_can_backend_t *backend);
 
 /**
- * @brief Initialize Mock backend
+ * @brief Initialize Mock backend (local queue, no networking)
  */
 int artie_can_backend_mock_init(artie_can_backend_t *backend);
+
+/**
+ * @brief Initialize Mock backend with TCP networking
+ */
+int artie_can_backend_mock_tcp_init(artie_can_backend_t *backend, const artie_can_mock_config_t *config);
 
 #ifdef __cplusplus
 }

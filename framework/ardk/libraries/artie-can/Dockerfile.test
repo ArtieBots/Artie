@@ -1,0 +1,21 @@
+# Dockerfile for Artie CAN library test image
+# This image contains the CAN library source code and test suite for unit testing
+
+ARG ARTIE_BASE_IMG=artie/ardk-base:latest
+FROM ${ARTIE_BASE_IMG}
+
+# Create directory for artie-can
+RUN mkdir -p /artie-can
+WORKDIR /artie-can
+
+# Copy the entire artie-can library (source + tests)
+COPY . ./
+
+# Install the library in development mode with test dependencies
+RUN pip install -e ".[dev]"
+
+# Set working directory to tests
+WORKDIR /artie-can
+
+# Default command runs all tests
+CMD ["pytest", "tests/", "-v", "--tb=short", "--color=yes"]

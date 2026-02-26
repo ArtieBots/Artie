@@ -1,0 +1,103 @@
+# Integration tests for the Artie CAN library.
+# This test suite validates the mock backend TCP networking between two containers.
+name: can-integration-tests
+labels:
+  - docker-image
+  - integration
+dependencies:
+  - artie-cli: docker-image
+type: test
+steps:
+  - job: docker-compose-test-suite
+    compose-fname: compose.can.yaml
+    compose-docker-image-variables:
+      - ARTIE_CLI_TEST_IMAGE:
+          dependency:
+            name: docker-image
+            producing-task: artie-cli
+    cli-image:
+      dependency:
+        name: docker-image
+        producing-task: artie-cli
+    steps:
+      # Test 1: Send RTACP message from client to server
+      - test-name: rtacp-send-receive
+        cmd-to-run-in-cli: >
+          artie-cli can rtacp-send
+            --node-address 0x01
+            --mock
+            --mock-host can-itest-server
+            --mock-port 5555
+            --target 0x02
+            --data 48656c6c6f
+            --priority MED_LOW
+        expected-outputs:
+          - what: "Sent RTACP message to 0x02"
+            where: artie-cli
+          - what: "Received from 0x01 to 0x02: 48656c6c6f"
+            where: can-server
+
+      # Test 2: Broadcast RTACP message
+      - test-name: rtacp-broadcast
+        cmd-to-run-in-cli: >
+          artie-cli can rtacp-send
+            --node-address 0x01
+            --mock
+            --mock-host can-itest-server
+            --mock-port 5555
+            --target 0x00
+            --data 42726f6164636173742074657374
+            --priority HIGH
+        expected-outputs:
+          - what: "Sent RTACP message to 0x00"
+            where: artie-cli
+          - what: "Received from 0x01 to 0x00: 42726f6164636173742074657374"
+            where: can-server
+
+      # Test 3: Publish/Subscribe
+      - test-name: pubsub
+        # First, run subscribe in server container as background process
+        setup-cmds:
+          - container: can-server
+            cmd: >
+              sh -c "
+                artie-cli can subscribe
+                  --node-address 0x02
+                  --mock
+                  --mock-host 0.0.0.0
+                  --mock-port 5556
+                  --mock-server
+                  --timeout 15000 > /tmp/subscribe_output.txt 2>&1 &
+              "
+        cmd-to-run-in-cli: >
+          sh -c "
+            sleep 2 &&
+            artie-cli can publish
+              --node-address 0x01
+              --mock
+              --mock-host can-itest-server
+              --mock-port 5556
+              --topic 0x10
+              --data 546f706963206d657373616765
+              --priority MED_LOW
+          "
+        expected-outputs:
+          - what: "Published to topic 0x10"
+            where: artie-cli
+
+      # Test 4: RPC call
+      - test-name: rpc-call
+        cmd-to-run-in-cli: >
+          artie-cli can rpc-call
+            --node-address 0x01
+            --mock
+            --mock-host can-itest-server
+            --mock-port 5555
+            --target 0x02
+            --procedure-id 42
+            --payload 5250432074657374
+            --priority MED_HIGH
+            --synchronous
+        expected-outputs:
+          - what: "Called RPC 42 on node 0x02"
+            where: artie-cli
