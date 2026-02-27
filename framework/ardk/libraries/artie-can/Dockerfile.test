@@ -12,7 +12,7 @@ WORKDIR /artie-can
 COPY . ./
 
 # Install the library in development mode with test dependencies
-RUN pip install -e ".[dev]"
+RUN pip install ".[dev]"
 
 # Set working directory to tests
 WORKDIR /artie-can
