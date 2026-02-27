@@ -255,6 +255,7 @@ All tests start with:
 Available job values:
 
 * [single-container-sanity-suite](#sanity-test-job)
+* [single-container-pytest-suite](#pytest-test-job)
 * [single-container-cli-suite](#unit-test-job)
 * [docker-compose-test-suite](#integration-test-job)
 * [hardware-test-job](#hardware-test-job)
@@ -270,6 +271,49 @@ A sanity test job looks like this:
   - *docker-image-under-test*: The `DUT` (Docker image Under Test). Can be either a `dependency`
           (with name and producing-task) or a hard-coded Docker image name.
   - *cmd-to-run-in-dut*: The command to execute in the DUT. This command will run to completion or timeout.
+
+### Pytest Test Job
+
+A pytest test job is designed for Python projects with pytest-based unit tests. It runs pytest once in a Docker container and then checks the output for each individual test's pass/fail status:
+
+- *job*: single-container-pytest-suite; this runs pytest once inside a Docker container to execute the entire test suite,
+         then checks the container's output for each individual test result. Each test is tracked separately in the final test report.
+- *docker-image-under-test*: The `DUT` (Docker image Under Test). Can be either a `dependency`
+          (with name and producing-task) or a hard-coded Docker image name. The image should have pytest installed
+          and the test files present.
+- *cmd-to-run-in-dut*: The pytest command to run in the container (e.g., `"pytest tests/ -v --tb=short"`).
+- *steps*: Each step represents one individual pytest test that you want to track separately:
+  - *test-name*: The name of the individual test (should match the pytest test function name).
+  - *expected-outputs*: A list of `what` and `where` entries that define what output indicates test success.
+      * *what*: The string to expect in the output/logs (typically `"test_name PASSED"`).
+      * *where*: The container we are reading from (typically `${DUT}`).
+  - *unexpected-outputs*: (Optional) A list of `what` and `where` entries that indicate test failure.
+
+**Example:**
+```yaml
+steps:
+  - job: single-container-pytest-suite
+    docker-image-under-test:
+      dependency:
+        name: docker-image
+        producing-task: my-library-test-image
+    cmd-to-run-in-dut: "pytest tests/ -v --tb=short --color=yes"
+    steps:
+      - test-name: test_initialization
+        expected-outputs:
+          - what: "test_initialization PASSED"
+            where: ${DUT}
+      - test-name: test_basic_operations
+        expected-outputs:
+          - what: "test_basic_operations PASSED"
+            where: ${DUT}
+      - test-name: test_edge_cases
+        expected-outputs:
+          - what: "test_edge_cases PASSED"
+            where: ${DUT}
+```
+
+**Note:** Each pytest test must be listed individually in the YAML to be tracked in the test results. This requires maintaining the YAML file when tests are added or removed, but provides detailed per-test reporting.
 
 ### Unit Test Job
 

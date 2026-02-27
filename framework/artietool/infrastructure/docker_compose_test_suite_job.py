@@ -4,6 +4,7 @@ from typing import Tuple
 from . import dependency
 from . import result
 from . import test_job
+from . import single_container_cli_suite_job
 from .. import common
 from .. import docker
 import datetime
@@ -11,7 +12,7 @@ import os
 import yaml
 
 class DockerComposeTestSuiteJob(test_job.TestJob):
-    def __init__(self, steps: List[test_job.CLITest], compose_fname: str, compose_docker_image_variables: List[Tuple[str, str|dependency.Dependency]], docker_network_name: str) -> None:
+    def __init__(self, steps: List[single_container_cli_suite_job.CLITest], compose_fname: str, compose_docker_image_variables: List[Tuple[str, str|dependency.Dependency]], docker_network_name: str) -> None:
         super().__init__(artifacts=[], steps=steps)
         self.compose_fname = compose_fname
         self.compose_variables = compose_docker_image_variables  # List of (key, value) pairs; gets transformed into dict[str: str] when setup() is called

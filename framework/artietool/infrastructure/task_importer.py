@@ -9,6 +9,7 @@ from . import flash_yocto_image_job
 from . import hardware_test_job
 from . import scriptdefs
 from . import single_container_cli_suite_job
+from . import single_container_pytest_suite_job
 from . import single_container_sanity_suite_job
 from . import test_job
 from . import yocto_build_job
@@ -457,6 +458,28 @@ def _import_sanity_test_job(job_def: Dict, fpath: str) -> single_container_sanit
         sanity_test_steps.append(test_step)
     return single_container_sanity_suite_job.SingleContainerSanitySuiteJob(sanity_test_steps)
 
+def _import_pytest_test_job(job_def: Dict, fpath: str) -> single_container_pytest_suite_job.SingleContainerPytestSuiteJob:
+    _validate_dict(job_def, 'steps', keyerrmsg=f"Missing 'steps' section in 'single-container-pytest-suite' definition in {fpath}")
+    _validate_dict(job_def, 'docker-image-under-test', keyerrmsg=f"Missing 'docker-image-under-test' in {fpath}")
+    _validate_dict(job_def, 'cmd-to-run-in-dut', keyerrmsg=f"Missing 'cmd-to-run-in-dut' in {fpath}")
+    
+    dut = _replace_variables(job_def['docker-image-under-test'], fpath) if type(job_def['docker-image-under-test']) != dict else _import_single_dependency(job_def['docker-image-under-test'], fpath)
+    cmd_to_run_in_dut = _replace_variables(job_def['cmd-to-run-in-dut'], fpath, {'DUT': dut})
+    
+    pytest_test_steps = []
+    steps_def = job_def['steps']
+    for sdef in steps_def:
+        _validate_dict(sdef, 'test-name', keyerrmsg=f"Missing 'test-name' from 'steps' section in {fpath}")
+        test_name = _replace_variables(sdef['test-name'], fpath, {"DUT": dut})
+        expected_outputs = _import_expected_outputs(sdef, fpath, {'DUT': dut})
+        unexpected_outputs = _import_unexpected_outputs(sdef, fpath, {'DUT': dut})
+        if not expected_outputs and not unexpected_outputs:
+            raise ValueError(f"Test '{test_name}' in {fpath} must have at least one expected output or unexpected output")
+        test_step = single_container_pytest_suite_job.PytestTest(test_name, expected_outputs=expected_outputs, unexpected_outputs=unexpected_outputs)
+        pytest_test_steps.append(test_step)
+    
+    return single_container_pytest_suite_job.SingleContainerPytestSuiteJob(pytest_test_steps, dut, cmd_to_run_in_dut)
+
 def _import_expected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) -> List[test_job.ExpectedOutput]:
     if 'expected-outputs' not in config:
         return []
@@ -640,6 +663,8 @@ def _import_test_task(header: TaskHeader, steps_configs: List[Dict], fpath: str)
         match job_def['job']:
             case 'single-container-sanity-suite':
                 jobs.append(_import_sanity_test_job(job_def, fpath))
+            case 'single-container-pytest-suite':
+                jobs.append(_import_pytest_test_job(job_def, fpath))
             case 'single-container-cli-suite':
                 jobs.append(_import_unit_test_job(job_def, fpath))
             case 'docker-compose-test-suite':
