@@ -458,6 +458,8 @@ def _import_sanity_test_job(job_def: Dict, fpath: str) -> single_container_sanit
     return single_container_sanity_suite_job.SingleContainerSanitySuiteJob(sanity_test_steps)
 
 def _import_expected_outputs(config: Dict, fpath: str, key_value_pairs: Dict) -> List[test_job.ExpectedOutput]:
+    if 'expected-outputs' not in config:
+        return []
     expected_outputs_def = config['expected-outputs']
     expected_outputs = []
     for expected_output in expected_outputs_def:
@@ -501,11 +503,13 @@ def _import_unit_test_job(job_def: Dict, fpath: str) -> test_job.CLITest:
     for sdef in steps_def:
         _validate_dict(sdef, 'test-name', keyerrmsg=f"Missing 'test-name' from 'steps' section in {fpath}")
         _validate_dict(sdef, 'cmd-to-run-in-cli', keyerrmsg=f"Missing 'cmd-to-run-in-cli' from 'steps' section in {fpath}")
-        _validate_dict(sdef, 'expected-outputs', keyerrmsg=f"Missing 'expected-outputs' section from 'steps' section in {fpath}")
         test_name = _replace_variables(sdef['test-name'], fpath, {"DUT": dut, "CLI": cli_image})
         cli_cmd = _replace_variables(sdef['cmd-to-run-in-cli'], fpath, {"DUT": dut})
         expected_outputs = _import_expected_outputs(sdef, fpath, {'DUT': dut, 'CLI': cli_image})
-        cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs))
+        unexpected_outputs = _import_unexpected_outputs(sdef, fpath, {'DUT': dut, 'CLI': cli_image})
+        if not expected_outputs and not unexpected_outputs:
+            raise ValueError(f"Test '{test_name}' in {fpath} must have at least one expected output or unexpected output")
+        cli_test_steps.append(test_job.CLITest(test_name, cli_image, cli_cmd, expected_outputs=expected_outputs, unexpected_outputs=unexpected_outputs))
     return single_container_cli_suite_job.SingleContainerCLISuiteJob(cli_test_steps, dut, cmd_to_run_in_dut, dut_port_mappings)
 
 def _import_docker_compose_variables(config: Dict, fpath: str, cli: str) -> List[Tuple[str, str]]:

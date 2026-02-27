@@ -27,6 +27,7 @@ TEST_CLASSES = [
     "all-containers",
     "all-yocto",
     "all-hw",
+    "all-library",
 ]
 
 def _create_test_folder_tag(args) -> str:
@@ -75,6 +76,8 @@ def _test_class_of_items(args):
             tasks = [t for t in TEST_TASKS if task.Labels.SANITY in t.labels]
         case "all-hw":
             tasks = [t for t in TEST_TASKS if task.Labels.HARDWARE in t.labels]
+        case "all-library":
+            tasks = [t for t in TEST_TASKS if task.Labels.LIBRARY in t.labels]
         case _:
             raise ValueError(f"{args.module} is invalid for some reason")
 

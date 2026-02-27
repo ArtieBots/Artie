@@ -1,0 +1,28 @@
+# Unit tests for the Artie CAN library.
+# Runs pytest suite to validate all CAN protocols.
+name: artie-can-unit-tests
+labels:
+  - docker-image
+  - unit
+  - library
+dependencies:
+  - artie-can-test-image: docker-image
+  - artie-cli: docker-image
+type: test
+steps:
+  - job: single-container-cli-suite
+    docker-image-under-test:
+      dependency:
+        name: docker-image
+        producing-task: artie-can-test-image
+    cmd-to-run-in-dut: "pytest /artie-can/tests/ -v --tb=short --color=yes"
+    cli-image:
+      dependency:
+        name: docker-image
+        producing-task: artie-cli
+    steps:
+      - test-name: run-pytest-suite
+        cmd-to-run-in-cli: "artie-cli help --unit-test --artie-profile /unit_test_profile.json"
+        unexpected-outputs:
+          - what: "FAILED"
+            where: ${DUT}

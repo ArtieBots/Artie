@@ -117,6 +117,38 @@ class UnexpectedOutput:
             where = self.where
         return where
 
+    def check(self, args, test_name: str, task_name: str, timeout_s: float) -> result.TestResult|None:
+        """
+        Return whether the what can be found in the where. Ignores requests to check for CLI containers.
+
+        We will wait up to timeout amount of time for the what to appear, and if it does we will return a failure.
+        If it does not appear by that time, we will return a success.
+        """
+        if self.cli:
+            return None
+
+        common.info(f"Checking {test_name}'s DUT {self.pid} for output...")
+        container = docker.get_container(self.pid)
+        if container is None:
+            return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Could not find container corresponding to {self.evaluated_where(args)}")
+
+        timestamp = datetime.datetime.now().timestamp()
+        try:
+            common.info(f"Reading logs from {container.name} to see if '{self.what}' is in them...")
+            for line in container.logs(stream=True, follow=True):
+                if args.docker_logs:
+                    common.info(line.decode())
+
+                if self.what in line.decode():
+                    return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
+
+                if datetime.datetime.now().timestamp() - timestamp > timeout_s:
+                    return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
+        except docker.docker_errors.NotFound:
+            return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, msg=f"Container closed unexpectedly while reading its logs.")
+
+        return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.SUCCESS)
+
     def check_in_logs(self, args, logs: str, test_name: str, task_name: str) -> result.TestResult:
         """
         Check that the unexpected text is NOT in the logs. If it is found, the test fails.
@@ -401,6 +433,16 @@ class CLITest:
             if r is not None and r.exception is not None and type(r.exception) == TimeoutError:
                 timeout_s = 1  # Give us a chance to collect the rest of the results
             results.append(r)
+
+        for unexpected_out in self.unexpected_outputs:
+            if unexpected_out.cli:
+                continue  # We check for unexpected CLI output in _run_cli
+
+            r = unexpected_out.check(args, self.test_name, self.producing_task_name, timeout_s)
+            if r is not None and r.exception is not None and type(r.exception) == TimeoutError:
+                timeout_s = 1  # Give us a chance to collect the rest of the results
+            results.append(r)
+
         return results
 
     def _run_setup_cmds(self, args):

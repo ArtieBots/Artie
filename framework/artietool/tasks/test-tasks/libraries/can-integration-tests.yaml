@@ -4,6 +4,7 @@ name: can-integration-tests
 labels:
   - docker-image
   - integration
+  - library
 dependencies:
   - artie-cli: docker-image
 type: test
