@@ -280,7 +280,7 @@ A pytest test job is designed for Python projects with pytest-based unit tests. 
          then checks the container's output for each individual test result. Each test is tracked separately in the final test report.
 - *docker-image-under-test*: The `DUT` (Docker image Under Test). Can be either a `dependency`
           (with name and producing-task) or a hard-coded Docker image name. The image should have pytest installed
-          and the test files present.
+          and the test files present. It should run pytest and then sleep forever.
 - *cmd-to-run-in-dut*: The pytest command to run in the container (e.g., `"pytest tests/ -v --tb=short"`).
 - *steps*: Each step represents one individual pytest test that you want to track separately:
   - *test-name*: The name of the individual test (should match the pytest test function name).

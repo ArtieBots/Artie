@@ -104,10 +104,7 @@ class SingleContainerPytestSuiteJob(test_job.TestJob):
         else:
             docker_image_name = str(docker.construct_docker_image_name(args, self.dut, common.host_platform()))
 
-        kwargs = {
-            'environment': {'ARTIE_RUN_MODE': 'unit'},
-            'log_to_stdout': args.docker_logs or args.verbose
-        }
+        kwargs = {'environment': {'ARTIE_RUN_MODE': 'unit'}}
         self._dut_container = docker.start_docker_container(docker_image_name, self.cmd_to_run_in_dut, **kwargs)
         for step in self.steps:
             step.link_pids_to_expected_outs(args, {docker_image_name: self._dut_container.id})

@@ -32,8 +32,8 @@ class CLITest:
         if not cmd_to_run_in_cli and not parallel_cmds:
             raise ValueError(f"Test {test_name} must have either 'cmd-to-run-in-cli' or 'parallel-cmds'")
 
-        if not expected_outputs and not unexpected_outputs:
-            raise ValueError(f"Test {test_name} has no expected outputs or unexpected outputs. At least one of them is required.")
+        if not expected_outputs and not unexpected_outputs and not parallel_cmds:
+            raise ValueError(f"Test {test_name} has no expected outputs or unexpected outputs, and no parallel commands. At least one of them is required.")
 
     @property
     def stop_event(self):
