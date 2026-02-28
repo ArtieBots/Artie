@@ -18,4 +18,7 @@ RUN pip install ".[dev]"
 WORKDIR /artie-can
 
 # Default command runs all tests
-CMD ["/bin/bash", "-c", "pytest tests/ -v --tb=short --color=yes && sleep infinity"]
+
+# Note: The command runs pytest and then sleeps indefinitely to keep the container alive for inspection if needed
+#       Even if the tests fail, the container will stay alive so you can inspect logs and debug
+CMD pytest tests/ -v --tb=short; sleep infinity
