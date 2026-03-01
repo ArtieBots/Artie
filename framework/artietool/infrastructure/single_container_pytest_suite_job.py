@@ -54,7 +54,7 @@ class PytestTest:
             else:
                 raise KeyError(f"Cannot find a Docker ID corresponding to a Docker container that is expected to be running in this test. Offending container: {where}; available PIDs: {pids}")
 
-        for u in self.expected_outputs:
+        for u in self.unexpected_outputs:
             where = u.evaluated_where(args)
             if where in pids:
                 u.pid = pids[u.evaluated_where(args)]
@@ -64,17 +64,27 @@ class PytestTest:
     def _check_duts(self, args) -> list[result.TestResult]:
         """
         Runs _check_dut() on each DUT pid, managing the total test timeout appropriately.
+
+        Short-circuits at the first unexpected output, so results may not be equal
+        in length to the sum of expected and unexpected outputs.
         """
         timeout_s = args.test_timeout_s
         results = []
-        for expected_out in self.expected_outputs:
-            r = expected_out.check(args, self.test_name, self.producing_task_name, timeout_s)
-            if r is not None and r.exception is not None and type(r.exception) == TimeoutError:
-                timeout_s = 1  # Give us a chance to collect the rest of the results
-            results.append(r)
 
         for unexpected_out in self.unexpected_outputs:
-            r = unexpected_out.check(args, self.test_name, self.producing_task_name, timeout_s)
+            r = unexpected_out.check(args, self.test_name, self.producing_task_name, timeout_s, follow=False, stream=False)
+            if r is not None and r.exception is not None and type(r.exception) == TimeoutError:
+                timeout_s = 1  # Give us a chance to collect the rest of the results
+
+            # Check for short circuit
+            if r is not None and r.status != result.TestStatuses.SUCCESS:
+                results.append(r)
+                return results
+
+            results.append(r)
+
+        for expected_out in self.expected_outputs:
+            r = expected_out.check(args, self.test_name, self.producing_task_name, timeout_s, follow=False, stream=False)
             if r is not None and r.exception is not None and type(r.exception) == TimeoutError:
                 timeout_s = 1  # Give us a chance to collect the rest of the results
             results.append(r)
@@ -105,7 +115,7 @@ class SingleContainerPytestSuiteJob(test_job.TestJob):
             docker_image_name = str(docker.construct_docker_image_name(args, self.dut, common.host_platform()))
 
         kwargs = {'environment': {'ARTIE_RUN_MODE': 'unit'}}
-        self._dut_container = docker.start_docker_container(docker_image_name, self.cmd_to_run_in_dut, **kwargs)
+        self._dut_container = docker.start_docker_container(docker_image_name, self.cmd_to_run_in_dut, remove=False, **kwargs)
         for step in self.steps:
             step.link_pids_to_expected_outs(args, {docker_image_name: self._dut_container.id})
 
@@ -122,8 +132,14 @@ class SingleContainerPytestSuiteJob(test_job.TestJob):
             return
 
         super().teardown(args, results)
-        common.info(f"Tearing down. Stopping docker container...")
+        common.info(f"Tearing down. Stopping (and removing) docker container...")
         try:
             self._dut_container.stop()
         except docker.docker_errors.NotFound:
+            common.info(f"Container not found. Possibly it has already stopped.")
             pass  # Container already stopped
+
+        try:
+            self._dut_container.remove()
+        except docker.docker_errors.NotFound:
+            pass

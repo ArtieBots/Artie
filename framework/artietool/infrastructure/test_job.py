@@ -7,6 +7,7 @@ from .. import docker
 from dataclasses import dataclass
 from enum import Enum
 from enum import unique
+import abc
 import datetime
 import traceback
 
@@ -32,9 +33,10 @@ class ParallelCommand:
         if self.unexpected_outputs is None:
             self.unexpected_outputs = []
 
-class ExpectedOutput:
+class _Output(abc.ABC):
     """
-    An `ExpectedOutput` is a string that we expect to find inside a Docker container.
+    An abstract class representing an output that we want to check for in our tests.
+    This can be either an ExpectedOutput or an UnexpectedOutput.
     """
     def __init__(self, what: str, where: str | dependency.Dependency, cli=False) -> None:
         self.what = what
@@ -52,7 +54,7 @@ class ExpectedOutput:
             where = self.where
         return where
 
-    def check(self, args, test_name: str, task_name: str, timeout_s: float) -> result.TestResult|None:
+    def _check(self, args, test_name: str, task_name: str, timeout_s: float, stream=True, follow=True, _expected=True) -> result.TestResult|None:
         """
         Return whether the what can be found in the where. Ignores requests to check for CLI containers.
         """
@@ -64,95 +66,99 @@ class ExpectedOutput:
         if container is None:
             return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Could not find container corresponding to {self.evaluated_where(args)}")
 
+        if stream:
+            return self._check_stream(args, container, test_name, task_name, timeout_s, follow, _expected)
+        else:
+            return self._check_no_stream(args, container, test_name, task_name, _expected)
+
+    def _check_stream(self, args, container, test_name: str, task_name: str, timeout_s: float, follow=True, _expected=True) -> result.TestResult:
         timestamp = datetime.datetime.now().timestamp()
         try:
-            common.info(f"Reading logs from {container.name} to find '{self.what}'...")
-            for line in container.logs(stream=True, follow=True):
+            common.info(f"Reading logs from {container.name} to see if '{self.what}' is in them...")
+            for line in container.logs(stream=True, follow=follow):
                 if args.docker_logs:
                     common.info(line.decode())
 
                 if self.what in line.decode():
-                    return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
+                    if _expected:
+                        return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
+                    else:
+                        return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
 
                 if datetime.datetime.now().timestamp() - timestamp > timeout_s:
-                    return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, exception=TimeoutError(f"Timeout waiting for '{self.what}' in {self.evaluated_where(args)}"))
+                    if _expected:
+                        return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, exception=TimeoutError(f"Timeout waiting for '{self.what}' in {self.evaluated_where(args)}"))
+                    else:
+                        return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
         except docker.docker_errors.NotFound:
             return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, msg=f"Container closed unexpectedly while reading its logs.")
 
-        return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, msg=f"Container exited while we were waiting for '{self.what}' in {self.evaluated_where(args)}")
+        if _expected:
+            return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Did not find expected output '{self.what}' in logs of {self.evaluated_where(args)} within timeout.")
+        else:
+            return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
+
+    def _check_no_stream(self, args, container, test_name: str, task_name: str, _expected=True) -> result.TestResult:
+        try:
+            logs = container.logs().decode()
+            return self._check_in_logs(args, logs, test_name, task_name, _expected=_expected)
+        except docker.docker_errors.NotFound:
+            return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, msg=f"Container closed unexpectedly while reading its logs.")
+
+    def _check_in_logs(self, args, logs: str, test_name: str, task_name: str, _expected=True) -> result.TestResult:
+        """
+        Check for the expected or unexpected output in the logs.
+        """
+        common.info(f"Checking {test_name}'s logs for '{self.what}'...")
+        if self.what in logs:
+            if _expected:
+                return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
+            else:
+                return result.TestResult(test_name, task_name, result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
+        else:
+            if _expected:
+                return result.TestResult(test_name, task_name, result.TestStatuses.FAIL, msg=f"Did not find expected output '{self.what}' in logs")
+            else:
+                return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
+
+class ExpectedOutput(_Output):
+    """
+    An `ExpectedOutput` is a string that we expect to find inside a Docker container.
+    """
+    def __init__(self, what: str, where: str | dependency.Dependency, cli=False) -> None:
+        super().__init__(what, where, cli)
+
+    def check(self, args, test_name: str, task_name: str, timeout_s: float, stream=True, follow=True) -> result.TestResult:
+        """
+        Return whether the what can be found in the where.
+        """
+        return super()._check(args, test_name, task_name, timeout_s, stream, follow, _expected=True)
 
     def check_in_logs(self, args, logs: str, test_name: str, task_name: str) -> result.TestResult:
         """
-        Same as check, but uses logs to do the checking, instead of the where and is typically used for CLI containers.
+        Check for the expected output in the logs.
         """
-        common.info(f"Checking {test_name}'s DUT(s) for '{self.what}' in logs...")
-        if self.what in logs:
-            return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
-        else:
-            return result.TestResult(test_name, task_name, result.TestStatuses.FAIL)
+        return super()._check_in_logs(args, logs, test_name, task_name, _expected=True)
 
-class UnexpectedOutput:
+class UnexpectedOutput(_Output):
     """
     An `UnexpectedOutput` is a string that we expect NOT to find inside a Docker container or logs.
     If found, the test should fail.
     """
     def __init__(self, what: str, where: str | dependency.Dependency, cli=False) -> None:
-        self.what = what
-        self.where = where
-        self.cli = cli  # is 'where' the CLI container? It gets treated differently than all the others
-        self.pid = None  # Needs to be filled in by whoever launches the DUT(s)
+        super().__init__(what, where, cli)
 
-    def evaluated_where(self, args) -> str:
+    def check(self, args, test_name: str, task_name: str, timeout_s: float, stream=True, follow=True) -> result.TestResult:
         """
-        Returns our `where`, after evaluating it if it is a dependency.
+        Return whether the what can be found in the where.
         """
-        if issubclass(type(self.where), dependency.Dependency):
-            where = self.where.evaluate(args).item
-        else:
-            where = self.where
-        return where
-
-    def check(self, args, test_name: str, task_name: str, timeout_s: float) -> result.TestResult|None:
-        """
-        Return whether the what can be found in the where. Ignores requests to check for CLI containers.
-
-        We will wait up to timeout amount of time for the what to appear, and if it does we will return a failure.
-        If it does not appear by that time, we will return a success.
-        """
-        if self.cli:
-            return None
-
-        common.info(f"Checking {test_name}'s DUT {self.pid} for output...")
-        container = docker.get_container(self.pid)
-        if container is None:
-            return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Could not find container corresponding to {self.evaluated_where(args)}")
-
-        timestamp = datetime.datetime.now().timestamp()
-        try:
-            common.info(f"Reading logs from {container.name} to see if '{self.what}' is in them...")
-            for line in container.logs(stream=True, follow=True):
-                if args.docker_logs:
-                    common.info(line.decode())
-
-                if self.what in line.decode():
-                    return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
-
-                if datetime.datetime.now().timestamp() - timestamp > timeout_s:
-                    return result.TestResult(test_name, producing_task_name=task_name, status=result.TestStatuses.SUCCESS)
-        except docker.docker_errors.NotFound:
-            return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.FAIL, msg=f"Container closed unexpectedly while reading its logs.")
-
-        return result.TestResult(test_name, producing_task_name=task_name, status=TestStatuses.SUCCESS)
+        return super()._check(args, test_name, task_name, timeout_s, stream, follow, _expected=False)
 
     def check_in_logs(self, args, logs: str, test_name: str, task_name: str) -> result.TestResult:
         """
-        Check that the unexpected text is NOT in the logs. If it is found, the test fails.
+        Check for the unexpected output in the logs.
         """
-        common.info(f"Checking {test_name}'s logs to ensure '{self.what}' is NOT present...")
-        if self.what in logs:
-            return result.TestResult(test_name, task_name, result.TestStatuses.FAIL, msg=f"Found unexpected output '{self.what}' in logs")
-        else:
-            return result.TestResult(test_name, task_name, result.TestStatuses.SUCCESS)
+        return super()._check_in_logs(args, logs, test_name, task_name, _expected=False)
 
 class TestJob(job.Job):
     """
@@ -227,7 +233,7 @@ class TestJob(job.Job):
                 # interfering with future tests.
                 if hasattr(t, "kill_child_threads"):
                     common.info(f"Killing child threads of test {t.test_name} to prevent interference with future tests...")
-                    t._kill_child_threads()
+                    t.kill_child_threads()
 
                 # Log exception if --enable-error-tracing
                 if args.enable_error_tracing:
@@ -247,6 +253,8 @@ class TestJob(job.Job):
                     return results
                 else:
                     common.debug(f"Finished test {t.test_name} with an exception, but there are no more tests to run in this task, so we're not marking any additional tests as DID_NOT_RUN.")
+
+        common.info(f"Finished test {t.test_name}")
         return results
 
     def link(self, parent, index: int):

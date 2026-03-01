@@ -461,10 +461,12 @@ def _import_sanity_test_job(job_def: Dict, fpath: str) -> single_container_sanit
 def _import_pytest_test_job(job_def: Dict, fpath: str) -> single_container_pytest_suite_job.SingleContainerPytestSuiteJob:
     _validate_dict(job_def, 'steps', keyerrmsg=f"Missing 'steps' section in 'single-container-pytest-suite' definition in {fpath}")
     _validate_dict(job_def, 'docker-image-under-test', keyerrmsg=f"Missing 'docker-image-under-test' in {fpath}")
-    _validate_dict(job_def, 'cmd-to-run-in-dut', keyerrmsg=f"Missing 'cmd-to-run-in-dut' in {fpath}")
 
     dut = _replace_variables(job_def['docker-image-under-test'], fpath) if type(job_def['docker-image-under-test']) != dict else _import_single_dependency(job_def['docker-image-under-test'], fpath)
-    cmd_to_run_in_dut = _replace_variables(job_def['cmd-to-run-in-dut'], fpath, {'DUT': dut})
+    if 'cmd-to-run-in-dut' in job_def:
+        cmd_to_run_in_dut = _replace_variables(job_def['cmd-to-run-in-dut'], fpath, {'DUT': dut})
+    else:
+        cmd_to_run_in_dut = None
 
     pytest_test_steps = []
     steps_def = job_def['steps']

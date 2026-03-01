@@ -15,7 +15,6 @@ steps:
       dependency:
         name: docker-image
         producing-task: artie-can-test-image
-    cmd-to-run-in-dut: "pytest tests/ -v --tb=short --color=yes"
     steps:
       # Core functionality tests
       - test-name: test_init_with_mock_backend
