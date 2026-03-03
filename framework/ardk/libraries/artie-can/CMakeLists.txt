@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 option(BUILD_STATIC_LIBS "Build static libraries" ON)
 option(BUILD_TESTS "Build tests" OFF)
+option(BUILD_DEBUG_EXECUTABLE "Build standalone debug executable" OFF)
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -69,6 +70,24 @@ if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+# Debug executable
+if(BUILD_DEBUG_EXECUTABLE)
+    add_executable(artie_can_debug examples/debug_main.c ${ARTIE_CAN_SOURCES})
+    target_include_directories(artie_can_debug PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+    # Link with Winsock2 on Windows for the mock TCP backend
+    if(WIN32)
+        target_link_libraries(artie_can_debug ws2_32)
+    endif()
+
+    # Set output directory for easier access
+    set_target_properties(artie_can_debug PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
+
+    message(STATUS "Debug executable will be built: artie_can_debug")
+endif()
+
 # Print configuration summary
 message(STATUS "")
 message(STATUS "Artie CAN Library Configuration:")
@@ -76,4 +95,5 @@ message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "  Build static libs: ${BUILD_STATIC_LIBS}")
 message(STATUS "  Build tests: ${BUILD_TESTS}")
+message(STATUS "  Build debug executable: ${BUILD_DEBUG_EXECUTABLE}")
 message(STATUS "")

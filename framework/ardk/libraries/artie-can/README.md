@@ -43,6 +43,70 @@ make
 sudo make install
 ```
 
+### Building the Debug Executable (for development and debugging)
+
+For debugging issues with the C library on Windows (or any platform), you can build a standalone debug executable:
+
+**On Windows with Visual Studio:**
+```powershell
+mkdir build
+cd build
+cmake .. -DBUILD_DEBUG_EXECUTABLE=ON
+cmake --build . --config Debug
+```
+
+**On Linux/macOS:**
+```bash
+mkdir build
+cd build
+cmake .. -DBUILD_DEBUG_EXECUTABLE=ON -DCMAKE_BUILD_TYPE=Debug
+make
+```
+
+The executable will be created at:
+- **Windows (MSVC):** `build\Debug\artie_can_debug.exe`
+- **Linux/macOS:** `build/artie_can_debug`
+
+#### Debugging with Visual Studio
+
+1. Build the debug executable as shown above
+2. Open Visual Studio
+3. Go to **File → Open → Project/Solution**
+4. Navigate to the `build` directory and open `artie-can.sln`
+5. In Solution Explorer, right-click `artie_can_debug` and select **Set as Startup Project**
+6. Edit `examples/debug_main.c` to add your test code
+7. Set breakpoints in the source files you want to debug
+8. Press **F5** to start debugging
+
+#### Debugging with VS Code
+
+1. Build the debug executable as shown above
+2. Open the `artie-can` folder in VS Code
+3. Install the C/C++ extension if not already installed
+   ```bash
+   # On Windows
+   copy .\launch.json.example .vscode\launch.json
+
+   # On Linux/macOS
+   cp ./launch.json.example .vscode/launch.json
+   ```
+5. Select the appropriate debug configuration from the dropdown in the Debug panel:
+   - **Windows MSVC:** "Debug artie_can_debug (Windows MSVC)"
+   - **Linux/macOS:** "Debug artie_can_debug (Linux/macOS)"
+6. Edit `examples/debug_main.c` to add your test code
+7. Set breakpoints in source files
+8. Press **F5** to start debugging
+
+#### Customizing the Debug Test
+
+The file `examples/debug_main.c` contains a `main()` function with example test code. You can:
+- Uncomment any of the example test functions
+- Add your own test code in the designated section
+- Set breakpoints and step through library functions
+- Inspect variables and CAN frames
+
+The debug executable uses the **Mock backend** by default, which works on all platforms without requiring actual CAN hardware.
+
 ### Building the Python Package
 
 The Python package will automatically build the C library during installation:

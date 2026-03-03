@@ -240,6 +240,12 @@ if _lib is not None:
     ]
     _lib.artie_can_bwacp_send_ready.restype = ctypes.c_int
 
+    _lib.artie_can_bwacp_send_data.argtypes = [
+        ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.c_uint8,
+        ctypes.c_uint8, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t
+    ]
+    _lib.artie_can_bwacp_send_data.restype = ctypes.c_int
+
     _lib.artie_can_bwacp_receive.argtypes = [ctypes.POINTER(CANContext), ctypes.POINTER(BWACPMessage), ctypes.c_uint32]
     _lib.artie_can_bwacp_receive.restype = ctypes.c_int
 
@@ -265,8 +271,7 @@ class ArtieCAN:
     This class provides a Pythonic interface to the Artie CAN library.
     """
 
-    def __init__(self, node_address: int, backend: BackendType = BackendType.SOCKETCAN,
-                 mock_host: str = "localhost", mock_port: int = 5555, mock_server: bool = False):
+    def __init__(self, node_address: int, backend=BackendType.SOCKETCAN, mock_host="localhost", mock_port=5555, mock_server=False):
         """
         Initialize Artie CAN context
 
@@ -285,8 +290,8 @@ class ArtieCAN:
 
         self._ctx = CANContext()
 
-        if backend == BackendType.MOCK and (mock_host != "localhost" or mock_port != 5555):
-            # Use TCP mock backend with custom configuration
+        if backend == BackendType.MOCK:
+            # Use TCP mock backend
             mock_config = MockConfig()
             mock_config.host = mock_host.encode('utf-8')
             mock_config.port = mock_port
@@ -316,13 +321,16 @@ class ArtieCAN:
         Send an RTACP message
 
         Args:
-            target_addr: Target address (0 for broadcast)
+            target_addr: Target address (0 for broadcast). At most 6 bits (0-63).
             data: Data to send (max 8 bytes)
             priority: Message priority
             wait_ack: Wait for ACK if targeted (not broadcast)
         """
         if len(data) > 8:
             raise ValueError("RTACP data must be <= 8 bytes")
+
+        if not (0 <= target_addr <= 63):
+            raise ValueError("Target address must be 0-63 (0 is broadcast)")
 
         msg = RTACPMessage()
         msg.frame_type = RTACPFrameType.MSG
@@ -417,6 +425,55 @@ class ArtieCAN:
 
         data = bytes(msg.payload[:msg.payload_len])
         return (msg.sender_addr, msg.topic, data)
+
+    def bwacp_write(self, target_addr: int, block_id: int, data: bytes,
+                    priority: Priority = Priority.MED_LOW, class_mask: int = 0, interrupt: bool = False):
+        """
+        Write a block of data using BWACP (Block Write Addressed Communication Protocol)
+
+        Args:
+            target_addr: Target node address (1-63, or 0 for broadcast)
+            block_id: Block identifier (0-4294967295)
+            data: Data to write
+            priority: Message priority
+            class_mask: Class mask for multicast (default 0 for unicast)
+            interrupt: If True, interrupt any ongoing transfer (default False)
+        """
+        if not (0 <= target_addr <= 63):
+            raise ValueError("Target address must be 0-63")
+
+        if not (0 <= block_id <= 0xFFFFFFFF):
+            raise ValueError("Block ID must be 0-4294967295")
+
+        if len(data) > 0:
+            data_arr = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)
+        else:
+            data_arr = (ctypes.c_uint8 * 0)()
+
+        result = _lib.artie_can_bwacp_send_ready(
+            ctypes.byref(self._ctx), target_addr, class_mask,
+            priority.value, block_id, data_arr, len(data), interrupt
+        )
+        if result != 0:
+            raise ArtieCANException(f"BWACP write failed: {result}")
+
+    def bwacp_receive(self, timeout_ms: int = 0) -> Tuple[int, int, int, bytes]:
+        """
+        Receive a block write message
+
+        Args:
+            timeout_ms: Timeout in milliseconds (0 for non-blocking)
+
+        Returns:
+            Tuple of (sender_addr, target_addr, address, data)
+        """
+        msg = BWACPMessage()
+        result = _lib.artie_can_bwacp_receive(ctypes.byref(self._ctx), ctypes.byref(msg), timeout_ms)
+        if result != 0:
+            raise ArtieCANException(f"BWACP receive failed: {result}")
+
+        data = bytes(msg.payload[:msg.payload_len])
+        return (msg.sender_addr, msg.target_addr, msg.address, data)
 
 
 # ===== Utility Functions =====
