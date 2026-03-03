@@ -49,6 +49,9 @@ RTACP uses extended CAN frames. An extended CAN frame looks like this
 [7 bits EOF]
 ```
 
+Data is sent most-significant bit first, so the 11 bits of IDA are sent
+bit 10, followed by bit 9, followed by bit 8, etc. down to bit 0.
+
 (Total overhead bits per CAN frame: 64; this accounts for all bits but the Data field)
 
 For RTACP (and all Artie CAN protocols), we only care about the following four fields:

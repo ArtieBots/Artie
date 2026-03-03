@@ -60,6 +60,65 @@ extern "C" {
 #define ARTIE_CAN_ERROR_EINVAL 0x16  /* EINVAL */
 #define ARTIE_CAN_ERROR_EALREADY 0x72 /* EALREADY */
 
+/* CAN ID bit field positions (for bit shifting operations) */
+/* Protocol field (common to all protocols) */
+#define ARTIE_CAN_ID_PROTOCOL_SHIFT 26
+
+/* RTACP bit field positions */
+#define ARTIE_CAN_ID_RTACP_FRAME_TYPE_SHIFT 25
+#define ARTIE_CAN_ID_RTACP_PRIORITY_SHIFT 23
+#define ARTIE_CAN_ID_RTACP_SENDER_SHIFT 16
+#define ARTIE_CAN_ID_RTACP_TARGET_SHIFT 10
+
+/* RPCACP bit field positions */
+#define ARTIE_CAN_ID_RPCACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_RPCACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_RPCACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_RPCACP_TARGET_SHIFT 8
+
+/* PSACP bit field positions */
+#define ARTIE_CAN_ID_PSACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_PSACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_PSACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_PSACP_TOPIC_SHIFT 6
+
+/* BWACP bit field positions */
+#define ARTIE_CAN_ID_BWACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_BWACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_BWACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_BWACP_TARGET_SHIFT 8
+#define ARTIE_CAN_ID_BWACP_CLASS_SHIFT 2
+
+/* Multi-byte value bit positions (for byte extraction/assembly) */
+#define ARTIE_CAN_BYTE3_SHIFT 24
+#define ARTIE_CAN_BYTE2_SHIFT 16
+#define ARTIE_CAN_BYTE1_SHIFT 8
+#define ARTIE_CAN_BYTE0_SHIFT 0
+
+/* Bit masks for field extraction (used with bitwise AND after shifting) */
+/* Common field masks */
+#define ARTIE_CAN_MASK_PROTOCOL 0x07     /* 3 bits for protocol */
+#define ARTIE_CAN_MASK_PRIORITY 0x03     /* 2 bits for priority */
+#define ARTIE_CAN_MASK_ADDRESS 0x3F      /* 6 bits for addresses */
+#define ARTIE_CAN_MASK_BYTE 0xFF         /* 8 bits for full byte */
+
+/* Protocol-specific field masks */
+#define ARTIE_CAN_MASK_RTACP_FRAME_TYPE 0x01    /* 1 bit for RTACP frame type */
+#define ARTIE_CAN_MASK_FRAME_TYPE_4BIT 0x0F     /* 4 bits for RPCACP/PSACP/BWACP frame type */
+#define ARTIE_CAN_MASK_TOPIC 0xFF                /* 8 bits for PSACP topic */
+#define ARTIE_CAN_MASK_RANDOM 0xFF               /* 8 bits for RPCACP random value */
+#define ARTIE_CAN_MASK_CLASS 0x3F                /* 6 bits for BWACP class mask */
+
+/* Special bit masks */
+#define ARTIE_CAN_MASK_SYNC_BIT 0x80             /* Sync bit in RPCACP procedure ID byte */
+#define ARTIE_CAN_MASK_PROCEDURE_ID 0x7F         /* 7 bits for RPCACP procedure ID */
+#define ARTIE_CAN_MASK_PARITY_BIT 0x01           /* Parity/repeat bit in BWACP */
+#define ARTIE_CAN_MASK_REPEAT_BIT 0x02           /* Repeat bit in BWACP */
+
+/* Low-level bit masks for frame padding */
+#define ARTIE_CAN_RTACP_PADDING 0x3FF            /* Bottom 10 bits all 1s for RTACP */
+#define ARTIE_CAN_PSACP_PADDING 0x3F             /* Bottom 6 bits all 1s for PSACP */
+
 /* ===== Type Definitions ===== */
 
 /**
