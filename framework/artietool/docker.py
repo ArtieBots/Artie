@@ -734,5 +734,5 @@ def start_docker_container(image_name: str|DockerImageName, cmd: str|None, remov
     """
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     common.info(f"Running command: {cmd}")
-    container = client.containers.run(str(image_name), cmd, remove=True, detach=True, **kwargs)
+    container = client.containers.run(str(image_name), cmd, remove=remove, detach=True, **kwargs)
     return container
