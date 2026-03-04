@@ -443,7 +443,11 @@ class ArtieCAN:
         if not (0 <= block_id <= 0xFFFFFFFF):
             raise ValueError("Block ID must be 0-4294967295")
 
-        data_arr = (ctypes.c_uint8 * len(data))(*data) if len(data) > 0 else None
+        if len(data) > 0:
+            data_arr = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)
+        else:
+            data_arr = (ctypes.c_uint8 * 0)()
+
         result = _lib.artie_can_bwacp_send_ready(
             ctypes.byref(self._ctx), target_addr, class_mask,
             priority.value, block_id, data_arr, len(data), interrupt
