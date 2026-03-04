@@ -240,6 +240,12 @@ if _lib is not None:
     ]
     _lib.artie_can_bwacp_send_ready.restype = ctypes.c_int
 
+    _lib.artie_can_bwacp_send_data.argtypes = [
+        ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.c_uint8,
+        ctypes.c_uint8, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t
+    ]
+    _lib.artie_can_bwacp_send_data.restype = ctypes.c_int
+
     _lib.artie_can_bwacp_receive.argtypes = [ctypes.POINTER(CANContext), ctypes.POINTER(BWACPMessage), ctypes.c_uint32]
     _lib.artie_can_bwacp_receive.restype = ctypes.c_int
 
@@ -417,6 +423,51 @@ class ArtieCAN:
 
         data = bytes(msg.payload[:msg.payload_len])
         return (msg.sender_addr, msg.topic, data)
+
+    def bwacp_write(self, target_addr: int, block_id: int, data: bytes,
+                    priority: Priority = Priority.MED_LOW, class_mask: int = 0, interrupt: bool = False):
+        """
+        Write a block of data using BWACP (Block Write Addressed Communication Protocol)
+
+        Args:
+            target_addr: Target node address (1-63, or 0 for broadcast)
+            block_id: Block identifier (0-4294967295)
+            data: Data to write
+            priority: Message priority
+            class_mask: Class mask for multicast (default 0 for unicast)
+            interrupt: If True, interrupt any ongoing transfer (default False)
+        """
+        if not (0 <= target_addr <= 63):
+            raise ValueError("Target address must be 0-63")
+
+        if not (0 <= block_id <= 0xFFFFFFFF):
+            raise ValueError("Block ID must be 0-4294967295")
+
+        data_arr = (ctypes.c_uint8 * len(data))(*data) if len(data) > 0 else None
+        result = _lib.artie_can_bwacp_send_ready(
+            ctypes.byref(self._ctx), target_addr, class_mask,
+            priority.value, block_id, data_arr, len(data), interrupt
+        )
+        if result != 0:
+            raise ArtieCANException(f"BWACP write failed: {result}")
+
+    def bwacp_receive(self, timeout_ms: int = 0) -> Tuple[int, int, int, bytes]:
+        """
+        Receive a block write message
+
+        Args:
+            timeout_ms: Timeout in milliseconds (0 for non-blocking)
+
+        Returns:
+            Tuple of (sender_addr, target_addr, address, data)
+        """
+        msg = BWACPMessage()
+        result = _lib.artie_can_bwacp_receive(ctypes.byref(self._ctx), ctypes.byref(msg), timeout_ms)
+        if result != 0:
+            raise ArtieCANException(f"BWACP receive failed: {result}")
+
+        data = bytes(msg.payload[:msg.payload_len])
+        return (msg.sender_addr, msg.target_addr, msg.address, data)
 
 
 # ===== Utility Functions =====
