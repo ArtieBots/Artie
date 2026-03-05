@@ -176,5 +176,5 @@ uint8_t artie_can_get_protocol(const artie_can_frame_t *frame)
     }
 
     /* Extract top 3 bits of 29-bit CAN ID */
-    return (uint8_t)((frame->can_id >> ARTIE_CAN_ID_PROTOCOL_SHIFT) & 0x07);
+    return (uint8_t)((frame->can_id >> ARTIE_CAN_ID_PROTOCOL_SHIFT) & ARTIE_CAN_MASK_PROTOCOL);
 }

@@ -95,6 +95,30 @@ extern "C" {
 #define ARTIE_CAN_BYTE1_SHIFT 8
 #define ARTIE_CAN_BYTE0_SHIFT 0
 
+/* Bit masks for field extraction (used with bitwise AND after shifting) */
+/* Common field masks */
+#define ARTIE_CAN_MASK_PROTOCOL 0x07     /* 3 bits for protocol */
+#define ARTIE_CAN_MASK_PRIORITY 0x03     /* 2 bits for priority */
+#define ARTIE_CAN_MASK_ADDRESS 0x3F      /* 6 bits for addresses */
+#define ARTIE_CAN_MASK_BYTE 0xFF         /* 8 bits for full byte */
+
+/* Protocol-specific field masks */
+#define ARTIE_CAN_MASK_RTACP_FRAME_TYPE 0x01    /* 1 bit for RTACP frame type */
+#define ARTIE_CAN_MASK_FRAME_TYPE_4BIT 0x0F     /* 4 bits for RPCACP/PSACP/BWACP frame type */
+#define ARTIE_CAN_MASK_TOPIC 0xFF                /* 8 bits for PSACP topic */
+#define ARTIE_CAN_MASK_RANDOM 0xFF               /* 8 bits for RPCACP random value */
+#define ARTIE_CAN_MASK_CLASS 0x3F                /* 6 bits for BWACP class mask */
+
+/* Special bit masks */
+#define ARTIE_CAN_MASK_SYNC_BIT 0x80             /* Sync bit in RPCACP procedure ID byte */
+#define ARTIE_CAN_MASK_PROCEDURE_ID 0x7F         /* 7 bits for RPCACP procedure ID */
+#define ARTIE_CAN_MASK_PARITY_BIT 0x01           /* Parity/repeat bit in BWACP */
+#define ARTIE_CAN_MASK_REPEAT_BIT 0x02           /* Repeat bit in BWACP */
+
+/* Low-level bit masks for frame padding */
+#define ARTIE_CAN_RTACP_PADDING 0x3FF            /* Bottom 10 bits all 1s for RTACP */
+#define ARTIE_CAN_PSACP_PADDING 0x3F             /* Bottom 6 bits all 1s for PSACP */
+
 /* ===== Type Definitions ===== */
 
 /**
