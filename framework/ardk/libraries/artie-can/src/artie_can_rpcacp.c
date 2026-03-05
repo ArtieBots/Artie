@@ -26,19 +26,19 @@ static uint32_t rpcacp_build_can_id(uint8_t frame_type, uint8_t priority,
     uint32_t can_id = 0;
 
     /* Protocol bits (28-26): 010 for RPCACP */
-    can_id |= (ARTIE_CAN_PROTOCOL_RPCACP << 26);
+    can_id |= (ARTIE_CAN_PROTOCOL_RPCACP << ARTIE_CAN_ID_PROTOCOL_SHIFT);
 
     /* Frame type (25-22) */
-    can_id |= (frame_type & 0x0F) << 22;
+    can_id |= (frame_type & 0x0F) << ARTIE_CAN_ID_RPCACP_FRAME_TYPE_SHIFT;
 
     /* Priority (21-20) */
-    can_id |= (priority & 0x03) << 20;
+    can_id |= (priority & 0x03) << ARTIE_CAN_ID_RPCACP_PRIORITY_SHIFT;
 
     /* Sender address (19-14) */
-    can_id |= (sender_addr & 0x3F) << 14;
+    can_id |= (sender_addr & 0x3F) << ARTIE_CAN_ID_RPCACP_SENDER_SHIFT;
 
     /* Target address (13-8) */
-    can_id |= (target_addr & 0x3F) << 8;
+    can_id |= (target_addr & 0x3F) << ARTIE_CAN_ID_RPCACP_TARGET_SHIFT;
 
     /* Random value (7-0) */
     can_id |= random_value;
@@ -51,10 +51,10 @@ static uint32_t rpcacp_build_can_id(uint8_t frame_type, uint8_t priority,
  */
 static void rpcacp_parse_can_id(uint32_t can_id, artie_can_rpcacp_msg_t *msg)
 {
-    msg->frame_type = (can_id >> 22) & 0x0F;
-    msg->priority = (can_id >> 20) & 0x03;
-    msg->sender_addr = (can_id >> 14) & 0x3F;
-    msg->target_addr = (can_id >> 8) & 0x3F;
+    msg->frame_type = (can_id >> ARTIE_CAN_ID_RPCACP_FRAME_TYPE_SHIFT) & 0x0F;
+    msg->priority = (can_id >> ARTIE_CAN_ID_RPCACP_PRIORITY_SHIFT) & 0x03;
+    msg->sender_addr = (can_id >> ARTIE_CAN_ID_RPCACP_SENDER_SHIFT) & 0x3F;
+    msg->target_addr = (can_id >> ARTIE_CAN_ID_RPCACP_TARGET_SHIFT) & 0x3F;
     msg->random_value = can_id & 0xFF;
 }
 
@@ -116,7 +116,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
 
     /* First frame contains: sync bit + procedure ID + CRC16 + remaining data */
     frame.data[0] = crc_data[0];  /* sync bit + procedure ID */
-    frame.data[1] = (crc >> 8) & 0xFF;  /* CRC high byte */
+    frame.data[1] = (crc >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;  /* CRC high byte */
     frame.data[2] = crc & 0xFF;  /* CRC low byte */
 
     size_t data_offset = 0;
@@ -272,7 +272,7 @@ int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *m
         uint8_t sync_and_proc = frame.data[0];
         msg->is_synchronous = (sync_and_proc & 0x80) != 0;
         msg->procedure_id = sync_and_proc & 0x7F;
-        msg->crc16 = (frame.data[1] << 8) | frame.data[2];
+        msg->crc16 = (frame.data[1] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[2];
 
         /* Collect payload data */
         uint8_t stuffed_data[ARTIE_CAN_MAX_STUFFED_PAYLOAD];
@@ -348,7 +348,7 @@ int artie_can_rpcacp_respond(artie_can_context_t *ctx, uint8_t target_addr, uint
                                       ctx->node_address, target_addr, random_value);
 
     frame.data[0] = crc_data[0];
-    frame.data[1] = (crc >> 8) & 0xFF;
+    frame.data[1] = (crc >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;
     frame.data[2] = crc & 0xFF;
 
     size_t frame_data_space = ARTIE_CAN_MAX_DATA_SIZE - 3;

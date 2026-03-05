@@ -7,6 +7,7 @@ This script provides a convenient way to run the test suite with common options.
 import sys
 import subprocess
 from pathlib import Path
+import pytest
 
 
 def main():
@@ -15,14 +16,6 @@ def main():
     # Get the directory containing this script
     script_dir = Path(__file__).parent.resolve()
     test_dir = script_dir / "tests"
-
-    # Check if pytest is available
-    try:
-        import pytest
-    except ImportError:
-        print("ERROR: pytest not found. Please install development dependencies:")
-        print("  pip install -e \".[dev]\"")
-        return 1
 
     # Default pytest arguments
     pytest_args = [
@@ -40,7 +33,6 @@ def main():
     print(f"Command: pytest {' '.join(pytest_args)}\n")
 
     return pytest.main(pytest_args)
-
 
 if __name__ == "__main__":
     sys.exit(main())

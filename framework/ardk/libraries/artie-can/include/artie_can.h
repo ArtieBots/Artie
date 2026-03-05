@@ -60,6 +60,41 @@ extern "C" {
 #define ARTIE_CAN_ERROR_EINVAL 0x16  /* EINVAL */
 #define ARTIE_CAN_ERROR_EALREADY 0x72 /* EALREADY */
 
+/* CAN ID bit field positions (for bit shifting operations) */
+/* Protocol field (common to all protocols) */
+#define ARTIE_CAN_ID_PROTOCOL_SHIFT 26
+
+/* RTACP bit field positions */
+#define ARTIE_CAN_ID_RTACP_FRAME_TYPE_SHIFT 25
+#define ARTIE_CAN_ID_RTACP_PRIORITY_SHIFT 23
+#define ARTIE_CAN_ID_RTACP_SENDER_SHIFT 16
+#define ARTIE_CAN_ID_RTACP_TARGET_SHIFT 10
+
+/* RPCACP bit field positions */
+#define ARTIE_CAN_ID_RPCACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_RPCACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_RPCACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_RPCACP_TARGET_SHIFT 8
+
+/* PSACP bit field positions */
+#define ARTIE_CAN_ID_PSACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_PSACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_PSACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_PSACP_TOPIC_SHIFT 6
+
+/* BWACP bit field positions */
+#define ARTIE_CAN_ID_BWACP_FRAME_TYPE_SHIFT 22
+#define ARTIE_CAN_ID_BWACP_PRIORITY_SHIFT 20
+#define ARTIE_CAN_ID_BWACP_SENDER_SHIFT 14
+#define ARTIE_CAN_ID_BWACP_TARGET_SHIFT 8
+#define ARTIE_CAN_ID_BWACP_CLASS_SHIFT 2
+
+/* Multi-byte value bit positions (for byte extraction/assembly) */
+#define ARTIE_CAN_BYTE3_SHIFT 24
+#define ARTIE_CAN_BYTE2_SHIFT 16
+#define ARTIE_CAN_BYTE1_SHIFT 8
+#define ARTIE_CAN_BYTE0_SHIFT 0
+
 /* ===== Type Definitions ===== */
 
 /**

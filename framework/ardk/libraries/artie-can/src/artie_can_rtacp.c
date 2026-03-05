@@ -24,19 +24,19 @@ static uint32_t rtacp_build_can_id(const artie_can_rtacp_msg_t *msg)
     uint32_t can_id = 0;
 
     /* Protocol bits (28-26): 000 for RTACP */
-    can_id |= (ARTIE_CAN_PROTOCOL_RTACP << 26);
+    can_id |= (ARTIE_CAN_PROTOCOL_RTACP << ARTIE_CAN_ID_PROTOCOL_SHIFT);
 
     /* Frame type bit (25) */
-    can_id |= (msg->frame_type & 0x01) << 25;
+    can_id |= (msg->frame_type & 0x01) << ARTIE_CAN_ID_RTACP_FRAME_TYPE_SHIFT;
 
     /* Priority bits (24-23) */
-    can_id |= (msg->priority & 0x03) << 23;
+    can_id |= (msg->priority & 0x03) << ARTIE_CAN_ID_RTACP_PRIORITY_SHIFT;
 
     /* Sender address (21-16) */
-    can_id |= (msg->sender_addr & 0x3F) << 16;
+    can_id |= (msg->sender_addr & 0x3F) << ARTIE_CAN_ID_RTACP_SENDER_SHIFT;
 
     /* Target address (15-10) */
-    can_id |= (msg->target_addr & 0x3F) << 10;
+    can_id |= (msg->target_addr & 0x3F) << ARTIE_CAN_ID_RTACP_TARGET_SHIFT;
 
     /* Bottom 10 bits all 1s */
     can_id |= 0x3FF;
@@ -52,16 +52,16 @@ static int rtacp_parse_frame(const artie_can_frame_t *frame, artie_can_rtacp_msg
     uint32_t can_id = frame->can_id;
 
     /* Extract frame type */
-    msg->frame_type = (can_id >> 25) & 0x01;
+    msg->frame_type = (can_id >> ARTIE_CAN_ID_RTACP_FRAME_TYPE_SHIFT) & 0x01;
 
     /* Extract priority */
-    msg->priority = (can_id >> 23) & 0x03;
+    msg->priority = (can_id >> ARTIE_CAN_ID_RTACP_PRIORITY_SHIFT) & 0x03;
 
     /* Extract sender address */
-    msg->sender_addr = (can_id >> 16) & 0x3F;
+    msg->sender_addr = (can_id >> ARTIE_CAN_ID_RTACP_SENDER_SHIFT) & 0x3F;
 
     /* Extract target address */
-    msg->target_addr = (can_id >> 10) & 0x3F;
+    msg->target_addr = (can_id >> ARTIE_CAN_ID_RTACP_TARGET_SHIFT) & 0x3F;
 
     /* Copy data */
     msg->data_len = frame->dlc;

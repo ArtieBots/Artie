@@ -25,22 +25,22 @@ static uint32_t psacp_build_can_id(bool high_priority, uint8_t frame_type,
 
     /* Protocol bits (28-26) */
     if (high_priority) {
-        can_id |= (ARTIE_CAN_PROTOCOL_PSACP_HIGH << 26);
+        can_id |= (ARTIE_CAN_PROTOCOL_PSACP_HIGH << ARTIE_CAN_ID_PROTOCOL_SHIFT);
     } else {
-        can_id |= (ARTIE_CAN_PROTOCOL_PSACP_LOW << 26);
+        can_id |= (ARTIE_CAN_PROTOCOL_PSACP_LOW << ARTIE_CAN_ID_PROTOCOL_SHIFT);
     }
 
     /* Frame type (25-22) */
-    can_id |= (frame_type & 0x0F) << 22;
+    can_id |= (frame_type & 0x0F) << ARTIE_CAN_ID_PSACP_FRAME_TYPE_SHIFT;
 
     /* Priority (21-20) */
-    can_id |= (priority & 0x03) << 20;
+    can_id |= (priority & 0x03) << ARTIE_CAN_ID_PSACP_PRIORITY_SHIFT;
 
     /* Sender address (19-14) */
-    can_id |= (sender_addr & 0x3F) << 14;
+    can_id |= (sender_addr & 0x3F) << ARTIE_CAN_ID_PSACP_SENDER_SHIFT;
 
     /* Topic (13-6) */
-    can_id |= (topic & 0xFF) << 6;
+    can_id |= (topic & 0xFF) << ARTIE_CAN_ID_PSACP_TOPIC_SHIFT;
 
     /* Bottom 6 bits all 1s */
     can_id |= 0x3F;
@@ -53,13 +53,13 @@ static uint32_t psacp_build_can_id(bool high_priority, uint8_t frame_type,
  */
 static void psacp_parse_can_id(uint32_t can_id, artie_can_psacp_msg_t *msg)
 {
-    uint8_t protocol = (can_id >> 26) & 0x07;
+    uint8_t protocol = (can_id >> ARTIE_CAN_ID_PROTOCOL_SHIFT) & 0x07;
     msg->high_priority = (protocol == ARTIE_CAN_PROTOCOL_PSACP_HIGH);
 
-    msg->frame_type = (can_id >> 22) & 0x0F;
-    msg->priority = (can_id >> 20) & 0x03;
-    msg->sender_addr = (can_id >> 14) & 0x3F;
-    msg->topic = (can_id >> 6) & 0xFF;
+    msg->frame_type = (can_id >> ARTIE_CAN_ID_PSACP_FRAME_TYPE_SHIFT) & 0x0F;
+    msg->priority = (can_id >> ARTIE_CAN_ID_PSACP_PRIORITY_SHIFT) & 0x03;
+    msg->sender_addr = (can_id >> ARTIE_CAN_ID_PSACP_SENDER_SHIFT) & 0x3F;
+    msg->topic = (can_id >> ARTIE_CAN_ID_PSACP_TOPIC_SHIFT) & 0xFF;
 }
 
 /**
@@ -94,7 +94,7 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
                                      priority, ctx->node_address, topic);
 
     /* First frame contains CRC16 + data */
-    frame.data[0] = (crc >> 8) & 0xFF;
+    frame.data[0] = (crc >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;
     frame.data[1] = crc & 0xFF;
 
     size_t data_offset = 0;
@@ -184,7 +184,7 @@ int artie_can_psacp_receive(artie_can_context_t *ctx, artie_can_psacp_msg_t *msg
             return -1;
         }
 
-        msg->crc16 = (frame.data[0] << 8) | frame.data[1];
+        msg->crc16 = (frame.data[0] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[1];
 
         /* Collect stuffed payload */
         uint8_t stuffed_data[ARTIE_CAN_MAX_STUFFED_PAYLOAD];

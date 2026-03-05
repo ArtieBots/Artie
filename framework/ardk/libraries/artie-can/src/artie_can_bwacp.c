@@ -27,22 +27,22 @@ static uint32_t bwacp_build_can_id(uint8_t frame_type, uint8_t priority,
     uint32_t can_id = 0;
 
     /* Protocol bits (28-26): 101 for BWACP */
-    can_id |= (ARTIE_CAN_PROTOCOL_BWACP << 26);
+    can_id |= (ARTIE_CAN_PROTOCOL_BWACP << ARTIE_CAN_ID_PROTOCOL_SHIFT);
 
     /* Frame type (25-22) */
-    can_id |= (frame_type & 0x0F) << 22;
+    can_id |= (frame_type & 0x0F) << ARTIE_CAN_ID_BWACP_FRAME_TYPE_SHIFT;
 
     /* Priority (21-20) */
-    can_id |= (priority & 0x03) << 20;
+    can_id |= (priority & 0x03) << ARTIE_CAN_ID_BWACP_PRIORITY_SHIFT;
 
     /* Sender address (19-14) */
-    can_id |= (sender_addr & 0x3F) << 14;
+    can_id |= (sender_addr & 0x3F) << ARTIE_CAN_ID_BWACP_SENDER_SHIFT;
 
     /* Target address (13-8) */
-    can_id |= (target_addr & 0x3F) << 8;
+    can_id |= (target_addr & 0x3F) << ARTIE_CAN_ID_BWACP_TARGET_SHIFT;
 
     /* Class mask (7-2) */
-    can_id |= (class_mask & 0x3F) << 2;
+    can_id |= (class_mask & 0x3F) << ARTIE_CAN_ID_BWACP_CLASS_SHIFT;
 
     /* Bit 1 */
     if (bit1) {
@@ -62,11 +62,11 @@ static uint32_t bwacp_build_can_id(uint8_t frame_type, uint8_t priority,
  */
 static void bwacp_parse_can_id(uint32_t can_id, artie_can_bwacp_msg_t *msg)
 {
-    msg->frame_type = (can_id >> 22) & 0x0F;
-    msg->priority = (can_id >> 20) & 0x03;
-    msg->sender_addr = (can_id >> 14) & 0x3F;
-    msg->target_addr = (can_id >> 8) & 0x3F;
-    msg->class_mask = (can_id >> 2) & 0x3F;
+    msg->frame_type = (can_id >> ARTIE_CAN_ID_BWACP_FRAME_TYPE_SHIFT) & 0x0F;
+    msg->priority = (can_id >> ARTIE_CAN_ID_BWACP_PRIORITY_SHIFT) & 0x03;
+    msg->sender_addr = (can_id >> ARTIE_CAN_ID_BWACP_SENDER_SHIFT) & 0x3F;
+    msg->target_addr = (can_id >> ARTIE_CAN_ID_BWACP_TARGET_SHIFT) & 0x3F;
+    msg->class_mask = (can_id >> ARTIE_CAN_ID_BWACP_CLASS_SHIFT) & 0x3F;
     msg->is_repeat = (can_id & 0x02) != 0;
     msg->parity = (can_id & 0x01) != 0;
 }
@@ -96,9 +96,9 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
 
     /* Build data for CRC: address + stuffed payload */
     uint8_t crc_data[ARTIE_CAN_MAX_STUFFED_PAYLOAD + 4];
-    crc_data[0] = (address >> 24) & 0xFF;
-    crc_data[1] = (address >> 16) & 0xFF;
-    crc_data[2] = (address >> 8) & 0xFF;
+    crc_data[0] = (address >> ARTIE_CAN_BYTE3_SHIFT) & 0xFF;
+    crc_data[1] = (address >> ARTIE_CAN_BYTE2_SHIFT) & 0xFF;
+    crc_data[2] = (address >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;
     crc_data[3] = address & 0xFF;
     if (stuffed_len > 0) {
         memcpy(&crc_data[4], stuffed_payload, stuffed_len);
@@ -114,12 +114,12 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
                                      class_mask, interrupt, true);
 
     /* READY frame data: CRC24 (3 bytes) + address (4 bytes) + first stuffing byte */
-    frame.data[0] = (crc24 >> 16) & 0xFF;
-    frame.data[1] = (crc24 >> 8) & 0xFF;
+    frame.data[0] = (crc24 >> ARTIE_CAN_BYTE2_SHIFT) & 0xFF;
+    frame.data[1] = (crc24 >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;
     frame.data[2] = crc24 & 0xFF;
-    frame.data[3] = (address >> 24) & 0xFF;
-    frame.data[4] = (address >> 16) & 0xFF;
-    frame.data[5] = (address >> 8) & 0xFF;
+    frame.data[3] = (address >> ARTIE_CAN_BYTE3_SHIFT) & 0xFF;
+    frame.data[4] = (address >> ARTIE_CAN_BYTE2_SHIFT) & 0xFF;
+    frame.data[5] = (address >> ARTIE_CAN_BYTE1_SHIFT) & 0xFF;
     frame.data[6] = address & 0xFF;
 
     if (stuffed_len > 0) {
@@ -233,9 +233,9 @@ int artie_can_bwacp_receive(artie_can_context_t *ctx, artie_can_bwacp_msg_t *msg
             return -1;
         }
 
-        msg->crc24 = (frame.data[0] << 16) | (frame.data[1] << 8) | frame.data[2];
-        msg->address = (frame.data[3] << 24) | (frame.data[4] << 16) |
-                      (frame.data[5] << 8) | frame.data[6];
+        msg->crc24 = (frame.data[0] << ARTIE_CAN_BYTE2_SHIFT) | (frame.data[1] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[2];
+        msg->address = (frame.data[3] << ARTIE_CAN_BYTE3_SHIFT) | (frame.data[4] << ARTIE_CAN_BYTE2_SHIFT) |
+                      (frame.data[5] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[6];
 
         /* Collect stuffed payload */
         if (frame.dlc > 7) {
