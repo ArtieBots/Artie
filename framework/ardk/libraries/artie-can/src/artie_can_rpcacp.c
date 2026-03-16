@@ -78,11 +78,11 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
                           const uint8_t *payload, size_t payload_len)
 {
     if (!ctx || (payload_len > 0 && !payload)) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (target_addr == ARTIE_CAN_BROADCAST_ADDRESS) {
-        return -1;  /* Broadcast not allowed for RPC */
+        return ARTIE_CAN_ERR_INVALID_ARG;  /* Broadcast not allowed for RPC */
     }
 
     /* Byte stuff the payload */
@@ -128,7 +128,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
         frame.dlc = 3 + stuffed_len;
 
         if (!ctx->backend.send) {
-            return -1;
+            return ARTIE_CAN_ERR_NOT_INITIALIZED;
         }
         return ctx->backend.send(ctx->backend.context, &frame);
     } else {
@@ -138,7 +138,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
         data_offset = frame_data_space;
 
         if (!ctx->backend.send) {
-            return -1;
+            return ARTIE_CAN_ERR_NOT_INITIALIZED;
         }
         int result = ctx->backend.send(ctx->backend.context, &frame);
         if (result != 0) {
@@ -178,7 +178,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
     }
 
     if (response.frame_type != ARTIE_CAN_RPCACP_ACK) {
-        return -1;  /* Unexpected response */
+        return ARTIE_CAN_ERR_PROTOCOL;  /* Unexpected response */
     }
 
     return 0;
@@ -191,7 +191,7 @@ int artie_can_rpcacp_wait_response(artie_can_context_t *ctx, uint8_t *response,
                                    size_t max_len, size_t *actual_len, uint32_t timeout_ms)
 {
     if (!ctx || !response || !actual_len) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     artie_can_rpcacp_msg_t msg;
@@ -202,11 +202,11 @@ int artie_can_rpcacp_wait_response(artie_can_context_t *ctx, uint8_t *response,
     }
 
     if (msg.frame_type != ARTIE_CAN_RPCACP_START_RETURN) {
-        return -1;  /* Wrong frame type */
+        return ARTIE_CAN_ERR_PROTOCOL;  /* Wrong frame type */
     }
 
     if (msg.payload_len > max_len) {
-        return -1;  /* Response too large */
+        return ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE;  /* Response too large */
     }
 
     memcpy(response, msg.payload, msg.payload_len);
@@ -221,11 +221,11 @@ int artie_can_rpcacp_wait_response(artie_can_context_t *ctx, uint8_t *response,
 int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *msg, uint32_t timeout_ms)
 {
     if (!ctx || !msg) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (!ctx->backend.receive) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* Receive frames until we get an RPCACP frame */
@@ -239,7 +239,7 @@ int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *m
     /* Check if this is an RPCACP frame */
     uint8_t protocol = artie_can_get_protocol(&frame);
     if (protocol != ARTIE_CAN_PROTOCOL_RPCACP) {
-        return -1;  /* Not RPCACP */
+        return ARTIE_CAN_ERR_PROTOCOL;  /* Not RPCACP */
     }
 
     /* Parse CAN ID */
@@ -255,7 +255,7 @@ int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *m
     if (msg->frame_type == ARTIE_CAN_RPCACP_NACK) {
         /* NACK frame - 1 byte error code */
         if (frame.dlc < 1) {
-            return -1;
+            return ARTIE_CAN_ERR_PROTOCOL;
         }
         msg->nack_error_code = frame.data[0];
         msg->payload_len = 0;
@@ -266,7 +266,7 @@ int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *m
         msg->frame_type == ARTIE_CAN_RPCACP_START_RETURN) {
         /* Parse header */
         if (frame.dlc < 3) {
-            return -1;
+            return ARTIE_CAN_ERR_PROTOCOL;
         }
 
         uint8_t sync_and_proc = frame.data[0];
@@ -305,7 +305,7 @@ int artie_can_rpcacp_receive(artie_can_context_t *ctx, artie_can_rpcacp_msg_t *m
         return 0;
     }
 
-    return -1;  /* Unsupported frame type */
+    return ARTIE_CAN_ERR_NOT_IMPLEMENTED;  /* Unsupported frame type */
 }
 
 /**
@@ -316,7 +316,7 @@ int artie_can_rpcacp_respond(artie_can_context_t *ctx, uint8_t target_addr, uint
                              const uint8_t *payload, size_t payload_len)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Similar to artie_can_rpcacp_call but sends StartReturn frames */
@@ -358,13 +358,13 @@ int artie_can_rpcacp_respond(artie_can_context_t *ctx, uint8_t target_addr, uint
         frame.dlc = 3 + stuffed_len;
 
         if (!ctx->backend.send) {
-            return -1;
+            return ARTIE_CAN_ERR_NOT_INITIALIZED;
         }
         return ctx->backend.send(ctx->backend.context, &frame);
     }
 
     /* TODO: Handle multi-frame returns */
-    return -1;  /* Not implemented yet */
+    return ARTIE_CAN_ERR_NOT_IMPLEMENTED;  /* Not implemented yet */
 }
 
 /**
@@ -374,7 +374,7 @@ int artie_can_rpcacp_send_ack(artie_can_context_t *ctx, uint8_t target_addr,
                               uint8_t priority, uint8_t random_value)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     artie_can_frame_t frame;
@@ -384,7 +384,7 @@ int artie_can_rpcacp_send_ack(artie_can_context_t *ctx, uint8_t target_addr,
     frame.dlc = 0;  /* ACK has no data */
 
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     return ctx->backend.send(ctx->backend.context, &frame);
@@ -397,7 +397,7 @@ int artie_can_rpcacp_send_nack(artie_can_context_t *ctx, uint8_t target_addr,
                                uint8_t priority, uint8_t random_value, uint8_t error_code)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     artie_can_frame_t frame;
@@ -408,7 +408,7 @@ int artie_can_rpcacp_send_nack(artie_can_context_t *ctx, uint8_t target_addr,
     frame.dlc = 1;
 
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     return ctx->backend.send(ctx->backend.context, &frame);

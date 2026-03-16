@@ -13,12 +13,12 @@
 int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Validate node address (6 bits) */
     if (node_address > 0x3F) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Initialize context */
@@ -41,7 +41,7 @@ int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_bac
             break;
 
         default:
-            return -1;
+            return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (result != 0) {
@@ -62,12 +62,12 @@ int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_bac
 int artie_can_init_mock(artie_can_context_t *ctx, uint8_t node_address, const artie_can_mock_config_t *mock_config)
 {
     if (!ctx || !mock_config) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Validate node address (6 bits) */
     if (node_address > 0x3F) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Initialize context */
@@ -94,12 +94,12 @@ int artie_can_init_mock(artie_can_context_t *ctx, uint8_t node_address, const ar
 int artie_can_init_custom(artie_can_context_t *ctx, uint8_t node_address, const artie_can_backend_t *backend)
 {
     if (!ctx || !backend) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Validate node address (6 bits) */
     if (node_address > 0x3F) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Initialize context */
@@ -123,7 +123,7 @@ int artie_can_init_custom(artie_can_context_t *ctx, uint8_t node_address, const 
 int artie_can_close(artie_can_context_t *ctx)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Close backend */

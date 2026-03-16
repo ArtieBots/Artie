@@ -79,7 +79,7 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
                                size_t payload_len, bool interrupt)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Byte stuff the payload */
@@ -130,7 +130,7 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
     }
 
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     int result = ctx->backend.send(ctx->backend.context, &frame);
@@ -154,11 +154,11 @@ int artie_can_bwacp_send_data(artie_can_context_t *ctx, uint8_t target_addr, uin
                               uint8_t priority, const uint8_t *payload, size_t payload_len)
 {
     if (!ctx || !payload) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     size_t offset = 0;
@@ -196,11 +196,11 @@ int artie_can_bwacp_send_data(artie_can_context_t *ctx, uint8_t target_addr, uin
 int artie_can_bwacp_receive(artie_can_context_t *ctx, artie_can_bwacp_msg_t *msg, uint32_t timeout_ms)
 {
     if (!ctx || !msg) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (!ctx->backend.receive) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* Receive frames until we get a BWACP frame */
@@ -214,7 +214,7 @@ int artie_can_bwacp_receive(artie_can_context_t *ctx, artie_can_bwacp_msg_t *msg
     /* Check if this is a BWACP frame */
     uint8_t protocol = artie_can_get_protocol(&frame);
     if (protocol != ARTIE_CAN_PROTOCOL_BWACP) {
-        return -1;  /* Not BWACP */
+        return ARTIE_CAN_ERR_PROTOCOL;  /* Not BWACP */
     }
 
     /* Parse CAN ID */
@@ -230,7 +230,7 @@ int artie_can_bwacp_receive(artie_can_context_t *ctx, artie_can_bwacp_msg_t *msg
     if (msg->frame_type == ARTIE_CAN_BWACP_READY) {
         /* Parse READY frame */
         if (frame.dlc < 7) {
-            return -1;
+            return ARTIE_CAN_ERR_PROTOCOL;
         }
 
         msg->crc24 = (frame.data[0] << ARTIE_CAN_BYTE2_SHIFT) | (frame.data[1] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[2];
@@ -257,7 +257,7 @@ int artie_can_bwacp_receive(artie_can_context_t *ctx, artie_can_bwacp_msg_t *msg
         return 0;
     }
 
-    return -1;  /* Unsupported frame type */
+    return ARTIE_CAN_ERR_NOT_IMPLEMENTED;  /* Unsupported frame type */
 }
 
 /**
@@ -267,7 +267,7 @@ int artie_can_bwacp_send_repeat(artie_can_context_t *ctx, uint8_t target_addr,
                                 uint8_t priority, bool repeat_all)
 {
     if (!ctx) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     artie_can_frame_t frame;
@@ -278,7 +278,7 @@ int artie_can_bwacp_send_repeat(artie_can_context_t *ctx, uint8_t target_addr,
     frame.dlc = 0;  /* REPEAT has no data */
 
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     return ctx->backend.send(ctx->backend.context, &frame);
