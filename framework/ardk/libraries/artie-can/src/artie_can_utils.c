@@ -65,13 +65,13 @@ int artie_can_byte_stuff(const uint8_t *input, size_t input_len,
                          uint8_t *output, size_t output_max_len, size_t *output_len)
 {
     if (!input || !output || !output_len) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Handle empty input */
     if (input_len == 0) {
         if (output_max_len < 1) {
-            return -1;  /* Not enough space */
+            return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Not enough space */
         }
         output[0] = 0xFF;  /* No data */
         *output_len = 1;
@@ -88,7 +88,7 @@ int artie_can_byte_stuff(const uint8_t *input, size_t input_len,
 
         /* Check if we have enough space for special byte + data + potentially final special byte */
         if (out_idx + 1 + chunk_size + 1 > output_max_len) {
-            return -1;  /* Not enough space */
+            return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Not enough space */
         }
 
         /* Write special byte indicating position of next special byte */
@@ -102,7 +102,7 @@ int artie_can_byte_stuff(const uint8_t *input, size_t input_len,
 
     /* Add final special byte */
     if (out_idx >= output_max_len) {
-        return -1;  /* Not enough space */
+        return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Not enough space */
     }
     output[out_idx++] = 0xFF;
 
@@ -117,11 +117,11 @@ int artie_can_byte_unstuff(const uint8_t *input, size_t input_len,
                            uint8_t *output, size_t output_max_len, size_t *output_len)
 {
     if (!input || !output || !output_len) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (input_len == 0) {
-        return -1;  /* Invalid input */
+        return ARTIE_CAN_ERR_INVALID_ARG;  /* Invalid input */
     }
 
     /* Check for no data case */
@@ -138,7 +138,7 @@ int artie_can_byte_unstuff(const uint8_t *input, size_t input_len,
 
         /* Check for error condition */
         if (special_byte == 0x00) {
-            return -1;  /* Error in stuffing */
+            return ARTIE_CAN_ERR_STUFFING;  /* Error in stuffing */
         }
 
         /* Check for end marker */
@@ -148,12 +148,12 @@ int artie_can_byte_unstuff(const uint8_t *input, size_t input_len,
 
         /* Validate we have enough input data */
         if (in_idx + special_byte > input_len) {
-            return -1;  /* Invalid stuffing */
+            return ARTIE_CAN_ERR_UNSTUFFING;  /* Invalid stuffing */
         }
 
         /* Check output space */
         if (out_idx + special_byte > output_max_len) {
-            return -1;  /* Not enough output space */
+            return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Not enough output space */
         }
 
         /* Copy data bytes */

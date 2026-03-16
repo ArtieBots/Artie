@@ -66,7 +66,7 @@ static int rtacp_parse_frame(const artie_can_frame_t *frame, artie_can_rtacp_msg
     /* Copy data */
     msg->data_len = frame->dlc;
     if (msg->data_len > ARTIE_CAN_MAX_DATA_SIZE) {
-        return -1;
+        return ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE;
     }
     memcpy(msg->data, frame->data, msg->data_len);
 
@@ -79,7 +79,7 @@ static int rtacp_parse_frame(const artie_can_frame_t *frame, artie_can_rtacp_msg
 int artie_can_rtacp_send(artie_can_context_t *ctx, const artie_can_rtacp_msg_t *msg, bool wait_ack)
 {
     if (!ctx || !msg) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Build CAN frame */
@@ -89,14 +89,14 @@ int artie_can_rtacp_send(artie_can_context_t *ctx, const artie_can_rtacp_msg_t *
     frame.dlc = msg->data_len;
 
     if (msg->data_len > ARTIE_CAN_MAX_DATA_SIZE) {
-        return -1;
+        return ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE;
     }
 
     memcpy(frame.data, msg->data, msg->data_len);
 
     /* Send frame */
     if (!ctx->backend.send) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     int result = ctx->backend.send(ctx->backend.context, &frame);
@@ -133,7 +133,7 @@ int artie_can_rtacp_send(artie_can_context_t *ctx, const artie_can_rtacp_msg_t *
         }
 
         /* Timeout or error - should resend, but for now just return error */
-        return -1;
+        return ARTIE_CAN_ERR_TIMEOUT;
     }
 
     return 0;
@@ -145,11 +145,11 @@ int artie_can_rtacp_send(artie_can_context_t *ctx, const artie_can_rtacp_msg_t *
 int artie_can_rtacp_receive(artie_can_context_t *ctx, artie_can_rtacp_msg_t *msg, uint32_t timeout_ms)
 {
     if (!ctx || !msg) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (!ctx->backend.receive) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* Receive frames until we get an RTACP frame */

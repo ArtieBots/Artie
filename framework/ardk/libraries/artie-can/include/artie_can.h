@@ -51,8 +51,37 @@ extern "C" {
 #define ARTIE_CAN_MAX_RPC_PAYLOAD 1024
 #define ARTIE_CAN_MAX_PUBSUB_PAYLOAD 2048
 
-/* Error codes (errno compatible) */
-#define ARTIE_CAN_SUCCESS 0
+/* Error codes */
+typedef enum {
+    ARTIE_CAN_SUCCESS = 0,                  /* Success */
+    ARTIE_CAN_ERR_INVALID_ARG = -1,         /* Invalid argument (NULL pointer, out of range, etc.) */
+    ARTIE_CAN_ERR_TIMEOUT = -2,             /* Operation timed out */
+    ARTIE_CAN_ERR_NO_DATA = -3,             /* No data available */
+    ARTIE_CAN_ERR_BUFFER_FULL = -4,         /* Buffer is full */
+    ARTIE_CAN_ERR_BUFFER_TOO_SMALL = -5,    /* Buffer too small for operation */
+    ARTIE_CAN_ERR_PROTOCOL = -6,            /* Protocol error (wrong frame type, etc.) */
+    ARTIE_CAN_ERR_CRC = -7,                 /* CRC mismatch */
+    ARTIE_CAN_ERR_BACKEND = -8,             /* Backend operation failed */
+    ARTIE_CAN_ERR_NOT_INITIALIZED = -9,     /* Context not initialized */
+    ARTIE_CAN_ERR_STUFFING = -10,           /* Byte stuffing error */
+    ARTIE_CAN_ERR_UNSTUFFING = -11,         /* Byte unstuffing error */
+    ARTIE_CAN_ERR_NETWORK = -12,            /* Network error (socket, connection, etc.) */
+    ARTIE_CAN_ERR_NOT_CONNECTED = -13,      /* Not connected (TCP backend) */
+    ARTIE_CAN_ERR_SEND_FAILED = -14,        /* Send operation failed */
+    ARTIE_CAN_ERR_RECV_FAILED = -15,        /* Receive operation failed */
+    ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE = -16,  /* Payload exceeds maximum size */
+    ARTIE_CAN_ERR_NOT_IMPLEMENTED = -17,    /* Feature not implemented */
+
+    /* Legacy errno-compatible codes (for RPCACP NACK compatibility) */
+    ARTIE_CAN_ERR_PERM = -100,              /* EPERM - Operation not permitted */
+    ARTIE_CAN_ERR_E2BIG = -101,             /* E2BIG - Argument list too long */
+    ARTIE_CAN_ERR_ENOEXEC = -102,           /* ENOEXEC - Exec format error */
+    ARTIE_CAN_ERR_EAGAIN = -103,            /* EAGAIN - Try again */
+    ARTIE_CAN_ERR_EINVAL = -104,            /* EINVAL - Invalid argument */
+    ARTIE_CAN_ERR_EALREADY = -105           /* EALREADY - Operation already in progress */
+} artie_can_error_t;
+
+/* Legacy error code defines for backward compatibility */
 #define ARTIE_CAN_ERROR_PERM 0x01    /* EPERM */
 #define ARTIE_CAN_ERROR_E2BIG 0x07   /* E2BIG */
 #define ARTIE_CAN_ERROR_ENOEXEC 0x08 /* ENOEXEC */
