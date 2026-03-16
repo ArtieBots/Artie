@@ -69,7 +69,7 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
                             bool high_priority, const uint8_t *payload, size_t payload_len)
 {
     if (!ctx || (payload_len > 0 && !payload)) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Byte stuff the payload */
@@ -106,7 +106,7 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
         frame.dlc = 2 + stuffed_len;
 
         if (!ctx->backend.send) {
-            return -1;
+            return ARTIE_CAN_ERR_NOT_INITIALIZED;
         }
         return ctx->backend.send(ctx->backend.context, &frame);
     } else {
@@ -116,7 +116,7 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
         data_offset = frame_data_space;
 
         if (!ctx->backend.send) {
-            return -1;
+            return ARTIE_CAN_ERR_NOT_INITIALIZED;
         }
         int result = ctx->backend.send(ctx->backend.context, &frame);
         if (result != 0) {
@@ -152,11 +152,11 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
 int artie_can_psacp_receive(artie_can_context_t *ctx, artie_can_psacp_msg_t *msg, uint32_t timeout_ms)
 {
     if (!ctx || !msg) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     if (!ctx->backend.receive) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* Receive frames until we get a PSACP frame */
@@ -171,7 +171,7 @@ int artie_can_psacp_receive(artie_can_context_t *ctx, artie_can_psacp_msg_t *msg
     uint8_t protocol = artie_can_get_protocol(&frame);
     if (protocol != ARTIE_CAN_PROTOCOL_PSACP_HIGH &&
         protocol != ARTIE_CAN_PROTOCOL_PSACP_LOW) {
-        return -1;  /* Not PSACP */
+        return ARTIE_CAN_ERR_PROTOCOL;  /* Not PSACP */
     }
 
     /* Parse CAN ID */
@@ -181,7 +181,7 @@ int artie_can_psacp_receive(artie_can_context_t *ctx, artie_can_psacp_msg_t *msg
     if (msg->frame_type == ARTIE_CAN_PSACP_PUB) {
         /* Parse CRC and collect payload */
         if (frame.dlc < 2) {
-            return -1;
+            return ARTIE_CAN_ERR_PROTOCOL;
         }
 
         msg->crc16 = (frame.data[0] << ARTIE_CAN_BYTE1_SHIFT) | frame.data[1];
@@ -216,5 +216,5 @@ int artie_can_psacp_receive(artie_can_context_t *ctx, artie_can_psacp_msg_t *msg
         return 0;
     }
 
-    return -1;  /* Unsupported frame type or need continuation */
+    return ARTIE_CAN_ERR_NOT_IMPLEMENTED;  /* Unsupported frame type or need continuation */
 }

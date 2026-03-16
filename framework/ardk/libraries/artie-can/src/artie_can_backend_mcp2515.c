@@ -38,7 +38,7 @@ static int mcp2515_send(void *ctx, const artie_can_frame_t *frame)
     mcp2515_context_t *mcp = (mcp2515_context_t *)ctx;
 
     if (!mcp->initialized) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* TODO: Load CAN frame into MCP2515 TX buffer */
@@ -54,7 +54,7 @@ static int mcp2515_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeout
     mcp2515_context_t *mcp = (mcp2515_context_t *)ctx;
 
     if (!mcp->initialized) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_INITIALIZED;
     }
 
     /* TODO: Check if RX buffers have data */
@@ -63,7 +63,7 @@ static int mcp2515_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeout
 
     (void)frame;
     (void)timeout_ms;
-    return -1;  /* Stub: always timeout */
+    return ARTIE_CAN_ERR_NO_DATA;  /* Stub: always timeout */
 }
 
 static int mcp2515_close(void *ctx)
@@ -80,7 +80,7 @@ static int mcp2515_close(void *ctx)
 int artie_can_backend_mcp2515_init(artie_can_backend_t *backend)
 {
     if (!backend) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     backend->init = mcp2515_init;

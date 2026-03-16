@@ -34,7 +34,7 @@ static int socketcan_init(void *ctx)
     /* Create socket */
     sc->socket_fd = socket(PF_CAN, SOCK_RAW, CAN_RAW);
     if (sc->socket_fd < 0) {
-        return -1;
+        return ARTIE_CAN_ERR_NETWORK;
     }
 
     /* Get interface index */
@@ -44,7 +44,7 @@ static int socketcan_init(void *ctx)
     if (ioctl(sc->socket_fd, SIOCGIFINDEX, &ifr) < 0) {
         close(sc->socket_fd);
         sc->socket_fd = -1;
-        return -1;
+        return ARTIE_CAN_ERR_NETWORK;
     }
 
     /* Bind socket to CAN interface */
@@ -55,7 +55,7 @@ static int socketcan_init(void *ctx)
     if (bind(sc->socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(sc->socket_fd);
         sc->socket_fd = -1;
-        return -1;
+        return ARTIE_CAN_ERR_NETWORK;
     }
 
     return 0;
@@ -67,7 +67,7 @@ static int socketcan_send(void *ctx, const artie_can_frame_t *frame)
     struct can_frame can_frame;
 
     if (sc->socket_fd < 0) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_CONNECTED;
     }
 
     /* Convert to SocketCAN frame */
@@ -85,7 +85,7 @@ static int socketcan_send(void *ctx, const artie_can_frame_t *frame)
     /* Send frame */
     ssize_t nbytes = write(sc->socket_fd, &can_frame, sizeof(struct can_frame));
     if (nbytes != sizeof(struct can_frame)) {
-        return -1;
+        return ARTIE_CAN_ERR_SEND_FAILED;
     }
 
     return 0;
@@ -97,7 +97,7 @@ static int socketcan_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeo
     struct can_frame can_frame;
 
     if (sc->socket_fd < 0) {
-        return -1;
+        return ARTIE_CAN_ERR_NOT_CONNECTED;
     }
 
     /* Use poll for timeout */
@@ -107,7 +107,7 @@ static int socketcan_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeo
 
     int ret = poll(&pfd, 1, timeout_ms);
     if (ret < 0) {
-        return -1;  /* Error */
+        return ARTIE_CAN_ERR_RECV_FAILED;  /* Error */
     } else if (ret == 0) {
         return -2;  /* Timeout */
     }
@@ -115,7 +115,7 @@ static int socketcan_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeo
     /* Receive frame */
     ssize_t nbytes = read(sc->socket_fd, &can_frame, sizeof(struct can_frame));
     if (nbytes != sizeof(struct can_frame)) {
-        return -1;
+        return ARTIE_CAN_ERR_RECV_FAILED;
     }
 
     /* Convert from SocketCAN frame */
@@ -148,7 +148,7 @@ static int socketcan_close(void *ctx)
 int artie_can_backend_socketcan_init(artie_can_backend_t *backend)
 {
     if (!backend) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     backend->init = socketcan_init;
@@ -166,7 +166,7 @@ int artie_can_backend_socketcan_init(artie_can_backend_t *backend)
 int artie_can_backend_socketcan_init(artie_can_backend_t *backend)
 {
     (void)backend;
-    return -1;  /* Not supported on this platform */
+    return ARTIE_CAN_ERR_NOT_IMPLEMENTED;  /* Not supported on this platform */
 }
 
 #endif /* __linux__ */

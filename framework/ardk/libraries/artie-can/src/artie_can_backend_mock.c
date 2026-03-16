@@ -70,7 +70,7 @@ static int mock_queue_send(void *ctx, const artie_can_frame_t *frame)
     mock_queue_context_t *mock = (mock_queue_context_t *)ctx;
 
     if (mock->count >= MOCK_QUEUE_SIZE) {
-        return -1;  /* Queue full */
+        return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Queue full */
     }
 
     /* Add to queue */
@@ -88,7 +88,7 @@ static int mock_queue_receive(void *ctx, artie_can_frame_t *frame, uint32_t time
     (void)timeout_ms;  /* Ignore timeout in local queue mock */
 
     if (mock->count == 0) {
-        return -1;  /* Queue empty */
+        return ARTIE_CAN_ERR_NO_DATA;  /* Queue empty */
     }
 
     /* Remove from queue */
@@ -108,7 +108,7 @@ static int mock_queue_close(void *ctx)
 int artie_can_backend_mock_init(artie_can_backend_t *backend)
 {
     if (!backend) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     backend->init = mock_queue_init;
@@ -129,14 +129,14 @@ static int mock_tcp_init(void *ctx)
 #ifdef _WIN32
     WSADATA wsa_data;
     if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
-        return -1;
+        return ARTIE_CAN_ERR_NETWORK;
     }
 #endif
 
     /* Create socket */
     mock->sock = socket(AF_INET, SOCK_STREAM, 0);
     if (mock->sock == INVALID_SOCKET) {
-        return -1;
+        return ARTIE_CAN_ERR_NETWORK;
     }
 
     /* Set socket to non-blocking mode */
@@ -163,12 +163,12 @@ static int mock_tcp_init(void *ctx)
 
         if (bind(mock->sock, (struct sockaddr *)&mock->addr, sizeof(mock->addr)) == SOCKET_ERROR) {
             closesocket(mock->sock);
-            return -1;
+            return ARTIE_CAN_ERR_NETWORK;
         }
 
         if (listen(mock->sock, 1) == SOCKET_ERROR) {
             closesocket(mock->sock);
-            return -1;
+            return ARTIE_CAN_ERR_NETWORK;
         }
 
         mock->client_sock = INVALID_SOCKET;
@@ -183,12 +183,12 @@ static int mock_tcp_init(void *ctx)
 #ifdef _WIN32
         if (result == SOCKET_ERROR && WSAGetLastError() != WSAEWOULDBLOCK) {
             closesocket(mock->sock);
-            return -1;
+            return ARTIE_CAN_ERR_NETWORK;
         }
 #else
         if (result == SOCKET_ERROR && errno != EINPROGRESS) {
             closesocket(mock->sock);
-            return -1;
+            return ARTIE_CAN_ERR_NETWORK;
         }
 #endif
 
@@ -239,7 +239,7 @@ static int mock_tcp_send(void *ctx, const artie_can_frame_t *frame)
     mock_tcp_context_t *mock = (mock_tcp_context_t *)ctx;
 
     if (mock_tcp_ensure_connection(mock) != 0) {
-        return -1;  /* Not connected */
+        return ARTIE_CAN_ERR_NOT_CONNECTED;  /* Not connected */
     }
 
     SOCKET send_sock = mock->is_server ? mock->client_sock : mock->sock;
@@ -248,13 +248,13 @@ static int mock_tcp_send(void *ctx, const artie_can_frame_t *frame)
     uint32_t frame_size = sizeof(artie_can_frame_t);
     ssize_t sent = send(send_sock, (char *)&frame_size, sizeof(frame_size), 0);
     if (sent != sizeof(frame_size)) {
-        return -1;
+        return ARTIE_CAN_ERR_SEND_FAILED;
     }
 
     /* Send frame data */
     sent = send(send_sock, (char *)frame, sizeof(artie_can_frame_t), 0);
     if (sent != sizeof(artie_can_frame_t)) {
-        return -1;
+        return ARTIE_CAN_ERR_SEND_FAILED;
     }
 
     return 0;
@@ -265,7 +265,7 @@ static int mock_tcp_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeou
     mock_tcp_context_t *mock = (mock_tcp_context_t *)ctx;
 
     if (mock_tcp_ensure_connection(mock) != 0) {
-        return -1;  /* Not connected */
+        return ARTIE_CAN_ERR_NOT_CONNECTED;  /* Not connected */
     }
 
     SOCKET recv_sock = mock->is_server ? mock->client_sock : mock->sock;
@@ -288,13 +288,13 @@ static int mock_tcp_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeou
     uint32_t frame_size;
     ssize_t received = recv(recv_sock, (char *)&frame_size, sizeof(frame_size), 0);
     if (received != sizeof(frame_size)) {
-        return -1;
+        return ARTIE_CAN_ERR_RECV_FAILED;
     }
 
     /* Receive frame data */
     received = recv(recv_sock, (char *)frame, sizeof(artie_can_frame_t), 0);
     if (received != sizeof(artie_can_frame_t)) {
-        return -1;
+        return ARTIE_CAN_ERR_RECV_FAILED;
     }
 
     return 0;
@@ -325,7 +325,7 @@ static int mock_tcp_close(void *ctx)
 int artie_can_backend_mock_tcp_init(artie_can_backend_t *backend, const artie_can_mock_config_t *config)
 {
     if (!backend || !config) {
-        return -1;
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     /* Configure TCP context */
