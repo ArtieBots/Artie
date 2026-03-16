@@ -24,7 +24,7 @@ class TestRTACPBasicSending:
         """Test sending a broadcast RTACP message."""
         mock_can_node.rtacp_send(
             target_addr=0x00,  # Broadcast address
-            data=b"Broadcast",
+            data=b"Broad",
             priority=Priority.HIGH
         )
         # Should not raise any exceptions
@@ -142,7 +142,7 @@ class TestRTACPCommunication:
         """Test broadcast message communication."""
         node1, node2 = mock_can_pair
 
-        test_data = b"Broadcast"
+        test_data = b"Broad"
         node1.rtacp_send(
             target_addr=0x00,  # Broadcast
             data=test_data,
@@ -217,7 +217,7 @@ class TestRTACPAcknowledgment:
         # Broadcast should not wait for ACK (undefined behavior)
         mock_can_node.rtacp_send(
             target_addr=0x00,  # Broadcast
-            data=b"Broadcast",
+            data=b"Broad",
             priority=Priority.HIGH,
             wait_ack=False  # Should be False for broadcast
         )

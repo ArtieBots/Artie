@@ -13,6 +13,10 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 typedef int socklen_t;
+/* MSVC doesn't have ssize_t, so define it */
+#ifndef ssize_t
+typedef SSIZE_T ssize_t;
+#endif
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>

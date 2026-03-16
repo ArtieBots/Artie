@@ -271,8 +271,7 @@ class ArtieCAN:
     This class provides a Pythonic interface to the Artie CAN library.
     """
 
-    def __init__(self, node_address: int, backend: BackendType = BackendType.SOCKETCAN,
-                 mock_host: str = "localhost", mock_port: int = 5555, mock_server: bool = False):
+    def __init__(self, node_address: int, backend=BackendType.SOCKETCAN, mock_host="localhost", mock_port=5555, mock_server=False):
         """
         Initialize Artie CAN context
 
@@ -291,8 +290,8 @@ class ArtieCAN:
 
         self._ctx = CANContext()
 
-        if backend == BackendType.MOCK and (mock_host != "localhost" or mock_port != 5555):
-            # Use TCP mock backend with custom configuration
+        if backend == BackendType.MOCK:
+            # Use TCP mock backend
             mock_config = MockConfig()
             mock_config.host = mock_host.encode('utf-8')
             mock_config.port = mock_port
@@ -322,13 +321,16 @@ class ArtieCAN:
         Send an RTACP message
 
         Args:
-            target_addr: Target address (0 for broadcast)
+            target_addr: Target address (0 for broadcast). At most 6 bits (0-63).
             data: Data to send (max 8 bytes)
             priority: Message priority
             wait_ack: Wait for ACK if targeted (not broadcast)
         """
         if len(data) > 8:
             raise ValueError("RTACP data must be <= 8 bytes")
+
+        if not (0 <= target_addr <= 63):
+            raise ValueError("Target address must be 0-63 (0 is broadcast)")
 
         msg = RTACPMessage()
         msg.frame_type = RTACPFrameType.MSG
