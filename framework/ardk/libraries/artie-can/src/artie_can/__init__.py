@@ -450,10 +450,7 @@ class ArtieCAN:
         else:
             data_arr = (ctypes.c_uint8 * 0)()
 
-        result = _lib.artie_can_bwacp_send_ready(
-            ctypes.byref(self._ctx), target_addr, class_mask,
-            priority.value, block_id, data_arr, len(data), interrupt
-        )
+        result = _lib.artie_can_bwacp_send_ready(ctypes.byref(self._ctx), target_addr, class_mask, priority.value, block_id, data_arr, len(data), interrupt)
         if result != 0:
             raise ArtieCANException(f"BWACP write failed: {result}")
 
