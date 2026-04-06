@@ -8,16 +8,27 @@ the Artie CAN Protocol for communication over CAN bus.
 import ctypes
 import os
 import pathlib
+import sys
 from typing import Optional, Tuple, List
 from enum import IntEnum
 
 # Find the shared library
-_lib_name = "libartie_can.so"
+# Determine platform-specific library name
+if sys.platform == "win32":
+    _lib_name = "artie_can.dll"
+elif sys.platform == "darwin":
+    _lib_name = "libartie_can.dylib"
+else:
+    _lib_name = "libartie_can.so"
+
 _lib_path = None
 
 # Search in common locations
 _search_paths = [
     pathlib.Path(__file__).parent / "lib",
+    pathlib.Path(__file__).parent.parent.parent / "build" / "Debug",  # Windows MSVC Debug build
+    pathlib.Path(__file__).parent.parent.parent / "build" / "Release",  # Windows MSVC Release build
+    pathlib.Path(__file__).parent.parent.parent / "build",  # Linux/Mac build
     pathlib.Path("/usr/local/lib"),
     pathlib.Path("/usr/lib"),
 ]
@@ -37,6 +48,13 @@ try:
 except OSError:
     # Library not found - this might be OK if we're just importing for documentation
     _lib = None
+
+
+# ===== Error Codes =====
+
+# Error code constants matching the C library
+ARTIE_CAN_ERR_TIMEOUT = -2
+ARTIE_CAN_ERR_NO_DATA = -3
 
 
 # ===== Enums =====
@@ -271,16 +289,17 @@ class ArtieCAN:
     This class provides a Pythonic interface to the Artie CAN library.
     """
 
-    def __init__(self, node_address: int, backend=BackendType.SOCKETCAN, mock_host="localhost", mock_port=5555, mock_server=False):
+    def __init__(self, node_address: int, backend=BackendType.SOCKETCAN, mock_host="localhost", mock_port=None, mock_server=False):
         """
         Initialize Artie CAN context
 
         Args:
             node_address: This node's CAN address (0-63)
             backend: Backend type to use
-            mock_host: Host for mock TCP backend (only used if backend is MOCK)
-            mock_port: Port for mock TCP backend (only used if backend is MOCK)
-            mock_server: If True, act as server; if False, act as client (only used if backend is MOCK)
+            mock_host: Host for mock TCP backend (only used if backend is MOCK and mock_port is specified)
+            mock_port: Port for mock TCP backend. If None (default), uses queue-based mock with shared queue.
+                      If specified, uses TCP-based mock for network testing.
+            mock_server: If True, act as server; if False, act as client (only used if backend is MOCK and mock_port is specified)
         """
         if _lib is None:
             raise ArtieCANException("Artie CAN library not found")
@@ -290,8 +309,8 @@ class ArtieCAN:
 
         self._ctx = CANContext()
 
-        if backend == BackendType.MOCK:
-            # Use TCP mock backend
+        if backend == BackendType.MOCK and mock_port is not None:
+            # Use TCP mock backend for network testing
             mock_config = MockConfig()
             mock_config.host = mock_host.encode('utf-8')
             mock_config.port = mock_port
@@ -299,7 +318,7 @@ class ArtieCAN:
 
             result = _lib.artie_can_init_mock(ctypes.byref(self._ctx), node_address, ctypes.byref(mock_config))
         else:
-            # Use standard backend initialization
+            # Use standard backend initialization (queue-based for MOCK)
             result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value)
 
         if result != 0:
@@ -358,6 +377,8 @@ class ArtieCAN:
         msg = RTACPMessage()
         result = _lib.artie_can_rtacp_receive(ctypes.byref(self._ctx), ctypes.byref(msg), timeout_ms)
         if result != 0:
+            if result == ARTIE_CAN_ERR_TIMEOUT or result == ARTIE_CAN_ERR_NO_DATA:
+                raise TimeoutError(f"RTACP receive timed out")
             raise ArtieCANException(f"RTACP receive failed: {result}")
 
         data = bytes(msg.data[:msg.data_len])
@@ -421,13 +442,14 @@ class ArtieCAN:
         msg = PSACPMessage()
         result = _lib.artie_can_psacp_receive(ctypes.byref(self._ctx), ctypes.byref(msg), timeout_ms)
         if result != 0:
+            if result == ARTIE_CAN_ERR_TIMEOUT or result == ARTIE_CAN_ERR_NO_DATA:
+                raise TimeoutError(f"PSACP receive timed out")
             raise ArtieCANException(f"Receive failed: {result}")
 
         data = bytes(msg.payload[:msg.payload_len])
         return (msg.sender_addr, msg.topic, data)
 
-    def bwacp_write(self, target_addr: int, block_id: int, data: bytes,
-                    priority: Priority = Priority.MED_LOW, class_mask: int = 0, interrupt: bool = False):
+    def bwacp_write(self, target_addr: int, block_id: int, data: bytes, priority: Priority = Priority.MED_LOW, class_mask: int = 0, interrupt: bool = False):
         """
         Write a block of data using BWACP (Block Write Addressed Communication Protocol)
 
@@ -467,6 +489,8 @@ class ArtieCAN:
         msg = BWACPMessage()
         result = _lib.artie_can_bwacp_receive(ctypes.byref(self._ctx), ctypes.byref(msg), timeout_ms)
         if result != 0:
+            if result == ARTIE_CAN_ERR_TIMEOUT or result == ARTIE_CAN_ERR_NO_DATA:
+                raise TimeoutError(f"BWACP receive timed out")
             raise ArtieCANException(f"BWACP receive failed: {result}")
 
         data = bytes(msg.payload[:msg.payload_len])
