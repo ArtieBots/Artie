@@ -72,6 +72,11 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
+    /* Validate payload size (must fit after byte stuffing) */
+    if (payload_len > ARTIE_CAN_MAX_UNSTUFFED_PUBSUB_PAYLOAD) {
+        return ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE;
+    }
+
     /* Byte stuff the payload */
     uint8_t stuffed_payload[ARTIE_CAN_MAX_STUFFED_PAYLOAD];
     size_t stuffed_len = 0;

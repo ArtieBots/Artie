@@ -56,6 +56,12 @@ except OSError:
 ARTIE_CAN_ERR_TIMEOUT = -2
 ARTIE_CAN_ERR_NO_DATA = -3
 
+# Maximum payload sizes (accounting for byte-stuffing overhead)
+# Byte stuffing adds ~1 byte per 254 bytes + 1 final byte
+MAX_UNSTUFFED_RPC_PAYLOAD = 1018      # For 1024-byte stuffed buffer
+MAX_UNSTUFFED_PUBSUB_PAYLOAD = 2038   # For 2048-byte stuffed buffer
+MAX_UNSTUFFED_BWACP_PAYLOAD = 2038    # For 2048-byte stuffed buffer
+
 
 # ===== Enums =====
 
@@ -392,7 +398,7 @@ class ArtieCAN:
         Args:
             target_addr: Target node address
             procedure_id: RPC procedure ID (0-127)
-            payload: Serialized arguments
+            payload: Serialized arguments (max 1018 bytes before byte-stuffing)
             priority: Message priority
             synchronous: True for synchronous (blocking) RPC
         """
@@ -401,6 +407,9 @@ class ArtieCAN:
 
         if not (0 <= procedure_id <= 127):
             raise ValueError("Procedure ID must be 0-127")
+
+        if len(payload) > MAX_UNSTUFFED_RPC_PAYLOAD:
+            raise ValueError(f"Payload too large: {len(payload)} bytes (max {MAX_UNSTUFFED_RPC_PAYLOAD} before byte-stuffing)")
 
         payload_arr = (ctypes.c_uint8 * len(payload))(*payload)
         result = _lib.artie_can_rpcacp_call(
@@ -417,10 +426,12 @@ class ArtieCAN:
 
         Args:
             topic: Topic ID (0x0B-0xF4, or 0x00 for broadcast)
-            data: Message data
+            data: Message data (max 2038 bytes before byte-stuffing)
             priority: Message priority
             high_priority: Use high priority pub/sub
         """
+        if len(data) > MAX_UNSTUFFED_PUBSUB_PAYLOAD:
+            raise ValueError(f"Payload too large: {len(data)} bytes (max {MAX_UNSTUFFED_PUBSUB_PAYLOAD} before byte-stuffing)")
         data_arr = (ctypes.c_uint8 * len(data))(*data)
         result = _lib.artie_can_psacp_publish(
             ctypes.byref(self._ctx), topic, priority.value,
@@ -456,7 +467,7 @@ class ArtieCAN:
         Args:
             target_addr: Target node address (1-63, or 0 for broadcast)
             block_id: Block identifier (0-4294967295)
-            data: Data to write
+            data: Data to write (max 2038 bytes before byte-stuffing)
             priority: Message priority
             class_mask: Class mask for multicast (default 0 for unicast)
             interrupt: If True, interrupt any ongoing transfer (default False)
@@ -466,6 +477,9 @@ class ArtieCAN:
 
         if not (0 <= block_id <= 0xFFFFFFFF):
             raise ValueError("Block ID must be 0-4294967295")
+
+        if len(data) > MAX_UNSTUFFED_BWACP_PAYLOAD:
+            raise ValueError(f"Payload too large: {len(data)} bytes (max {MAX_UNSTUFFED_BWACP_PAYLOAD} before byte-stuffing)")
 
         if len(data) > 0:
             data_arr = (ctypes.c_uint8 * len(data)).from_buffer_copy(data)

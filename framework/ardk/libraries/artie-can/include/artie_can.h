@@ -46,10 +46,17 @@ extern "C" {
 #define ARTIE_CAN_PRIORITY_MED_LOW 0x02
 #define ARTIE_CAN_PRIORITY_LOW 0x03
 
-/* Maximum payload sizes (accounting for byte stuffing overhead) */
+/* Maximum payload sizes for stuffed data (after byte stuffing) */
 #define ARTIE_CAN_MAX_STUFFED_PAYLOAD 2048
 #define ARTIE_CAN_MAX_RPC_PAYLOAD 1024
 #define ARTIE_CAN_MAX_PUBSUB_PAYLOAD 2048
+
+/* Maximum payload sizes for UNSTUFFED data (before byte stuffing)
+ * Byte stuffing adds 1 byte per 254 bytes + 1 final byte
+ * Formula: max_unstuffed where (max_unstuffed + ceil(max_unstuffed/254) + 1) <= max_stuffed */
+#define ARTIE_CAN_MAX_UNSTUFFED_RPC_PAYLOAD 1018      /* For 1024-byte stuffed buffer */
+#define ARTIE_CAN_MAX_UNSTUFFED_PUBSUB_PAYLOAD 2038   /* For 2048-byte stuffed buffer */
+#define ARTIE_CAN_MAX_UNSTUFFED_BWACP_PAYLOAD 2038    /* For 2048-byte stuffed buffer */
 
 /* Error codes */
 typedef enum {

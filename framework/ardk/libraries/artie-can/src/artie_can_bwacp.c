@@ -82,13 +82,17 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
+    /* Validate payload size (must fit after byte stuffing) */
+    if (payload_len > ARTIE_CAN_MAX_UNSTUFFED_BWACP_PAYLOAD) {
+        return ARTIE_CAN_ERR_PAYLOAD_TOO_LARGE;
+    }
+
     /* Byte stuff the payload */
     uint8_t stuffed_payload[ARTIE_CAN_MAX_STUFFED_PAYLOAD];
     size_t stuffed_len = 0;
 
     if (payload_len > 0 && payload) {
-        int result = artie_can_byte_stuff(payload, payload_len, stuffed_payload,
-                                         sizeof(stuffed_payload), &stuffed_len);
+        int result = artie_can_byte_stuff(payload, payload_len, stuffed_payload, sizeof(stuffed_payload), &stuffed_len);
         if (result != 0) {
             return result;
         }
