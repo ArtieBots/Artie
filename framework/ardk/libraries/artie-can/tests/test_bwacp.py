@@ -48,6 +48,18 @@ class TestBWACPBasicBlockWrite:
                 priority=Priority.MED_LOW
             )
 
+    def test_block_write_oversized_payload(self, mock_can_node):
+        """Test block write with payload exceeding maximum unstuffed size."""
+        # Maximum unstuffed BWACP payload is 2038 bytes
+        oversized_data = b"X" * 2500  # Way over the limit
+        with pytest.raises(ValueError, match="Payload too large"):
+            mock_can_node.bwacp_write(
+                target_addr=0x02,
+                block_id=1,
+                data=oversized_data,
+                priority=Priority.MED_LOW
+            )
+
 
 class TestBWACPBlockIDs:
     """Tests for BWACP block ID handling."""
@@ -137,13 +149,13 @@ class TestBWACPLargeData:
         )
 
     def test_firmware_size_block(self, mock_can_node):
-        """Test writing a firmware-sized block (simulated, 4KB)."""
-        # Smaller than actual firmware for test speed
-        firmware_data = b"F" * 4096
+        """Test writing a large block near the maximum unstuffed size (2KB)."""
+        # Maximum unstuffed payload is 2038 bytes; use 2000 to be safe
+        large_data = b"F" * 2000
         mock_can_node.bwacp_write(
             target_addr=0x02,
             block_id=99,
-            data=firmware_data,
+            data=large_data,
             priority=Priority.HIGH
         )
 
