@@ -88,7 +88,8 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
     }
 
     /* Byte stuff the payload */
-    uint8_t stuffed_payload[ARTIE_CAN_MAX_STUFFED_PAYLOAD];
+    static uint8_t stuffed_payload[ARTIE_CAN_MAX_STUFFED_PAYLOAD];
+    memset(stuffed_payload, 0, sizeof(stuffed_payload));
     size_t stuffed_len = 0;
 
     if (payload_len > 0 && payload) {
@@ -99,7 +100,8 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
     }
 
     /* Build data for CRC: address + stuffed payload */
-    uint8_t crc_data[ARTIE_CAN_MAX_STUFFED_PAYLOAD + 4];
+    static uint8_t crc_data[ARTIE_CAN_MAX_STUFFED_PAYLOAD + 4];
+    memset(crc_data, 0, sizeof(crc_data));
     crc_data[0] = (address >> ARTIE_CAN_BYTE3_SHIFT) & ARTIE_CAN_MASK_BYTE;
     crc_data[1] = (address >> ARTIE_CAN_BYTE2_SHIFT) & ARTIE_CAN_MASK_BYTE;
     crc_data[2] = (address >> ARTIE_CAN_BYTE1_SHIFT) & ARTIE_CAN_MASK_BYTE;
@@ -113,9 +115,7 @@ int artie_can_bwacp_send_ready(artie_can_context_t *ctx, uint8_t target_addr, ui
     /* Send READY frame */
     artie_can_frame_t frame;
     frame.extended = true;
-    frame.can_id = bwacp_build_can_id(ARTIE_CAN_BWACP_READY, priority,
-                                     ctx->node_address, target_addr,
-                                     class_mask, interrupt, true);
+    frame.can_id = bwacp_build_can_id(ARTIE_CAN_BWACP_READY, priority, ctx->node_address, target_addr, class_mask, interrupt, true);
 
     /* READY frame data: CRC24 (3 bytes) + address (4 bytes) + first stuffing byte */
     frame.data[0] = (crc24 >> ARTIE_CAN_BYTE2_SHIFT) & ARTIE_CAN_MASK_BYTE;

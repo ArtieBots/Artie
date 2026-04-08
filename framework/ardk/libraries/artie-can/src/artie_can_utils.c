@@ -61,8 +61,7 @@ uint32_t artie_can_crc24(const uint8_t *data, size_t len)
  * 0xFF indicates no more data.
  * 0x00 special byte indicates an error.
  */
-int artie_can_byte_stuff(const uint8_t *input, size_t input_len,
-                         uint8_t *output, size_t output_max_len, size_t *output_len)
+int artie_can_byte_stuff(const uint8_t *input, size_t input_len, uint8_t *output, size_t output_max_len, size_t *output_len)
 {
     if (!input || !output || !output_len) {
         return ARTIE_CAN_ERR_INVALID_ARG;

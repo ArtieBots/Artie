@@ -104,7 +104,7 @@ static void test_bwacp_example(artie_can_context_t *ctx)
 
     uint8_t target = 0x02;
     uint32_t block_id = 42;
-    uint8_t data[64];
+    uint8_t data[272];
 
     // Fill with test pattern
     for (size_t i = 0; i < sizeof(data); i++) {
@@ -172,13 +172,13 @@ int main(int argc, char *argv[])
     // Set breakpoints in Visual Studio or your debugger and step through.
 
     // Test RTACP (Real-Time messages)
-    test_rtacp_example(&ctx);
+    // test_rtacp_example(&ctx);
 
     // Test PSACP (Pub/Sub)
     // test_psacp_example(&ctx);
 
     // Test BWACP (Block Write)
-    // test_bwacp_example(&ctx);
+    test_bwacp_example(&ctx);
 
     // Test utility functions (CRC, etc.)
     // test_utilities();
