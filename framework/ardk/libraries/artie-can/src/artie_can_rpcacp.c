@@ -95,8 +95,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
     size_t stuffed_len = 0;
 
     if (payload_len > 0) {
-        int result = artie_can_byte_stuff(payload, payload_len, stuffed_payload,
-                                         sizeof(stuffed_payload), &stuffed_len);
+        int result = artie_can_byte_stuff(payload, payload_len, stuffed_payload, sizeof(stuffed_payload), &stuffed_len);
         if (result != 0) {
             return result;
         }
@@ -116,8 +115,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
     /* Send StartRPC frame(s) */
     artie_can_frame_t frame;
     frame.extended = true;
-    frame.can_id = rpcacp_build_can_id(ARTIE_CAN_RPCACP_START_RPC, priority,
-                                      ctx->node_address, target_addr, random_value);
+    frame.can_id = rpcacp_build_can_id(ARTIE_CAN_RPCACP_START_RPC, priority, ctx->node_address, target_addr, random_value);
 
     /* First frame contains: sync bit + procedure ID + CRC16 + remaining data */
     frame.data[0] = crc_data[0];  /* sync bit + procedure ID */
@@ -153,11 +151,9 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
         /* Send TxData frames */
         while (data_offset < stuffed_len) {
             size_t remaining = stuffed_len - data_offset;
-            size_t chunk_size = (remaining > ARTIE_CAN_MAX_DATA_SIZE) ?
-                               ARTIE_CAN_MAX_DATA_SIZE : remaining;
+            size_t chunk_size = (remaining > ARTIE_CAN_MAX_DATA_SIZE) ? ARTIE_CAN_MAX_DATA_SIZE : remaining;
 
-            frame.can_id = rpcacp_build_can_id(ARTIE_CAN_RPCACP_TX_DATA, priority,
-                                              ctx->node_address, target_addr, random_value);
+            frame.can_id = rpcacp_build_can_id(ARTIE_CAN_RPCACP_TX_DATA, priority, ctx->node_address, target_addr, random_value);
             memcpy(frame.data, &stuffed_payload[data_offset], chunk_size);
             frame.dlc = chunk_size;
 

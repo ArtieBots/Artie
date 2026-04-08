@@ -116,31 +116,31 @@ class TestRTACPReceiving:
 class TestRTACPCommunication:
     """Tests for RTACP communication between nodes."""
 
-    def test_send_and_receive_simple(self, mock_can_pair):
+    def test_send_and_receive_simple(self, mock_can_tcp_pair):
         """Test sending from one node and receiving on another."""
-        node1, node2 = mock_can_pair
+        node1, node2 = mock_can_tcp_pair
 
-        # Note: Mock backend uses a shared queue, so both nodes share the same queue
         # Send from node1
         test_data = b"Hello"
         node1.rtacp_send(
-            target_addr=0x02,
+            target_addr=node2.node_address,
             data=test_data,
             priority=Priority.MED_LOW
         )
 
-        # Receive on node1 (mock backend allows receiving own messages)
+        # Receive on node2 (TCP backend allows inter-node communication)
         try:
-            sender, target, recv_data = node1.rtacp_receive(timeout_ms=1000)
+            sender, target, recv_data = node2.rtacp_receive(timeout_ms=1000)
             assert recv_data == test_data
             assert target == 0x02
+            assert sender == 0x01
         except (TimeoutError, OSError):
-            # Mock backend might not support loopback
+            # May fail if TCP connection not established yet
             pass
 
-    def test_broadcast_communication(self, mock_can_pair):
+    def test_broadcast_communication(self, mock_can_tcp_pair):
         """Test broadcast message communication."""
-        node1, node2 = mock_can_pair
+        node1, node2 = mock_can_tcp_pair
 
         test_data = b"Broad"
         node1.rtacp_send(
@@ -149,34 +149,33 @@ class TestRTACPCommunication:
             priority=Priority.HIGH
         )
 
-        # Try to receive
+        # Try to receive on node2
         try:
-            sender, target, recv_data = node1.rtacp_receive(timeout_ms=1000)
+            sender, target, recv_data = node2.rtacp_receive(timeout_ms=1000)
             assert recv_data == test_data
             assert target == 0x00  # Broadcast address
+            assert sender == 0x01
         except (TimeoutError, OSError):
-            # Expected if mock backend doesn't support loopback
+            # May fail if TCP connection not established yet
             pass
 
-    def test_multiple_messages(self, mock_can_pair):
+    def test_multiple_messages(self, mock_can_tcp_pair):
         """Test sending and receiving multiple messages."""
-        node1, node2 = mock_can_pair
+        node1, node2 = mock_can_tcp_pair
 
         messages = [b"Msg1", b"Msg2", b"Msg3"]
 
         # Send multiple messages
         for msg in messages:
             node1.rtacp_send(
-                target_addr=0x02,
+                target_addr=node2.node_address,
                 data=msg,
                 priority=Priority.MED_LOW
             )
-
-        # Try to receive all messages
         received = []
         for _ in range(len(messages)):
             try:
-                sender, target, data = node1.rtacp_receive(timeout_ms=1000)
+                sender, target, data = node2.rtacp_receive(timeout_ms=1000)
                 received.append(data)
             except (TimeoutError, OSError):
                 break
@@ -188,19 +187,16 @@ class TestRTACPCommunication:
 class TestRTACPAcknowledgment:
     """Tests for RTACP acknowledgment functionality."""
 
-    def test_send_with_wait_ack(self, mock_can_node):
+    def test_send_with_wait_ack(self, mock_can_tcp_pair):
         """Test sending with ACK waiting enabled."""
-        # This may timeout on mock backend if ACK is not implemented
-        try:
-            mock_can_node.rtacp_send(
-                target_addr=0x02,
-                data=b"NeedAck",
-                priority=Priority.HIGH,
-                wait_ack=True
-            )
-        except (TimeoutError, OSError):
-            # Expected if mock backend doesn't implement ACK
-            pass
+        node1, node2 = mock_can_tcp_pair
+
+        node1.rtacp_send(
+            target_addr=node2.node_address,
+            data=b"NeedAck",
+            priority=Priority.HIGH,
+            wait_ack=True
+        )
 
     def test_send_without_wait_ack(self, mock_can_node):
         """Test sending without ACK waiting (fire and forget)."""
