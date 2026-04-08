@@ -22,9 +22,9 @@ set(ARTIE_CAN_SOURCES
     src/artie_can_rpcacp.c
     src/artie_can_psacp.c
     src/artie_can_bwacp.c
-    src/artie_can_backend_mock.c
-    src/artie_can_backend_socketcan.c
     src/artie_can_backend_mcp2515.c
+    src/artie_can_backend_mock.c
+    src/artie_can_backend_mock_tcp.c
 )
 
 # Header files

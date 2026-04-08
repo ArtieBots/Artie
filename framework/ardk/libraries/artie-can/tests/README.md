@@ -1,6 +1,8 @@
 # Artie CAN Library Unit Tests
 
-This directory contains comprehensive unit tests for the Artie CAN library. The tests use the mock backend (local queue) for isolated, deterministic testing without requiring actual CAN hardware.
+This directory contains comprehensive unit tests for the Artie CAN library. The tests use two types of mock backends for isolated, deterministic testing without requiring actual CAN hardware:
+- **Dead-end backend**: For send-only tests (discards data, never receives)
+- **TCP backend**: For send/receive communication tests between nodes
 
 ## Test Structure
 
@@ -164,26 +166,36 @@ The test suite provides comprehensive coverage of:
 
 ## Test Configuration
 
-### Mock Backend
+### Mock Backends
 
-All tests use the mock backend with local queue:
+Tests use two types of mock backends:
 
+**Dead-end backend** (for send-only tests):
 ```python
 can = ArtieCAN(node_address=0x01, backend=BackendType.MOCK)
 ```
-
-This provides:
+- Discards sent data (sends always succeed)
+- Never returns data on receive (always returns NO_DATA)
 - No hardware dependencies
-- Deterministic behavior
 - Fast execution
-- Isolated test environment
+- Ideal for validating send operations
+
+**TCP backend** (for communication tests):
+```python
+node1 = ArtieCAN(node_address=0x01, backend=BackendType.MOCK, mock_port=5555, mock_server=True)
+node2 = ArtieCAN(node_address=0x02, backend=BackendType.MOCK, mock_port=5555, mock_server=False)
+```
+- Enables actual communication between nodes
+- Uses TCP sockets for inter-process communication
+- One node acts as server, one as client
+- Ideal for testing send/receive functionality
 
 ### Fixtures
 
 Common test fixtures are defined in `conftest.py`:
 
-- `mock_can_node`: Single CAN node with mock backend
-- `mock_can_pair`: Pair of CAN nodes for communication tests
+- `mock_can_node`: Single CAN node with dead-end backend (send-only)
+- `mock_can_tcp_pair`: Pair of CAN nodes with TCP backend for communication tests
 - `valid_hex_data`: Sample binary data
 - `valid_hex_string`: Sample hex string
 
@@ -204,17 +216,22 @@ with pytest.raises((TimeoutError, OSError)):
     can.rtacp_receive(timeout_ms=100)
 ```
 
-This is expected behavior for the mock backend when no messages have been sent.
+This is expected behavior for the dead-end backend which never provides received data.
 
-### Mock Backend Limitations
+### Backend Behavior Notes
 
-The mock backend:
-- Uses a shared in-process queue
-- May not support full loopback (sending and receiving on same node)
-- ACK functionality may be limited
+**Dead-end backend:**
+- All sends succeed immediately (data is discarded)
+- All receives return NO_DATA error
+- Used for testing send operations in isolation
+
+**TCP backend:**
+- Requires both nodes to be initialized (server first, then client)
+- Actual network communication between nodes
+- Tests may fail if TCP connection is still establishing
 - Does not simulate real CAN bus timing
 
-These limitations are acceptable for unit testing, as integration tests with actual hardware or TCP mock backend provide full end-to-end validation.
+These backends are ideal for unit testing. Integration tests with actual hardware provide full end-to-end validation.
 
 ## Continuous Integration
 

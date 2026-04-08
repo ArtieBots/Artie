@@ -16,13 +16,15 @@ using the [Artie CAN Protocol](../../../../docs/specifications/CANProtocol.md).
 This library is written in C but also provides a Python wrapper for ARM64 platforms.
 
 In addition to the serialization and deserialization functions, the library also provides functions for
-initializing the CAN bus, sending messages, and receiving messages. It provides an ARM64 backend,
-a bare-metal backend, and two mock backends for testing. In all cases, no dynamic memory allocation is used.
-In the ARM64 backend, the library uses the SocketCAN interface to communicate with the CAN bus. In the bare-metal
-backend, the library assumes an MCP2515 CAN controller is used and provides functions for initializing the controller
-and sending/receiving messages. The mock backends include a local queue-based implementation for single-process
-testing and a TCP socket-based implementation for multi-container/multi-process testing. We also provide a call-back
-interface for registering custom backends, which can be used to support other CAN controllers or platforms.
+initializing the CAN bus, sending messages, and receiving messages. No dynamic memory allocation is used.
+Currently, a few backends are planned:
+
+[ ] Deadend: A backend used for testing one end of the protocol. Does not return or receive.
+[ ] TCP: A backend used for testing both ends of the protocol. Operates over TCP sockets.
+[ ] MCP2515: A backend used for interfacing with a SPI-to-CAN converter chip (the MCP2515), which
+    is quite a common IC for this purpose. Bare-metal targets can be plugged into this backend
+    by providing a SPI driver with appropriate functionality (TODO). Linux targets can be plugged
+    into this backend by using an appropriate device driver.
 
 Raspberry Pi devices will need something like the following in their config.txt files:
 
@@ -128,9 +130,9 @@ pip install -e .
 ```python
 from artie_can import ArtieCAN, BackendType, Priority
 
-# Initialize CAN with mock backend for testing (local queue)
+# Initialize CAN with mock backend for testing (dead-end: sends succeed, receives fail)
 with ArtieCAN(node_address=0x01, backend=BackendType.MOCK) as can:
-    # Send a real-time message
+    # Send a real-time message (data is discarded)
     can.rtacp_send(target_addr=0x02, data=b"Hello", priority=Priority.HIGH)
 
     # Publish to a topic
@@ -139,7 +141,7 @@ with ArtieCAN(node_address=0x01, backend=BackendType.MOCK) as can:
     # Send RPC
     can.rpcacp_call(target_addr=0x02, procedure_id=5, payload=b"\x01\x02\x03")
 
-# TCP Mock Backend (for inter-container/inter-process testing)
+# TCP Mock Backend (for inter-container/inter-process testing with actual communication)
 # Server mode (listens for connections)
 with ArtieCAN(node_address=0x02, backend=BackendType.MOCK,
               mock_host="0.0.0.0", mock_port=5555, mock_server=True) as server:
@@ -193,15 +195,15 @@ Production backend for ARM64/x86_64 Linux systems. Uses the kernel's SocketCAN i
 can = ArtieCAN(node_address=0x01, backend=BackendType.SOCKETCAN)
 ```
 
-### Mock (Local Queue)
-Single-process testing backend using an in-memory queue. Messages are exchanged within the same process.
+### Mock (Dead-End)
+Dead-end testing backend that discards sent data and never receives. Used for testing send operations in isolation.
 
 ```python
 can = ArtieCAN(node_address=0x01, backend=BackendType.MOCK)
 ```
 
 ### Mock (TCP Sockets)
-Multi-process/multi-container testing backend using TCP sockets. Enables integration testing with Docker Compose.
+Multi-process/multi-container testing backend using TCP sockets. Enables actual communication testing with Docker Compose.
 
 **Server Mode** (listens for incoming connections):
 ```python
@@ -250,7 +252,7 @@ The library is organized into several layers:
 - ✅ RPCACP implementation (basic, single-frame)
 - ✅ PSACP implementation (basic, single-frame)
 - ✅ BWACP implementation (basic)
-- ✅ Mock backend (local queue)
+- ✅ Mock backend (dead-end for send-only testing)
 - ✅ Mock backend (TCP sockets for inter-container testing)
 - ✅ SocketCAN backend
 - ⚠️ MCP2515 backend (stub only)

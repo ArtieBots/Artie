@@ -178,7 +178,7 @@ Note that the message being ACK'ed is the last frame in the RPC request. The dat
 *NACK frame*:
 A NACK frame should have its random bits (in the ID field) set to the same value as the message it is NACK'ing.
 Note that the message being NACK'ed is the last frame in the RPC request.
-The data field contains 1 byte, which should be an error code. Allowable error codes any Linux errno value,
+The data field contains 1 byte, which should be an error code. Allowable error codes include any Linux errno value,
 but in particular, the following values have specific meanings in this context:
 
 * 0x00:            Something went wrong in transmission. Send whole request again.
