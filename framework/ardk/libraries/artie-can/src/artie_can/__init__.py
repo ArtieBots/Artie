@@ -303,7 +303,7 @@ class ArtieCAN:
             node_address: This node's CAN address (0-63)
             backend: Backend type to use
             mock_host: Host for mock TCP backend (only used if backend is MOCK and mock_port is specified)
-            mock_port: Port for mock TCP backend. If None (default), uses queue-based mock with shared queue.
+            mock_port: Port for mock TCP backend. If None (default), uses dead-end mock (sends succeed, receives fail).
                       If specified, uses TCP-based mock for network testing.
             mock_server: If True, act as server; if False, act as client (only used if backend is MOCK and mock_port is specified)
         """
@@ -324,11 +324,14 @@ class ArtieCAN:
 
             result = _lib.artie_can_init_mock(ctypes.byref(self._ctx), node_address, ctypes.byref(mock_config))
         else:
-            # Use standard backend initialization (queue-based for MOCK)
+            # Use standard backend initialization (dead-end for MOCK)
             result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value)
 
         if result != 0:
             raise ArtieCANException(f"Failed to initialize CAN context: {result}")
+
+        self.node_address = node_address
+        self.backend = backend
 
     def __enter__(self):
         return self

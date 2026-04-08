@@ -1,6 +1,6 @@
 /**
  * @file artie_can_backend_mock.c
- * @brief Mock backend for testing with TCP networking support
+ * @brief Mock backend for testing with TCP networking and dead-end support
  */
 
 #include "artie_can.h"
@@ -30,16 +30,6 @@ typedef SSIZE_T ssize_t;
 typedef int SOCKET;
 #endif
 
-#define MOCK_QUEUE_SIZE 32
-
-/* Local queue-based mock context (original implementation) */
-typedef struct {
-    artie_can_frame_t queue[MOCK_QUEUE_SIZE];
-    size_t head;
-    size_t tail;
-    size_t count;
-} mock_queue_context_t;
-
 /* TCP-based mock context */
 typedef struct {
     SOCKET sock;
@@ -51,55 +41,35 @@ typedef struct {
     uint16_t port;
 } mock_tcp_context_t;
 
-static mock_queue_context_t g_mock_queue_ctx = {0};
 static mock_tcp_context_t g_mock_tcp_ctx = {0};
 
-/* ===== Local Queue Mock Backend ===== */
+/* ===== Dead-end Mock Backend ===== */
+/* A backend that discards sent data and never receives anything */
 
-static int mock_queue_init(void *ctx)
+static int mock_deadend_init(void *ctx)
 {
-    mock_queue_context_t *mock = (mock_queue_context_t *)ctx;
-    mock->head = 0;
-    mock->tail = 0;
-    mock->count = 0;
+    (void)ctx;
     return 0;
 }
 
-static int mock_queue_send(void *ctx, const artie_can_frame_t *frame)
+static int mock_deadend_send(void *ctx, const artie_can_frame_t *frame)
 {
-    mock_queue_context_t *mock = (mock_queue_context_t *)ctx;
-
-    if (mock->count >= MOCK_QUEUE_SIZE) {
-        return ARTIE_CAN_ERR_BUFFER_TOO_SMALL;  /* Queue full */
-    }
-
-    /* Add to queue */
-    memcpy(&mock->queue[mock->tail], frame, sizeof(artie_can_frame_t));
-    mock->tail = (mock->tail + 1) % MOCK_QUEUE_SIZE;
-    mock->count++;
-
+    (void)ctx;
+    (void)frame;
+    /* Discard the data - successful send to nowhere */
     return 0;
 }
 
-static int mock_queue_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms)
+static int mock_deadend_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms)
 {
-    mock_queue_context_t *mock = (mock_queue_context_t *)ctx;
-
-    (void)timeout_ms;  /* Ignore timeout in local queue mock */
-
-    if (mock->count == 0) {
-        return ARTIE_CAN_ERR_NO_DATA;  /* Queue empty */
-    }
-
-    /* Remove from queue */
-    memcpy(frame, &mock->queue[mock->head], sizeof(artie_can_frame_t));
-    mock->head = (mock->head + 1) % MOCK_QUEUE_SIZE;
-    mock->count--;
-
-    return 0;
+    (void)ctx;
+    (void)frame;
+    (void)timeout_ms;
+    /* Always return no data available */
+    return ARTIE_CAN_ERR_NO_DATA;
 }
 
-static int mock_queue_close(void *ctx)
+static int mock_deadend_close(void *ctx)
 {
     (void)ctx;
     return 0;
@@ -111,11 +81,11 @@ int artie_can_backend_mock_init(artie_can_backend_t *backend)
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    backend->init = mock_queue_init;
-    backend->send = mock_queue_send;
-    backend->receive = mock_queue_receive;
-    backend->close = mock_queue_close;
-    backend->context = &g_mock_queue_ctx;
+    backend->init = mock_deadend_init;
+    backend->send = mock_deadend_send;
+    backend->receive = mock_deadend_receive;
+    backend->close = mock_deadend_close;
+    backend->context = NULL;  /* No context needed for dead-end backend */
 
     return 0;
 }

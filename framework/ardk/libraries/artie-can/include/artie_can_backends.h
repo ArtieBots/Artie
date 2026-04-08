@@ -23,7 +23,7 @@ int artie_can_backend_socketcan_init(artie_can_backend_t *backend);
 int artie_can_backend_mcp2515_init(artie_can_backend_t *backend);
 
 /**
- * @brief Initialize Mock backend (local queue, no networking)
+ * @brief Initialize Mock backend (dead-end: discards sends, never receives)
  */
 int artie_can_backend_mock_init(artie_can_backend_t *backend);
 

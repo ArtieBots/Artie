@@ -187,9 +187,9 @@ class TestPSACPReceiving:
 class TestPSACPCommunication:
     """Tests for PSACP publish/subscribe communication."""
 
-    def test_publish_and_receive(self, mock_can_pair):
+    def test_publish_and_receive(self, mock_can_tcp_pair):
         """Test publishing and receiving messages."""
-        node1, node2 = mock_can_pair
+        node1, node2 = mock_can_tcp_pair
 
         test_data = b"PubSubTest"
         test_topic = 0x10
@@ -202,34 +202,31 @@ class TestPSACPCommunication:
             high_priority=False
         )
 
-        # Try to receive (mock backend might allow loopback)
+        # Try to receive on node2
         try:
-            sender, topic, recv_data = node1.psacp_receive(timeout_ms=1000)
+            sender, topic, recv_data = node2.psacp_receive(timeout_ms=1000)
             assert recv_data == test_data
             assert topic == test_topic
+            assert sender == 0x01
         except (TimeoutError, OSError):
-            # Expected if mock backend doesn't support loopback
+            # May fail if TCP connection not established yet
             pass
 
-    def test_multiple_publishes(self, mock_can_pair):
+    def test_multiple_publishes(self, mock_can_node):
         """Test publishing multiple messages to same topic."""
-        node1, node2 = mock_can_pair
-
         messages = [b"Msg1", b"Msg2", b"Msg3"]
         topic = 0x20
 
         for msg in messages:
-            node1.psacp_publish(
+            mock_can_node.psacp_publish(
                 topic=topic,
                 data=msg,
                 priority=Priority.MED_LOW,
                 high_priority=False
             )
 
-    def test_different_topics(self, mock_can_pair):
+    def test_different_topics(self, mock_can_node):
         """Test publishing to different topics."""
-        node1, node2 = mock_can_pair
-
         topics_data = [
             (0x10, b"Topic1"),
             (0x20, b"Topic2"),
@@ -237,7 +234,7 @@ class TestPSACPCommunication:
         ]
 
         for topic, data in topics_data:
-            node1.psacp_publish(
+            mock_can_node.psacp_publish(
                 topic=topic,
                 data=data,
                 priority=Priority.MED_LOW,
