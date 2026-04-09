@@ -293,7 +293,7 @@ class ArtieCAN:
     This class provides a Pythonic interface to the Artie CAN library.
     """
 
-    def __init__(self, node_address: int, backend=BackendType.SOCKETCAN, mock_host="localhost", mock_port=None, mock_server=False):
+    def __init__(self, node_address: int, backend: BackendType, mock_host="localhost", mock_port=None, mock_server=False):
         """
         Initialize Artie CAN context
 

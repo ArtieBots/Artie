@@ -147,7 +147,7 @@ static int mock_tcp_ensure_connection(mock_tcp_context_t *mock)
         FD_ZERO(&write_fds);
         FD_SET(mock->sock, &write_fds);
 
-        if (select(mock->sock + 1, NULL, &write_fds, NULL, &tv) > 0) {
+        if (select(((int)(mock->sock)) + 1, NULL, &write_fds, NULL, &tv) > 0) {
             mock->is_connected = true;
         }
     }
