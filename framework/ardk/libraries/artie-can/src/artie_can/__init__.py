@@ -324,7 +324,7 @@ class ArtieCAN:
                 mock_config.host = mock_host.encode('utf-8')
                 mock_config.port = mock_port
                 mock_config.is_server = mock_server
-                result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, ctypes.byref(mock_config))
+                result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, ctypes.cast(ctypes.byref(mock_config), ctypes.c_void_p))
             case BackendType.MCP2515:
                 # For MCP2515, we could define a specific config structure if needed. For now, we pass None for defaults.
                 result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, None)
