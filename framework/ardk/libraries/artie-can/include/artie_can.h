@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "artie_can_userdefs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -171,9 +172,9 @@ typedef struct {
  * @brief Backend types
  */
 typedef enum {
-    ARTIE_CAN_BACKEND_SOCKETCAN,  /**< Linux SocketCAN backend */
     ARTIE_CAN_BACKEND_MCP2515,    /**< Bare-metal MCP2515 backend */
-    ARTIE_CAN_BACKEND_MOCK        /**< Mock backend for testing */
+    ARTIE_CAN_BACKEND_DEADEND,    /**< Mock backend for testing */
+    ARTIE_CAN_BACKEND_TCP         /**< TCP socket backend for testing over network */
 } artie_can_backend_type_t;
 
 /**
@@ -347,18 +348,10 @@ typedef struct {
  * @param ctx Context to initialize
  * @param node_address This node's CAN address (0-63)
  * @param backend_type Type of backend to use
+ * @param backend_config Optional backend configuration (pass NULL for defaults or if not required by the chosen backend)
  * @return 0 on success, negative error code on failure
  */
-int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type);
-
-/**
- * @brief Initialize the Artie CAN context with mock backend configuration
- * @param ctx Context to initialize
- * @param node_address This node's CAN address (0-63)
- * @param mock_config Mock backend configuration
- * @return 0 on success, negative error code on failure
- */
-int artie_can_init_mock(artie_can_context_t *ctx, uint8_t node_address, const artie_can_mock_config_t *mock_config);
+int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type, const void *backend_config);
 
 /**
  * @brief Initialize with custom backend

@@ -6,6 +6,7 @@ the Artie CAN Protocol for communication over CAN bus.
 """
 
 import ctypes
+import enum
 import os
 import pathlib
 import sys
@@ -67,9 +68,9 @@ MAX_UNSTUFFED_BWACP_PAYLOAD = 2038    # For 2048-byte stuffed buffer
 
 class BackendType(IntEnum):
     """CAN backend types"""
-    SOCKETCAN = 0
-    MCP2515 = 1
-    MOCK = 2
+    MOCK_DEADEND = enum.auto()
+    MOCK_TCP = enum.auto()
+    MCP2515 = enum.auto()
 
 
 class Priority(IntEnum):
@@ -213,11 +214,8 @@ class MockConfig(ctypes.Structure):
 
 if _lib is not None:
     # Core functions
-    _lib.artie_can_init.argtypes = [ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.c_int]
+    _lib.artie_can_init.argtypes = [ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.c_int, ctypes.POINTER(ctypes.c_void_p)]
     _lib.artie_can_init.restype = ctypes.c_int
-
-    _lib.artie_can_init_mock.argtypes = [ctypes.POINTER(CANContext), ctypes.c_uint8, ctypes.POINTER(MockConfig)]
-    _lib.artie_can_init_mock.restype = ctypes.c_int
 
     _lib.artie_can_close.argtypes = [ctypes.POINTER(CANContext)]
     _lib.artie_can_close.restype = ctypes.c_int
@@ -314,24 +312,27 @@ class ArtieCAN:
             raise ValueError("Node address must be 0-63")
 
         self._ctx = CANContext()
+        self.node_address = node_address
+        self.backend = backend
 
-        if backend == BackendType.MOCK and mock_port is not None:
-            # Use TCP mock backend for network testing
-            mock_config = MockConfig()
-            mock_config.host = mock_host.encode('utf-8')
-            mock_config.port = mock_port
-            mock_config.is_server = mock_server
-
-            result = _lib.artie_can_init_mock(ctypes.byref(self._ctx), node_address, ctypes.byref(mock_config))
-        else:
-            # Use standard backend initialization (dead-end for MOCK)
-            result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value)
+        match backend:
+            case BackendType.MOCK_DEADEND:
+                # No additional config needed for dead-end mock
+                result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, None)
+            case BackendType.MOCK_TCP:
+                mock_config = MockConfig()
+                mock_config.host = mock_host.encode('utf-8')
+                mock_config.port = mock_port
+                mock_config.is_server = mock_server
+                result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, ctypes.byref(mock_config))
+            case BackendType.MCP2515:
+                # For MCP2515, we could define a specific config structure if needed. For now, we pass None for defaults.
+                result = _lib.artie_can_init(ctypes.byref(self._ctx), node_address, backend.value, None)
+            case _:
+                raise ValueError(f"Unsupported backend type: {backend}")
 
         if result != 0:
             raise ArtieCANException(f"Failed to initialize CAN context: {result}")
-
-        self.node_address = node_address
-        self.backend = backend
 
     def __enter__(self):
         return self
@@ -393,8 +394,7 @@ class ArtieCAN:
         data = bytes(msg.data[:msg.data_len])
         return (msg.sender_addr, msg.target_addr, data)
 
-    def rpcacp_call(self, target_addr: int, procedure_id: int, payload: bytes,
-                    priority: Priority = Priority.MED_LOW, synchronous: bool = True):
+    def rpcacp_call(self, target_addr: int, procedure_id: int, payload: bytes, priority: Priority = Priority.MED_LOW, synchronous: bool = True):
         """
         Send an RPC request
 
@@ -415,10 +415,7 @@ class ArtieCAN:
             raise ValueError(f"Payload too large: {len(payload)} bytes (max {MAX_UNSTUFFED_RPC_PAYLOAD} before byte-stuffing)")
 
         payload_arr = (ctypes.c_uint8 * len(payload))(*payload)
-        result = _lib.artie_can_rpcacp_call(
-            ctypes.byref(self._ctx), target_addr, priority.value,
-            synchronous, procedure_id, payload_arr, len(payload)
-        )
+        result = _lib.artie_can_rpcacp_call(ctypes.byref(self._ctx), target_addr, priority.value, synchronous, procedure_id, payload_arr, len(payload))
         if result != 0:
             raise ArtieCANException(f"RPC call failed: {result}")
 

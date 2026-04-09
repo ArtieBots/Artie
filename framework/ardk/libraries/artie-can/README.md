@@ -16,13 +16,15 @@ using the [Artie CAN Protocol](../../../../docs/specifications/CANProtocol.md).
 This library is written in C but also provides a Python wrapper for ARM64 platforms.
 
 In addition to the serialization and deserialization functions, the library also provides functions for
-initializing the CAN bus, sending messages, and receiving messages. It provides an ARM64 backend,
-a bare-metal backend, and two mock backends for testing. In all cases, no dynamic memory allocation is used.
-In the ARM64 backend, the library uses the SocketCAN interface to communicate with the CAN bus. In the bare-metal
-backend, the library assumes an MCP2515 CAN controller is used and provides functions for initializing the controller
-and sending/receiving messages. The mock backends include a dead-end implementation for send-only testing (discards data)
-and a TCP socket-based implementation for multi-container/multi-process send/receive testing. We also provide a call-back
-interface for registering custom backends, which can be used to support other CAN controllers or platforms.
+initializing the CAN bus, sending messages, and receiving messages. No dynamic memory allocation is used.
+Currently, a few backends are planned:
+
+[ ] Deadend: A backend used for testing one end of the protocol. Does not return or receive.
+[ ] TCP: A backend used for testing both ends of the protocol. Operates over TCP sockets.
+[ ] MCP2515: A backend used for interfacing with a SPI-to-CAN converter chip (the MCP2515), which
+    is quite a common IC for this purpose. Bare-metal targets can be plugged into this backend
+    by providing a SPI driver with appropriate functionality (TODO). Linux targets can be plugged
+    into this backend by using an appropriate device driver.
 
 Raspberry Pi devices will need something like the following in their config.txt files:
 

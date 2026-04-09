@@ -10,7 +10,7 @@
 /**
  * @brief Initialize the Artie CAN context with a specific backend type
  */
-int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type)
+int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type, const void *backend_config)
 {
     if (!ctx) {
         return ARTIE_CAN_ERR_INVALID_ARG;
@@ -28,16 +28,16 @@ int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_bac
     /* Initialize the appropriate backend */
     int result = 0;
     switch (backend_type) {
-        case ARTIE_CAN_BACKEND_SOCKETCAN:
-            result = artie_can_backend_socketcan_init(&ctx->backend);
+        case ARTIE_CAN_BACKEND_DEADEND:
+            result = artie_can_backend_mock_init(ctx, backend_config);
             break;
 
         case ARTIE_CAN_BACKEND_MCP2515:
-            result = artie_can_backend_mcp2515_init(&ctx->backend);
+            result = artie_can_backend_mcp2515_init(ctx, backend_config);
             break;
 
-        case ARTIE_CAN_BACKEND_MOCK:
-            result = artie_can_backend_mock_init(&ctx->backend);
+        case ARTIE_CAN_BACKEND_TCP:
+            result = artie_can_backend_mock_tcp_init(ctx, (const artie_can_mock_config_t *)backend_config);
             break;
 
         default:

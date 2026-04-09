@@ -123,6 +123,29 @@ static void test_bwacp_example(artie_can_context_t *ctx)
 }
 
 /**
+ * @brief Example: Test RPCACP call
+ *
+ */
+static void test_rpcacp_example(artie_can_context_t *ctx)
+{
+    printf("\n=== Testing RPCACP ===\n");
+
+    uint8_t target = 0x02;
+    uint8_t procedure_id = 5;
+    uint8_t payload[] = "Args";
+
+    printf("Making RPC call to 0x%02X, procedure %u\n", target, procedure_id);
+    print_hex("Payload", payload, sizeof(payload));
+
+    int result = artie_can_rpcacp_call(ctx, target, ARTIE_CAN_PRIORITY_MED_HIGH, true, procedure_id, payload, sizeof(payload));
+    if (result == 0) {
+        printf("RPC call completed successfully\n");
+    } else {
+        printf("RPC call failed: %d\n", result);
+    }
+}
+
+/**
  * @brief Example: Test utility functions
  */
 static void test_utilities(void)
@@ -157,9 +180,31 @@ int main(int argc, char *argv[])
 
     printf("\nInitializing CAN with node address 0x%02X (Mock backend)\n", node_address);
 
-    int result = artie_can_init(&ctx, node_address, ARTIE_CAN_BACKEND_MOCK);
+    const artie_can_mock_config_t mock_config = {
+        .port = 5555,
+        .is_server = true,
+        .host = "127.0.0.1"
+    };
+    int result = artie_can_init(&ctx, node_address, ARTIE_CAN_BACKEND_TCP, &mock_config);
     if (result != 0) {
         printf("ERROR: Failed to initialize CAN context: %d\n", result);
+        return 1;
+    }
+
+    artie_can_context_t cty;
+    uint8_t remote_address = 0x02;
+
+    printf("\nInitializing second CAN context with node address 0x%02X (Mock backend)\n", remote_address);
+
+    const artie_can_mock_config_t mock_config_remote = {
+        .port = 5556,
+        .is_server = false,
+        .host = "127.0.0.1"
+    };
+    result = artie_can_init(&cty, remote_address, ARTIE_CAN_BACKEND_TCP, &mock_config_remote);
+    if (result != 0) {
+        printf("ERROR: Failed to initialize second CAN context: %d\n", result);
+        artie_can_close(&ctx);
         return 1;
     }
 
@@ -178,7 +223,10 @@ int main(int argc, char *argv[])
     // test_psacp_example(&ctx);
 
     // Test BWACP (Block Write)
-    test_bwacp_example(&ctx);
+    // test_bwacp_example(&ctx);
+
+    // Test RPCACP (Remote Procedure Calls)
+    // test_rpcacp_example(&ctx);
 
     // Test utility functions (CRC, etc.)
     // test_utilities();
@@ -192,7 +240,7 @@ int main(int argc, char *argv[])
     printf("Set breakpoints, step through code, and inspect variables.\n");
 
     // Your code here...
-
+    test_
 
     // ========================================================================
     // END OF CUSTOM CODE
@@ -200,6 +248,7 @@ int main(int argc, char *argv[])
 
     // Clean up
     artie_can_close(&ctx);
+    artie_can_close(&cty);
     printf("\nCAN context closed\n");
 
     printf("\nTest completed successfully!\n");

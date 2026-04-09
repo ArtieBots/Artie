@@ -77,17 +77,17 @@ static int mcp2515_close(void *ctx)
     return 0;
 }
 
-int artie_can_backend_mcp2515_init(artie_can_backend_t *backend)
+int artie_can_backend_mcp2515_init(artie_can_context_t *ctx, const void *config)
 {
-    if (!backend) {
+    if (!ctx) {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    backend->init = mcp2515_init;
-    backend->send = mcp2515_send;
-    backend->receive = mcp2515_receive;
-    backend->close = mcp2515_close;
-    backend->context = &g_mcp2515_ctx;
+    ctx->backend.init = mcp2515_init;
+    ctx->backend.send = mcp2515_send;
+    ctx->backend.receive = mcp2515_receive;
+    ctx->backend.close = mcp2515_close;
+    ctx->backend.context = &g_mcp2515_ctx;
 
     return 0;
 }
