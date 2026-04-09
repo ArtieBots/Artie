@@ -240,7 +240,6 @@ int main(int argc, char *argv[])
     printf("Set breakpoints, step through code, and inspect variables.\n");
 
     // Your code here...
-    test_
 
     // ========================================================================
     // END OF CUSTOM CODE
