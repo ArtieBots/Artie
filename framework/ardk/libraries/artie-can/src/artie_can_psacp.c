@@ -108,7 +108,7 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
     if (stuffed_len <= frame_data_space) {
         /* Single frame publish */
         memcpy(&frame.data[2], stuffed_payload, stuffed_len);
-        frame.dlc = 2 + stuffed_len;
+        frame.dlc = 2 + (uint8_t)stuffed_len;
 
         if (!ctx->backend.send) {
             return ARTIE_CAN_ERR_NOT_INITIALIZED;
@@ -131,13 +131,12 @@ int artie_can_psacp_publish(artie_can_context_t *ctx, uint8_t topic, uint8_t pri
         /* Send DATA frames */
         while (data_offset < stuffed_len) {
             size_t remaining = stuffed_len - data_offset;
-            size_t chunk_size = (remaining > ARTIE_CAN_MAX_DATA_SIZE) ?
-                               ARTIE_CAN_MAX_DATA_SIZE : remaining;
+            size_t chunk_size = (remaining > ARTIE_CAN_MAX_DATA_SIZE) ? ARTIE_CAN_MAX_DATA_SIZE : remaining;
 
             frame.can_id = psacp_build_can_id(high_priority, ARTIE_CAN_PSACP_DATA,
                                              priority, ctx->node_address, topic);
             memcpy(frame.data, &stuffed_payload[data_offset], chunk_size);
-            frame.dlc = chunk_size;
+            frame.dlc = (uint8_t)chunk_size;
 
             result = ctx->backend.send(ctx->backend.context, &frame);
             if (result != 0) {

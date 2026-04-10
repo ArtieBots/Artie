@@ -128,7 +128,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
     if (stuffed_len <= frame_data_space) {
         /* Single frame RPC */
         memcpy(&frame.data[3], stuffed_payload, stuffed_len);
-        frame.dlc = 3 + stuffed_len;
+        frame.dlc = 3 + (uint8_t)stuffed_len;
 
         if (!ctx->backend.send) {
             return ARTIE_CAN_ERR_NOT_INITIALIZED;
@@ -155,7 +155,7 @@ int artie_can_rpcacp_call(artie_can_context_t *ctx, uint8_t target_addr, uint8_t
 
             frame.can_id = rpcacp_build_can_id(ARTIE_CAN_RPCACP_TX_DATA, priority, ctx->node_address, target_addr, random_value);
             memcpy(frame.data, &stuffed_payload[data_offset], chunk_size);
-            frame.dlc = chunk_size;
+            frame.dlc = (uint8_t)chunk_size;
 
             result = ctx->backend.send(ctx->backend.context, &frame);
             if (result != 0) {
@@ -356,7 +356,7 @@ int artie_can_rpcacp_respond(artie_can_context_t *ctx, uint8_t target_addr, uint
 
     if (stuffed_len <= frame_data_space) {
         memcpy(&frame.data[3], stuffed_payload, stuffed_len);
-        frame.dlc = 3 + stuffed_len;
+        frame.dlc = 3 + (uint8_t)stuffed_len;
 
         if (!ctx->backend.send) {
             return ARTIE_CAN_ERR_NOT_INITIALIZED;
@@ -371,8 +371,7 @@ int artie_can_rpcacp_respond(artie_can_context_t *ctx, uint8_t target_addr, uint
 /**
  * @brief Send an ACK for an RPC request
  */
-int artie_can_rpcacp_send_ack(artie_can_context_t *ctx, uint8_t target_addr,
-                              uint8_t priority, uint8_t random_value)
+int artie_can_rpcacp_send_ack(artie_can_context_t *ctx, uint8_t target_addr, uint8_t priority, uint8_t random_value)
 {
     if (!ctx) {
         return ARTIE_CAN_ERR_INVALID_ARG;

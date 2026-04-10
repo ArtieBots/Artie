@@ -354,15 +354,6 @@ typedef struct {
 int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type, const void *backend_config);
 
 /**
- * @brief Initialize with custom backend
- * @param ctx Context to initialize
- * @param node_address This node's CAN address (0-63)
- * @param backend Custom backend implementation
- * @return 0 on success, negative error code on failure
- */
-int artie_can_init_custom(artie_can_context_t *ctx, uint8_t node_address, const artie_can_backend_t *backend);
-
-/**
  * @brief Close the CAN context
  * @param ctx Context to close
  * @return 0 on success, negative error code on failure

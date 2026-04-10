@@ -175,7 +175,7 @@ int artie_can_bwacp_send_data(artie_can_context_t *ctx, uint8_t target_addr, uin
         frame.can_id = bwacp_build_can_id(ARTIE_CAN_BWACP_DATA, priority, ctx->node_address, target_addr, class_mask, false, parity);
 
         memcpy(frame.data, &payload[offset], chunk_size);
-        frame.dlc = chunk_size;
+        frame.dlc = (uint8_t)chunk_size;
 
         int result = ctx->backend.send(ctx->backend.context, &frame);
         if (result != 0) {

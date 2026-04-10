@@ -110,7 +110,6 @@ int artie_can_rtacp_send(artie_can_context_t *ctx, const artie_can_rtacp_msg_t *
 
         /* Wait for ACK with 1ms timeout */
         artie_can_rtacp_msg_t ack_msg;
-        uint32_t start_time = 0;  /* TODO: Implement timing */
         const uint32_t timeout_ms = 1;
 
         while (1) {

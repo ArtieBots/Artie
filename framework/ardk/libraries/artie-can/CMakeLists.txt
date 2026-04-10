@@ -33,6 +33,12 @@ set(ARTIE_CAN_HEADERS
     include/artie_can_backends.h
 )
 
+# Tests
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 # Shared library
 if(BUILD_SHARED_LIBS)
     add_library(artie_can SHARED ${ARTIE_CAN_SOURCES})
@@ -41,6 +47,24 @@ if(BUILD_SHARED_LIBS)
         SOVERSION 0
         PUBLIC_HEADER "${ARTIE_CAN_HEADERS}"
     )
+
+    # Enable warnings and treat them as errors
+    if(MSVC)
+        target_compile_options(artie_can PRIVATE /W4 /WX)
+        # Ignore the following warnings:
+        # C4100: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can PRIVATE /wd4100)
+    else()
+        target_compile_options(artie_can PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        # Ignore the following warnings:
+        # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can_debug PRIVATE -Wno-unused-parameter)
+    endif()
+
+    # Disable Windows complaints about strncpy and similar functions
+    if(WIN32)
+        target_compile_definitions(artie_can PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
 
     # Install shared library
     install(TARGETS artie_can
@@ -57,17 +81,29 @@ if(BUILD_STATIC_LIBS)
         PUBLIC_HEADER "${ARTIE_CAN_HEADERS}"
     )
 
+    # Enable warnings and treat them as errors
+    if(MSVC)
+        target_compile_options(artie_can_static PRIVATE /W4 /WX)
+        # Ignore the following warnings:
+        # C4100: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can_static PRIVATE /wd4100)
+    else()
+        target_compile_options(artie_can_static PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        # Ignore the following warnings:
+        # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can_static PRIVATE -Wno-unused-parameter)
+    endif()
+
+    # Disable Windows complaints about strncpy and similar functions
+    if(WIN32)
+        target_compile_definitions(artie_can_static PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
+
     # Install static library
     install(TARGETS artie_can_static
         ARCHIVE DESTINATION lib
         PUBLIC_HEADER DESTINATION include/artie_can
     )
-endif()
-
-# Tests
-if(BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
 endif()
 
 # Debug executable
@@ -84,6 +120,24 @@ if(BUILD_DEBUG_EXECUTABLE)
     set_target_properties(artie_can_debug PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
     )
+
+    # Enable warnings and treat them as errors
+    if(MSVC)
+        target_compile_options(artie_can_debug PRIVATE /W4 /WX)
+        # Ignore the following warnings:
+        # C4100: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can_debug PRIVATE /wd4100)
+    else()
+        target_compile_options(artie_can_debug PRIVATE -Wall -Wextra -Wpedantic -Werror)
+        # Ignore the following warnings:
+        # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
+        target_compile_options(artie_can_debug PRIVATE -Wno-unused-parameter)
+    endif()
+
+    # Disable Windows complaints about strncpy and similar functions
+    if(WIN32)
+        target_compile_definitions(artie_can_debug PRIVATE _CRT_SECURE_NO_WARNINGS)
+    endif()
 
     message(STATUS "Debug executable will be built: artie_can_debug")
 endif()

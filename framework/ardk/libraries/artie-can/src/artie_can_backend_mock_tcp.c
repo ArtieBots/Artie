@@ -200,7 +200,7 @@ static int mock_tcp_receive(void *ctx, artie_can_frame_t *frame, uint32_t timeou
     FD_ZERO(&read_fds);
     FD_SET(recv_sock, &read_fds);
 
-    int result = select(recv_sock + 1, &read_fds, NULL, NULL, &tv);
+    int result = select((int)recv_sock + 1, &read_fds, NULL, NULL, &tv);
     if (result <= 0) {
         return -2;  /* Timeout or error */
     }
