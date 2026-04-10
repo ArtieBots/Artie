@@ -54,16 +54,15 @@ if(BUILD_SHARED_LIBS)
         # Ignore the following warnings:
         # C4100: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can PRIVATE /wd4100)
+        # Disable warnings about unsafe functions like strncpy
+        target_compile_definitions(artie_can PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         target_compile_options(artie_can PRIVATE -Wall -Wextra -Wpedantic -Werror)
         # Ignore the following warnings:
         # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can PRIVATE -Wno-unused-parameter)
-    endif()
-
-    # Disable Windows complaints about strncpy and similar functions
-    if(WIN32)
-        target_compile_definitions(artie_can PRIVATE _CRT_SECURE_NO_WARNINGS)
+        # Ignore -Werror=stringop-truncation
+        target_compile_options(artie_can PRIVATE -Wno-error=stringop-truncation)
     endif()
 
     # Install shared library
@@ -87,11 +86,15 @@ if(BUILD_STATIC_LIBS)
         # Ignore the following warnings:
         # C4100: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can_static PRIVATE /wd4100)
+        # Disable warnings about unsafe functions like strncpy
+        target_compile_definitions(artie_can_static PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         target_compile_options(artie_can_static PRIVATE -Wall -Wextra -Wpedantic -Werror)
         # Ignore the following warnings:
         # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can_static PRIVATE -Wno-unused-parameter)
+        # Ignore -Werror=stringop-truncation
+        target_compile_options(artie_can_static PRIVATE -Wno-error=stringop-truncation)
     endif()
 
     # Disable Windows complaints about strncpy and similar functions
@@ -127,16 +130,15 @@ if(BUILD_DEBUG_EXECUTABLE)
         # Ignore the following warnings:
         # C4100: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can_debug PRIVATE /wd4100)
+        # Disable warnings about unsafe functions like strncpy
+        target_compile_definitions(artie_can_debug PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()
         target_compile_options(artie_can_debug PRIVATE -Wall -Wextra -Wpedantic -Werror)
         # Ignore the following warnings:
         # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
         target_compile_options(artie_can_debug PRIVATE -Wno-unused-parameter)
-    endif()
-
-    # Disable Windows complaints about strncpy and similar functions
-    if(WIN32)
-        target_compile_definitions(artie_can_debug PRIVATE _CRT_SECURE_NO_WARNINGS)
+        # Ignore -Werror=stringop-truncation
+        target_compile_options(artie_can_debug PRIVATE -Wno-error=stringop-truncation)
     endif()
 
     message(STATUS "Debug executable will be built: artie_can_debug")
