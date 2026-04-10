@@ -58,7 +58,7 @@ if(BUILD_SHARED_LIBS)
         target_compile_options(artie_can PRIVATE -Wall -Wextra -Wpedantic -Werror)
         # Ignore the following warnings:
         # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
-        target_compile_options(artie_can_debug PRIVATE -Wno-unused-parameter)
+        target_compile_options(artie_can PRIVATE -Wno-unused-parameter)
     endif()
 
     # Disable Windows complaints about strncpy and similar functions
