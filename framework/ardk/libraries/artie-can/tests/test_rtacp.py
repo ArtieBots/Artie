@@ -5,7 +5,7 @@ Tests sending and receiving real-time messages with various priorities,
 addressing modes, and data payloads.
 """
 import pytest
-from artie_can import ArtieCAN, BackendType, Priority
+import artie_can
 
 
 class TestRTACPBasicSending:
@@ -16,7 +16,7 @@ class TestRTACPBasicSending:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"Test",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
         # Should not raise any exceptions
 
@@ -25,7 +25,7 @@ class TestRTACPBasicSending:
         mock_can_node.rtacp_send(
             target_addr=0x00,  # Broadcast address
             data=b"Broad",
-            priority=Priority.HIGH
+            priority=artie_can.Priority.HIGH
         )
         # Should not raise any exceptions
 
@@ -34,7 +34,7 @@ class TestRTACPBasicSending:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"",
-            priority=Priority.LOW
+            priority=artie_can.Priority.LOW
         )
         # Should not raise any exceptions
 
@@ -44,7 +44,7 @@ class TestRTACPBasicSending:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=max_data,
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
         # Should not raise any exceptions
 
@@ -54,7 +54,7 @@ class TestRTACPBasicSending:
             mock_can_node.rtacp_send(
                 target_addr=0x40,  # Invalid (> 0x3F)
                 data=b"Test",
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
 
@@ -66,7 +66,7 @@ class TestRTACPPriorities:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"High",
-            priority=Priority.HIGH
+            priority=artie_can.Priority.HIGH
         )
 
     def test_send_med_high_priority(self, mock_can_node):
@@ -74,7 +74,7 @@ class TestRTACPPriorities:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"MedHigh",
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_send_med_low_priority(self, mock_can_node):
@@ -82,7 +82,7 @@ class TestRTACPPriorities:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"MedLow",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_send_low_priority(self, mock_can_node):
@@ -90,7 +90,7 @@ class TestRTACPPriorities:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"Low",
-            priority=Priority.LOW
+            priority=artie_can.Priority.LOW
         )
 
 
@@ -125,7 +125,7 @@ class TestRTACPCommunication:
         node1.rtacp_send(
             target_addr=node2.node_address,
             data=test_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
         # Receive on node2 (TCP backend allows inter-node communication)
@@ -146,7 +146,7 @@ class TestRTACPCommunication:
         node1.rtacp_send(
             target_addr=0x00,  # Broadcast
             data=test_data,
-            priority=Priority.HIGH
+            priority=artie_can.Priority.HIGH
         )
 
         # Try to receive on node2
@@ -170,7 +170,7 @@ class TestRTACPCommunication:
             node1.rtacp_send(
                 target_addr=node2.node_address,
                 data=msg,
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
         received = []
         for _ in range(len(messages)):
@@ -194,7 +194,7 @@ class TestRTACPAcknowledgment:
         node1.rtacp_send(
             target_addr=node2.node_address,
             data=b"NeedAck",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             wait_ack=True
         )
 
@@ -203,7 +203,7 @@ class TestRTACPAcknowledgment:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"NoAck",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             wait_ack=False
         )
         # Should complete immediately
@@ -214,7 +214,7 @@ class TestRTACPAcknowledgment:
         mock_can_node.rtacp_send(
             target_addr=0x00,  # Broadcast
             data=b"Broad",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             wait_ack=False  # Should be False for broadcast
         )
 
@@ -227,7 +227,7 @@ class TestRTACPDataPayloads:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"ASCII123",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_binary_data(self, mock_can_node):
@@ -236,7 +236,7 @@ class TestRTACPDataPayloads:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=binary_data,
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_single_byte(self, mock_can_node):
@@ -244,7 +244,7 @@ class TestRTACPDataPayloads:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=b"X",
-            priority=Priority.LOW
+            priority=artie_can.Priority.LOW
         )
 
     def test_numeric_data(self, mock_can_node):
@@ -254,5 +254,5 @@ class TestRTACPDataPayloads:
         mock_can_node.rtacp_send(
             target_addr=0x02,
             data=numeric_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )

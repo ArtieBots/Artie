@@ -2,7 +2,7 @@
 Pytest configuration and shared fixtures for Artie CAN library tests.
 """
 import pytest
-from artie_can import ArtieCAN, BackendType
+import artie_can
 
 
 @pytest.fixture
@@ -11,7 +11,7 @@ def mock_can_node():
 
     Uses dead-end mock backend that discards sends and never receives.
     """
-    with ArtieCAN(node_address=0x01, backend=BackendType.MOCK_DEADEND) as can:
+    with artie_can.ArtieCAN(node_address=0x01, backend=artie_can.BackendType.MOCK_DEADEND) as can:
         yield can
 
 
@@ -21,8 +21,8 @@ def mock_can_tcp_pair():
 
     Uses TCP sockets with one node as server and one as client.
     """
-    with ArtieCAN(node_address=0x01, backend=BackendType.MOCK_TCP, mock_port=5556, mock_server=False) as node1:
-        with ArtieCAN(node_address=0x02, backend=BackendType.MOCK_TCP, mock_port=5556, mock_server=True) as node2:
+    with artie_can.ArtieCAN(node_address=0x01, backend=artie_can.BackendType.MOCK_TCP, mock_port=5556, mock_server=False) as node1:
+        with artie_can.ArtieCAN(node_address=0x02, backend=artie_can.BackendType.MOCK_TCP, mock_port=5556, mock_server=True) as node2:
             yield node1, node2
 
 

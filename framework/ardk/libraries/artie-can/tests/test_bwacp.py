@@ -4,7 +4,7 @@ Unit tests for BWACP (Block Write Addressed Communication Protocol).
 Tests multi-frame data transfer, block IDs, and sequence numbering.
 """
 import pytest
-from artie_can import ArtieCAN, BackendType, Priority
+import artie_can
 
 
 class TestBWACPBasicBlockWrite:
@@ -17,7 +17,7 @@ class TestBWACPBasicBlockWrite:
             target_addr=0x02,
             block_id=1,
             data=test_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_empty_block_write(self, mock_can_node):
@@ -26,7 +26,7 @@ class TestBWACPBasicBlockWrite:
             target_addr=0x02,
             block_id=1,
             data=b"",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_single_byte_block(self, mock_can_node):
@@ -35,7 +35,7 @@ class TestBWACPBasicBlockWrite:
             target_addr=0x02,
             block_id=5,
             data=b"X",
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_block_write_to_invalid_target(self, mock_can_node):
@@ -45,7 +45,7 @@ class TestBWACPBasicBlockWrite:
                 target_addr=0x40,  # Invalid
                 block_id=1,
                 data=b"Test",
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_block_write_oversized_payload(self, mock_can_node):
@@ -57,7 +57,7 @@ class TestBWACPBasicBlockWrite:
                 target_addr=0x02,
                 block_id=1,
                 data=oversized_data,
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
 
@@ -70,7 +70,7 @@ class TestBWACPBlockIDs:
             target_addr=0x02,
             block_id=0,
             data=b"BlockZero",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_block_id_max(self, mock_can_node):
@@ -80,7 +80,7 @@ class TestBWACPBlockIDs:
             target_addr=0x02,
             block_id=255,
             data=b"BlockMax",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_sequential_block_ids(self, mock_can_node):
@@ -90,7 +90,7 @@ class TestBWACPBlockIDs:
                 target_addr=0x02,
                 block_id=block_id,
                 data=bytes([block_id]),
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_random_block_ids(self, mock_can_node):
@@ -101,7 +101,7 @@ class TestBWACPBlockIDs:
                 target_addr=0x02,
                 block_id=block_id,
                 data=b"Data",
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_block_id_invalid_negative(self, mock_can_node):
@@ -111,7 +111,7 @@ class TestBWACPBlockIDs:
                 target_addr=0x02,
                 block_id=-1,
                 data=b"Test",
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
 
@@ -125,7 +125,7 @@ class TestBWACPLargeData:
             target_addr=0x02,
             block_id=10,
             data=medium_data,
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_large_block(self, mock_can_node):
@@ -135,7 +135,7 @@ class TestBWACPLargeData:
             target_addr=0x02,
             block_id=20,
             data=large_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_very_large_block(self, mock_can_node):
@@ -145,7 +145,7 @@ class TestBWACPLargeData:
             target_addr=0x02,
             block_id=30,
             data=very_large_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_firmware_size_block(self, mock_can_node):
@@ -156,7 +156,7 @@ class TestBWACPLargeData:
             target_addr=0x02,
             block_id=99,
             data=large_data,
-            priority=Priority.HIGH
+            priority=artie_can.Priority.HIGH
         )
 
 
@@ -164,26 +164,26 @@ class TestBWACPPriorities:
     """Tests for BWACP message priorities."""
 
     def test_high_priority_block(self, mock_can_node):
-        """Test block write with high priority."""
+        """Test block write with high artie_can.Priority."""
         mock_can_node.bwacp_write(
             target_addr=0x02,
             block_id=1,
             data=b"HighPriBlock",
-            priority=Priority.HIGH
+            priority=artie_can.Priority.HIGH
         )
 
     def test_low_priority_block(self, mock_can_node):
-        """Test block write with low priority."""
+        """Test block write with low artie_can.Priority."""
         mock_can_node.bwacp_write(
             target_addr=0x02,
             block_id=2,
             data=b"LowPriBlock",
-            priority=Priority.LOW
+            priority=artie_can.Priority.LOW
         )
 
     def test_all_priorities(self, mock_can_node):
         """Test block write with all priority levels."""
-        priorities = [Priority.HIGH, Priority.MED_HIGH, Priority.MED_LOW, Priority.LOW]
+        priorities = [artie_can.Priority.HIGH, artie_can.Priority.MED_HIGH, artie_can.Priority.MED_LOW, artie_can.Priority.LOW]
 
         for i, priority in enumerate(priorities):
             mock_can_node.bwacp_write(
@@ -205,7 +205,7 @@ class TestBWACPMultiFrame:
             target_addr=0x02,
             block_id=42,
             data=multi_frame_data,
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_exactly_one_frame(self, mock_can_node):
@@ -215,7 +215,7 @@ class TestBWACPMultiFrame:
             target_addr=0x02,
             block_id=1,
             data=one_frame_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_just_over_one_frame(self, mock_can_node):
@@ -225,7 +225,7 @@ class TestBWACPMultiFrame:
             target_addr=0x02,
             block_id=2,
             data=over_one_frame,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
 
@@ -239,7 +239,7 @@ class TestBWACPDataTypes:
             target_addr=0x02,
             block_id=100,
             data=binary_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_ascii_data(self, mock_can_node):
@@ -249,7 +249,7 @@ class TestBWACPDataTypes:
             target_addr=0x02,
             block_id=50,
             data=ascii_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_structured_binary_data(self, mock_can_node):
@@ -264,7 +264,7 @@ class TestBWACPDataTypes:
             target_addr=0x02,
             block_id=75,
             data=structured_data,
-            priority=Priority.MED_HIGH
+            priority=artie_can.Priority.MED_HIGH
         )
 
     def test_null_bytes_in_data(self, mock_can_node):
@@ -274,7 +274,7 @@ class TestBWACPDataTypes:
             target_addr=0x02,
             block_id=25,
             data=null_data,
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
 
@@ -291,7 +291,7 @@ class TestBWACPTargetAddressing:
                 target_addr=target,
                 block_id=1,
                 data=test_data,
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_write_to_broadcast(self, mock_can_node):
@@ -302,7 +302,7 @@ class TestBWACPTargetAddressing:
                 target_addr=0x00,  # Broadcast
                 block_id=1,
                 data=b"Broadcast",
-                priority=Priority.HIGH
+                priority=artie_can.Priority.HIGH
             )
         except (ValueError, OSError):
             # Expected if broadcast not supported for BWACP
@@ -319,7 +319,7 @@ class TestBWACPEdgeCases:
                 target_addr=0x02,
                 block_id=i,
                 data=b"Block" + bytes([i]),
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_interleaved_targets(self, mock_can_node):
@@ -330,7 +330,7 @@ class TestBWACPEdgeCases:
                 target_addr=target,
                 block_id=i // 2,
                 data=bytes([i]),
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_same_block_id_different_targets(self, mock_can_node):
@@ -341,14 +341,14 @@ class TestBWACPEdgeCases:
             target_addr=0x02,
             block_id=same_block_id,
             data=b"TargetTwo",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
         mock_can_node.bwacp_write(
             target_addr=0x03,
             block_id=same_block_id,
             data=b"TargetThree",
-            priority=Priority.MED_LOW
+            priority=artie_can.Priority.MED_LOW
         )
 
     def test_rapid_block_writes(self, mock_can_node):
@@ -358,7 +358,7 @@ class TestBWACPEdgeCases:
                 target_addr=0x02,
                 block_id=i,
                 data=bytes([i]) * 20,
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )
 
     def test_varying_block_sizes(self, mock_can_node):
@@ -370,5 +370,5 @@ class TestBWACPEdgeCases:
                 target_addr=0x02,
                 block_id=i,
                 data=b"X" * size,
-                priority=Priority.MED_LOW
+                priority=artie_can.Priority.MED_LOW
             )

@@ -10,8 +10,7 @@ import enum
 import os
 import pathlib
 import sys
-from typing import Optional, Tuple, List
-from enum import IntEnum
+import typing
 
 # Find the shared library
 # Determine platform-specific library name
@@ -38,7 +37,11 @@ for path in _search_paths:
     candidate = path / _lib_name
     if candidate.exists():
         _lib_path = str(candidate)
-        break
+        try:
+            _lib = ctypes.CDLL(_lib_path)
+            break
+        except OSError:
+            _lib_path = None  # Reset if loading failed
 
 if _lib_path is None:
     # Try to load from system path
@@ -47,8 +50,7 @@ if _lib_path is None:
 try:
     _lib = ctypes.CDLL(_lib_path)
 except OSError:
-    # Library not found - this might be OK if we're just importing for documentation
-    _lib = None
+    raise RuntimeError(f"Warning: Could not load Artie CAN library from '{_lib_path}'. Make sure the library is built and the path is correct.")
 
 
 # ===== Error Codes =====
@@ -66,14 +68,14 @@ MAX_UNSTUFFED_BWACP_PAYLOAD = 2038    # For 2048-byte stuffed buffer
 
 # ===== Enums =====
 
-class BackendType(IntEnum):
+class BackendType(enum.IntEnum):
     """CAN backend types"""
     MOCK_DEADEND = enum.auto()
     MOCK_TCP = enum.auto()
     MCP2515 = enum.auto()
 
 
-class Priority(IntEnum):
+class Priority(enum.IntEnum):
     """Message priority levels"""
     HIGH = 0
     MED_HIGH = 1
@@ -81,13 +83,13 @@ class Priority(IntEnum):
     LOW = 3
 
 
-class RTACPFrameType(IntEnum):
+class RTACPFrameType(enum.IntEnum):
     """RTACP frame types"""
     ACK = 0
     MSG = 1
 
 
-class RPCACPFrameType(IntEnum):
+class RPCACPFrameType(enum.IntEnum):
     """RPCACP frame types"""
     ACK = 0
     NACK = 1
@@ -97,13 +99,13 @@ class RPCACPFrameType(IntEnum):
     RX_DATA = 5
 
 
-class PSACPFrameType(IntEnum):
+class PSACPFrameType(enum.IntEnum):
     """PSACP frame types"""
     PUB = 1
     DATA = 3
 
 
-class BWACPFrameType(IntEnum):
+class BWACPFrameType(enum.IntEnum):
     """BWACP frame types"""
     REPEAT = 1
     READY = 3
@@ -374,7 +376,7 @@ class ArtieCAN:
         if result != 0:
             raise ArtieCANException(f"RTACP send failed: {result}")
 
-    def rtacp_receive(self, timeout_ms: int = 0) -> Tuple[int, int, bytes]:
+    def rtacp_receive(self, timeout_ms: int = 0) -> typing.Tuple[int, int, bytes]:
         """
         Receive an RTACP message
 
@@ -440,7 +442,7 @@ class ArtieCAN:
         if result != 0:
             raise ArtieCANException(f"Publish failed: {result}")
 
-    def psacp_receive(self, timeout_ms: int = 0) -> Tuple[int, int, bytes]:
+    def psacp_receive(self, timeout_ms: int = 0) -> typing.Tuple[int, int, bytes]:
         """
         Receive a published message
 
@@ -490,7 +492,7 @@ class ArtieCAN:
         if result != 0:
             raise ArtieCANException(f"BWACP write failed: {result}")
 
-    def bwacp_receive(self, timeout_ms: int = 0) -> Tuple[int, int, int, bytes]:
+    def bwacp_receive(self, timeout_ms: int = 0) -> typing.Tuple[int, int, int, bytes]:
         """
         Receive a block write message
 

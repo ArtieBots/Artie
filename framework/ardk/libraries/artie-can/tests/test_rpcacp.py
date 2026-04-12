@@ -4,7 +4,7 @@ Unit tests for RPCACP (Remote Procedure Call Addressed Communication Protocol).
 Tests synchronous and asynchronous RPC calls, procedure IDs, and payload handling.
 """
 import pytest
-from artie_can import ArtieCAN, BackendType, Priority
+import artie_can
 
 
 class TestRPCACPBasicCalls:
@@ -17,7 +17,7 @@ class TestRPCACPBasicCalls:
             target_addr=0x02,
             procedure_id=1,
             payload=b"",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
         # Should not raise exceptions
@@ -29,7 +29,7 @@ class TestRPCACPBasicCalls:
             target_addr=0x02,
             procedure_id=5,
             payload=b"Args",
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             synchronous=False  # Async since no responder
         )
 
@@ -40,7 +40,7 @@ class TestRPCACPBasicCalls:
             target_addr=0x02,
             procedure_id=10,
             payload=b"",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             synchronous=False  # Async since no responder
         )
 
@@ -52,7 +52,7 @@ class TestRPCACPBasicCalls:
                 target_addr=0x40,  # Invalid
                 procedure_id=1,
                 payload=b"",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False
             )
 
@@ -67,7 +67,7 @@ class TestRPCACPProcedureIDs:
             target_addr=0x02,
             procedure_id=0,
             payload=b"",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
 
@@ -78,7 +78,7 @@ class TestRPCACPProcedureIDs:
             target_addr=0x02,
             procedure_id=127,
             payload=b"",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
 
@@ -90,7 +90,7 @@ class TestRPCACPProcedureIDs:
                 target_addr=0x02,
                 procedure_id=proc_id,
                 payload=b"",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False  # Async since no responder
             )
 
@@ -102,7 +102,7 @@ class TestRPCACPProcedureIDs:
                 target_addr=0x02,
                 procedure_id=-1,
                 payload=b"",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False
             )
 
@@ -114,7 +114,7 @@ class TestRPCACPProcedureIDs:
                 target_addr=0x02,
                 procedure_id=128,  # Max is 127
                 payload=b"",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False
             )
 
@@ -130,14 +130,14 @@ class TestRPCACPSynchronous:
             target_addr=0x02,
             procedure_id=1,
             payload=b"SyncCall",
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             synchronous=False
         )
 
     def test_synchronous_with_all_priorities(self, mock_can_tcp_pair):
         """Test synchronous RPC with all priority levels."""
         node1, node2 = mock_can_tcp_pair
-        priorities = [Priority.HIGH, Priority.MED_HIGH, Priority.MED_LOW, Priority.LOW]
+        priorities = [artie_can.Priority.HIGH, artie_can.Priority.MED_HIGH, artie_can.Priority.MED_LOW, artie_can.Priority.LOW]
 
         for i, priority in enumerate(priorities):
             node1.rpcacp_call(
@@ -156,7 +156,7 @@ class TestRPCACPSynchronous:
                 target_addr=target,
                 procedure_id=1,
                 payload=b"Multi",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False  # Async since no responder
             )
 
@@ -171,7 +171,7 @@ class TestRPCACPAsynchronous:
             target_addr=0x02,
             procedure_id=2,
             payload=b"AsyncCall",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False
         )
 
@@ -182,7 +182,7 @@ class TestRPCACPAsynchronous:
             target_addr=0x02,
             procedure_id=99,
             payload=b"",
-            priority=Priority.LOW,
+            priority=artie_can.Priority.LOW,
             synchronous=False
         )
         # Should return immediately
@@ -195,7 +195,7 @@ class TestRPCACPAsynchronous:
                 target_addr=0x02,
                 procedure_id=i,
                 payload=bytes([i]),
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False
             )
 
@@ -210,7 +210,7 @@ class TestRPCACPPriorities:
             target_addr=0x02,
             procedure_id=1,
             payload=b"HighPri",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             synchronous=False  # Async since no responder
         )
 
@@ -221,7 +221,7 @@ class TestRPCACPPriorities:
             target_addr=0x02,
             procedure_id=2,
             payload=b"LowPri",
-            priority=Priority.LOW,
+            priority=artie_can.Priority.LOW,
             synchronous=False
         )
 
@@ -231,15 +231,15 @@ class TestRPCACPPriorities:
         # Send RPCs with different priorities
         node1.rpcacp_call(
             target_addr=0x02, procedure_id=1,
-            payload=b"Low", priority=Priority.LOW, synchronous=False
+            payload=b"Low", priority=artie_can.Priority.LOW, synchronous=False
         )
         node1.rpcacp_call(
             target_addr=0x02, procedure_id=2,
-            payload=b"High", priority=Priority.HIGH, synchronous=False
+            payload=b"High", priority=artie_can.Priority.HIGH, synchronous=False
         )
         node1.rpcacp_call(
             target_addr=0x02, procedure_id=3,
-            payload=b"Med", priority=Priority.MED_LOW, synchronous=False
+            payload=b"Med", priority=artie_can.Priority.MED_LOW, synchronous=False
         )
 
 
@@ -253,7 +253,7 @@ class TestRPCACPPayloads:
             target_addr=0x02,
             procedure_id=1,
             payload=b"X",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
 
@@ -264,7 +264,7 @@ class TestRPCACPPayloads:
             target_addr=0x02,
             procedure_id=1,
             payload=b"1234",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
 
@@ -276,7 +276,7 @@ class TestRPCACPPayloads:
             target_addr=0x02,
             procedure_id=1,
             payload=max_payload,
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             synchronous=False  # Async since no responder
         )
 
@@ -288,7 +288,7 @@ class TestRPCACPPayloads:
             target_addr=0x02,
             procedure_id=50,
             payload=binary_payload,
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False  # Async since no responder
         )
 
@@ -302,7 +302,7 @@ class TestRPCACPPayloads:
             target_addr=0x02,
             procedure_id=75,
             payload=payload,
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             synchronous=False  # Async since no responder
         )
 
@@ -318,7 +318,7 @@ class TestRPCACPEdgeCases:
             target_addr=0x01,  # Same as sender
             procedure_id=1,
             payload=b"ToSelf",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             synchronous=False
         )
 
@@ -330,7 +330,7 @@ class TestRPCACPEdgeCases:
                 target_addr=0x02,
                 procedure_id=i % 128,
                 payload=bytes([i]),
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False
             )
 
@@ -342,6 +342,6 @@ class TestRPCACPEdgeCases:
                 target_addr=0x02,
                 procedure_id=i,
                 payload=bytes([i]),
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 synchronous=False  # All async since no responder
             )

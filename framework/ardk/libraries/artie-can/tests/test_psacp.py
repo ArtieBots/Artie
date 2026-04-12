@@ -4,7 +4,7 @@ Unit tests for PSACP (Publisher/Subscriber Addressed Communication Protocol).
 Tests topic-based publishing and subscribing with various priorities and data.
 """
 import pytest
-from artie_can import ArtieCAN, BackendType, Priority
+import artie_can
 
 
 class TestPSACPBasicPublishing:
@@ -15,7 +15,7 @@ class TestPSACPBasicPublishing:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"Test",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -24,7 +24,7 @@ class TestPSACPBasicPublishing:
         mock_can_node.psacp_publish(
             topic=0x20,
             data=b"",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -34,7 +34,7 @@ class TestPSACPBasicPublishing:
         mock_can_node.psacp_publish(
             topic=0x30,
             data=max_data,
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             high_priority=False
         )
 
@@ -43,7 +43,7 @@ class TestPSACPBasicPublishing:
         mock_can_node.psacp_publish(
             topic=0x00,  # Broadcast topic
             data=b"Broadcast",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             high_priority=False
         )
 
@@ -60,7 +60,7 @@ class TestPSACPTopicIDs:
             mock_can_node.psacp_publish(
                 topic=topic,
                 data=b"Data",
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 high_priority=False
             )
 
@@ -69,7 +69,7 @@ class TestPSACPTopicIDs:
         mock_can_node.psacp_publish(
             topic=0x0B,  # Minimum valid topic
             data=b"MinTopic",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -78,7 +78,7 @@ class TestPSACPTopicIDs:
         mock_can_node.psacp_publish(
             topic=0xF4,  # Maximum valid topic
             data=b"MaxTopic",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -91,7 +91,7 @@ class TestPSACPTopicIDs:
                 mock_can_node.psacp_publish(
                     topic=topic,
                     data=b"Reserved",
-                    priority=Priority.MED_LOW,
+                    priority=artie_can.Priority.MED_LOW,
                     high_priority=False
                 )
             except (ValueError, OSError):
@@ -103,26 +103,26 @@ class TestPSACPPriorities:
     """Tests for PSACP message priorities."""
 
     def test_high_priority_publish(self, mock_can_node):
-        """Test publishing with high priority."""
+        """Test publishing with high artie_can.Priority."""
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"HighPri",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             high_priority=False
         )
 
     def test_low_priority_publish(self, mock_can_node):
-        """Test publishing with low priority."""
+        """Test publishing with low artie_can.Priority."""
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"LowPri",
-            priority=Priority.LOW,
+            priority=artie_can.Priority.LOW,
             high_priority=False
         )
 
     def test_all_priority_levels(self, mock_can_node):
         """Test publishing with all priority levels."""
-        priorities = [Priority.HIGH, Priority.MED_HIGH, Priority.MED_LOW, Priority.LOW]
+        priorities = [artie_can.Priority.HIGH, artie_can.Priority.MED_HIGH, artie_can.Priority.MED_LOW, artie_can.Priority.LOW]
 
         for i, priority in enumerate(priorities):
             mock_can_node.psacp_publish(
@@ -141,7 +141,7 @@ class TestPSACPHighPriority:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"HighPriPubSub",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             high_priority=True
         )
 
@@ -150,17 +150,17 @@ class TestPSACPHighPriority:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"NormalPubSub",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
     def test_high_priority_with_low_message_priority(self, mock_can_node):
-        """Test high priority pub/sub with low message priority."""
+        """Test high priority pub/sub with low message artie_can.Priority."""
         # high_priority flag vs message priority are different concepts
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"Mixed",
-            priority=Priority.LOW,
+            priority=artie_can.Priority.LOW,
             high_priority=True
         )
 
@@ -198,7 +198,7 @@ class TestPSACPCommunication:
         node1.psacp_publish(
             topic=test_topic,
             data=test_data,
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -221,7 +221,7 @@ class TestPSACPCommunication:
             mock_can_node.psacp_publish(
                 topic=topic,
                 data=msg,
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 high_priority=False
             )
 
@@ -237,7 +237,7 @@ class TestPSACPCommunication:
             mock_can_node.psacp_publish(
                 topic=topic,
                 data=data,
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 high_priority=False
             )
 
@@ -250,7 +250,7 @@ class TestPSACPDataPayloads:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"ASCIIText",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -260,7 +260,7 @@ class TestPSACPDataPayloads:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=binary_data,
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             high_priority=False
         )
 
@@ -269,7 +269,7 @@ class TestPSACPDataPayloads:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"X",
-            priority=Priority.LOW,
+            priority=artie_can.Priority.LOW,
             high_priority=False
         )
 
@@ -280,7 +280,7 @@ class TestPSACPDataPayloads:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=numeric_data,
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
@@ -292,7 +292,7 @@ class TestPSACPDataPayloads:
         mock_can_node.psacp_publish(
             topic=0x50,  # Sensor topic
             data=sensor_data,
-            priority=Priority.MED_HIGH,
+            priority=artie_can.Priority.MED_HIGH,
             high_priority=False
         )
 
@@ -306,7 +306,7 @@ class TestPSACPEdgeCases:
             mock_can_node.psacp_publish(
                 topic=0x10,
                 data=bytes([i]),
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 high_priority=False
             )
 
@@ -317,7 +317,7 @@ class TestPSACPEdgeCases:
             mock_can_node.psacp_publish(
                 topic=topic,
                 data=bytes([i]),
-                priority=Priority.MED_LOW,
+                priority=artie_can.Priority.MED_LOW,
                 high_priority=False
             )
 
@@ -327,7 +327,7 @@ class TestPSACPEdgeCases:
         mock_can_node.psacp_publish(
             topic=0x00,
             data=b"Broadcast",
-            priority=Priority.HIGH,
+            priority=artie_can.Priority.HIGH,
             high_priority=False
         )
 
@@ -335,19 +335,19 @@ class TestPSACPEdgeCases:
         mock_can_node.psacp_publish(
             topic=0x10,
             data=b"Targeted",
-            priority=Priority.MED_LOW,
+            priority=artie_can.Priority.MED_LOW,
             high_priority=False
         )
 
     def test_priority_combinations(self, mock_can_node):
         """Test various combinations of priority settings."""
         combos = [
-            (Priority.HIGH, True),
-            (Priority.HIGH, False),
-            (Priority.LOW, True),
-            (Priority.LOW, False),
-            (Priority.MED_LOW, True),
-            (Priority.MED_HIGH, False),
+            (artie_can.Priority.HIGH, True),
+            (artie_can.Priority.HIGH, False),
+            (artie_can.Priority.LOW, True),
+            (artie_can.Priority.LOW, False),
+            (artie_can.Priority.MED_LOW, True),
+            (artie_can.Priority.MED_HIGH, False),
         ]
 
         for msg_priority, high_pri_flag in combos:
