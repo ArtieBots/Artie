@@ -34,6 +34,3 @@ Thumbs.db
 
 # Examples (not needed for tests)
 examples/__pycache__/
-
-# Don't exclude tests directory - we need it!
-# Don't exclude src directory - we need it!

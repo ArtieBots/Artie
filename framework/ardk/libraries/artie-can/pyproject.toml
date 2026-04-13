@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "artie-can"
 readme = "README.md"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 license = "MIT"
 description = "Artie CAN library for communication over CAN bus"
 dependencies = []
@@ -25,8 +25,3 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--strict-markers", "--tb=short"]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-]

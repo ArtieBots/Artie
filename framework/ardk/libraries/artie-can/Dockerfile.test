@@ -11,8 +11,11 @@ WORKDIR /artie-can
 # Copy the entire artie-can library (source + tests)
 COPY . ./
 
+# Build the C library stand-alone (for testing the C API)
+# TODO
+
 # Install the library in development mode with test dependencies
 RUN pip install ".[dev]"
 
-# Default command runs all tests
+# Default command runs all Python tests AND all C tests (TODO)
 CMD pytest tests/ -v --tb=short

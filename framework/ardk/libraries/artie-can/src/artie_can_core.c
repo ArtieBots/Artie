@@ -1,74 +1,162 @@
 /**
  * @file artie_can_core.c
- * @brief Core initialization and backend management for Artie CAN library
+ * @brief Core implementation for Artie CAN library.
+ *
  */
 
+#include <stdbool.h>
+#include <stdint.h>
 #include "artie_can.h"
-#include "artie_can_backends.h"
-#include <string.h>
+#include "err.h"
 
-/**
- * @brief Initialize the Artie CAN context with a specific backend type
- */
-int artie_can_init(artie_can_context_t *ctx, uint8_t node_address, artie_can_backend_type_t backend_type, const void *backend_config)
+static artie_can_error_t _init_mcp2515(artie_can_mcp2515_context_t *context, artie_can_backend_t *handle)
 {
-    if (!ctx) {
+    artie_can_error_t err;
+
+    err = artie_can_init_mcp2515(context, handle);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+    else if (handle->init == NULL)
+    {
+        return ARTIE_CAN_ERR_INIT_FAIL;
+    }
+    else
+    {
+        return handle->init(handle->context);
+    }
+}
+
+static artie_can_error_t _init_tcp(artie_can_tcp_context_t *context, artie_can_backend_t *handle)
+{
+    artie_can_error_t err;
+
+    err = artie_can_init_tcp(context, handle);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+    else if (handle->init == NULL)
+    {
+        return ARTIE_CAN_ERR_INIT_FAIL;
+    }
+    else
+    {
+        return handle->init(handle->context);
+    }
+}
+
+artie_can_error_t artie_can_init(void *context, artie_can_backend_t *handle, artie_can_backend_type_t backend_type)
+{
+    if (context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle == NULL)
+    {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    /* Validate node address (6 bits) */
-    if (node_address > 0x3F) {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    /* Initialize context */
-    memset(ctx, 0, sizeof(artie_can_context_t));
-    ctx->node_address = node_address;
-
-    /* Initialize the appropriate backend */
-    int result = 0;
-    switch (backend_type) {
-        case ARTIE_CAN_BACKEND_DEADEND:
-            result = artie_can_backend_mock_init(ctx, backend_config);
-            break;
-
+    switch (backend_type)
+    {
         case ARTIE_CAN_BACKEND_MCP2515:
-            result = artie_can_backend_mcp2515_init(ctx, backend_config);
-            break;
-
+            return artie_can_init_mcp2515((artie_can_mcp2515_context_t *)context, handle);
         case ARTIE_CAN_BACKEND_TCP:
-            result = artie_can_backend_mock_tcp_init(ctx, (const artie_can_mock_config_t *)backend_config);
-            break;
-
+            return artie_can_init_tcp((artie_can_tcp_context_t *)context, handle);
         default:
             return ARTIE_CAN_ERR_INVALID_ARG;
     }
-
-    if (result != 0) {
-        return result;
-    }
-
-    /* Initialize the backend */
-    if (ctx->backend.init) {
-        return ctx->backend.init(ctx->backend.context);
-    }
-
-    return 0;
 }
 
-/**
- * @brief Close the CAN context
- */
-int artie_can_close(artie_can_context_t *ctx)
+artie_can_error_t artie_can_init_custom(artie_can_backend_t *handle)
 {
-    if (!ctx) {
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->init == NULL)
+    {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    /* Close backend */
-    if (ctx->backend.close) {
-        return ctx->backend.close(ctx->backend.context);
+    return handle->init(handle->context);
+}
+
+artie_can_error_t artie_can_close(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->close == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    return 0;
+    artie_can_error_t err = handle->close(handle->context);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // Zero out the handle so it can't be used again without reinitialization
+        memset(handle, 0, sizeof(artie_can_backend_t));
+    }
+    return err;
+}
+
+artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_frame_t *frame)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (frame == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->send == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    return handle->send(handle->context, frame);
+}
+
+artie_can_error_t artie_can_receive(artie_can_backend_t *handle, artie_can_frame_t *frame, uint32_t timeout_ms)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (frame == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->receive == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    return handle->receive(handle->context, frame, timeout_ms);
+}
+
+artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, artie_can_frame_t *frame, uint32_t timeout_ms, artie_can_receive_callback_t callback)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (frame == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (callback == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->receive_nonblocking == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    return handle->receive_nonblocking(handle->context, frame, timeout_ms, callback);
 }
