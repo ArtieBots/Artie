@@ -17,3 +17,11 @@
  * @param frame2 The second CAN frame to compare.
  */
 void assert_frames_equal(const artie_can_frame_t *frame1, const artie_can_frame_t *frame2);
+
+/**
+ * @brief Test that two RTACP frames are equal.
+ *
+ * @param frame1 The first RTACP frame to compare.
+ * @param frame2 The second RTACP frame to compare.
+ */
+void assert_rtacp_frames_equal(const artie_can_frame_rtacp_t *frame1, const artie_can_frame_rtacp_t *frame2);

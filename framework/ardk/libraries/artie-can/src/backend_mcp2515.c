@@ -4,7 +4,7 @@
 #include "backend_mcp2515.h"
 #include "err.h"
 
-static artie_can_error_t _init_mcp2515(void *ctx, artie_can_backend_t *handle)
+static artie_can_error_t _init_mcp2515(void *ctx)
 {
     // TODO
     return ARTIE_CAN_ERR_NONE;

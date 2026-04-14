@@ -22,6 +22,9 @@ target_include_directories(test_utils PUBLIC
     ${CMAKE_SOURCE_DIR}/include
 )
 
+# Link against Unity so test utilities can use Unity assertions
+target_link_libraries(test_utils PUBLIC unity)
+
 # Helper function to create test executables
 function(add_artie_can_test test_name)
     add_executable(${test_name} ${test_name}.c)

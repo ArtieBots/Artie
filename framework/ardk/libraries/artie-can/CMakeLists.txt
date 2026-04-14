@@ -52,6 +52,17 @@ function(set_artie_can_compile_options target)
     endif()
 endfunction()
 
+# Function to link platform-specific libraries
+function(link_artie_can_platform_libs target)
+    if(WIN32)
+        # Windows: link against Winsock2 for socket functions
+        target_link_libraries(${target} PRIVATE ws2_32)
+    else()
+        # Unix/Linux: link against pthread for threading and m for math
+        target_link_libraries(${target} PRIVATE pthread m)
+    endif()
+endfunction()
+
 # Shared library
 if(BUILD_SHARED_LIBS)
     add_library(artie_can SHARED ${ARTIE_CAN_SOURCES})
@@ -63,6 +74,9 @@ if(BUILD_SHARED_LIBS)
 
     # Apply common compile options
     set_artie_can_compile_options(artie_can)
+
+    # Link platform-specific libraries
+    link_artie_can_platform_libs(artie_can)
 
     # Install shared library
     install(TARGETS artie_can
@@ -81,6 +95,9 @@ if(BUILD_STATIC_LIBS)
 
     # Apply common compile options
     set_artie_can_compile_options(artie_can_static)
+
+    # Link platform-specific libraries
+    link_artie_can_platform_libs(artie_can_static)
 
     # Install static library
     install(TARGETS artie_can_static

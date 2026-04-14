@@ -23,6 +23,8 @@
 #define DEFAULT_TIMEOUT_MS 3000
 
 // A few nodes that the tests use for communication.
+static artie_can_tcp_context_t _node_context1;
+static artie_can_tcp_context_t _node_context2;
 static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
 
@@ -55,24 +57,22 @@ static void _receive_callback(void *ctx, artie_can_error_t error, artie_can_fram
 void setUp(void)
 {
     artie_can_error_t err;
-    artie_can_tcp_context_t node_context1;
-    artie_can_tcp_context_t node_context2;
 
     // Reset the callback called flag before each test
     _callback_called = false;
 
     // Set up the nodes with TCP contexts (first node is client, second node is server)
-    err = artie_can_init_context_tcp(&node_context1, "127.0.0.1", 5000, false);
+    err = artie_can_init_context_tcp(&_node_context1, "127.0.0.1", 5000, false);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_tcp(&node_context2, "127.0.0.1", 5001, true);
+    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5001, true);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes
-    err = artie_can_init(&node_context1, &_node1, ARTIE_CAN_BACKEND_TCP);
+    err = artie_can_init(&_node_context1, &_node1, ARTIE_CAN_BACKEND_TCP);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&node_context2, &_node2, ARTIE_CAN_BACKEND_TCP);
+    err = artie_can_init(&_node_context2, &_node2, ARTIE_CAN_BACKEND_TCP);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 
@@ -107,8 +107,18 @@ void test_broadcast(void)
     artie_can_error_t err;
 
     // Create a frame to send
+    uint8_t data_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    artie_can_frame_rtacp_t rtacp_frame = {
+        .ack = false,
+        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
+        .source_address = 0x01,
+        .target_address = ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST,
+        .nbytes = sizeof(data_bytes),
+        .data = {0}
+    };
+    memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
     artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, 0);
+    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
@@ -122,6 +132,12 @@ void test_broadcast(void)
 
     // Check that the received frame matches the sent frame
     assert_frames_equal(&frame_to_send, &frame_received);
+
+    // Parse the received frame back into RTACP format and check that it matches the original RTACP frame
+    artie_can_frame_rtacp_t rtacp_frame_received;
+    err = artie_can_rtacp_parse_frame(&_node2, &frame_received, &rtacp_frame_received);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    assert_rtacp_frames_equal(&rtacp_frame, &rtacp_frame_received);
 }
 
 /**
@@ -176,12 +192,12 @@ void test_nonblocking_receive_with_callback(void)
 int main(void)
 {
     // Initialize Unity test framework
-    UnityBegin("test_rtacp.c");
+    UNITY_BEGIN();
 
     // Run tests
     RUN_TEST(test_broadcast);
     RUN_TEST(test_nonblocking_receive_with_callback);
 
     // Finish and return results
-    return UnityEnd();
+    return UNITY_END();
 }

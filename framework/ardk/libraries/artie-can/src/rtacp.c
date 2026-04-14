@@ -1,3 +1,4 @@
+#include <string.h>
 #include "backend.h"
 #include "err.h"
 #include "frame.h"

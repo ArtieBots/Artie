@@ -15,9 +15,12 @@
 #ifdef _WIN32
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #include <windows.h>
     typedef SOCKET socket_t;
+    typedef HANDLE thread_handle_t;
     #define CLOSE_SOCKET closesocket
     #define SOCK_ERRNO WSAGetLastError()
+    #define INVALID_THREAD_HANDLE NULL
 #else
     #include <sys/types.h>
     #include <sys/socket.h>
@@ -25,9 +28,13 @@
     #include <arpa/inet.h>
     #include <unistd.h>
     #include <errno.h>
+    #include <pthread.h>
     typedef int socket_t;
+    typedef pthread_t thread_handle_t;
     #define CLOSE_SOCKET close
     #define SOCK_ERRNO errno
+    #define INVALID_SOCKET -1
+    #define INVALID_THREAD_HANDLE 0
 #endif
 
 
@@ -42,7 +49,10 @@ typedef struct {
     char host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH];   /**< Hostname or IP address of the TCP server */
     uint16_t port;                                  /**< Port number of the TCP server */
     socket_t socket_fd;                             /**< File descriptor for the TCP socket */
+    socket_t listen_fd;                             /**< File descriptor for the listening socket (server mode only) */
     bool is_server;                                 /**< Flag indicating whether this context is for a server (true) or client (false) */
+    thread_handle_t accept_thread;                  /**< Thread handle for the server accept thread (server mode only) */
+    volatile bool should_stop;                      /**< Flag to signal the accept thread to stop */
 } artie_can_tcp_context_t;
 
 /**
@@ -50,9 +60,6 @@ typedef struct {
  *
  * If is_server is true, the context will be set up for a server that listens for incoming connections on the specified host and port.
  * This will be set up in a separate thread when the backend is initialized.
- *
- * Note that this function is not expected to call the node handle's init() function - that will be done
- * after this function returns.
  *
  * @param context Pointer to the artie_can_tcp_context_t struct to initialize.
  * @param host Hostname or IP address of the TCP server.
@@ -65,6 +72,9 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_tcp_context_t *context, c
 
 /**
  * @brief Initialize the Artie CAN backend struct with the TCP backend, using the provided context for configuration.
+ *
+ * Note that this function is not expected to call the node handle's init() function - that will be done
+ * after this function returns.
  *
  * @param context Pointer to the artie_can_tcp_context_t struct.
  * @param handle Pointer to the artie_can_backend_t struct that will be populated with the function pointers and context for the TCP backend.
