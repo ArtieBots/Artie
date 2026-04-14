@@ -30,9 +30,20 @@ static artie_can_backend_t _node2;
 static volatile bool _callback_called = false;
 
 /** The callback to use with non-blocking receive tests */
-static void _receive_callback(artie_can_frame_t *frame)
+static void _receive_callback(void *ctx, artie_can_error_t error, artie_can_frame_t *frame)
 {
-    _callback_called = true;
+    if (error != ARTIE_CAN_ERR_NONE)
+    {
+        TEST_FAIL_MESSAGE("Error in receive callback");
+    }
+    else if (frame == NULL)
+    {
+        TEST_FAIL_MESSAGE("Received NULL frame in callback");
+    }
+    else
+    {
+        _callback_called = true;
+    }
 }
 
 /**
@@ -97,7 +108,7 @@ void test_broadcast(void)
 
     // Create a frame to send
     artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, todo);
+    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, 0);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
@@ -123,7 +134,7 @@ void test_nonblocking_receive_with_callback(void)
 
     // Create a frame to send
     artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, todo);
+    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, 0);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
@@ -169,6 +180,7 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_broadcast);
+    RUN_TEST(test_nonblocking_receive_with_callback);
 
     // Finish and return results
     return UnityEnd();

@@ -16,19 +16,21 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 # Source files
 set(ARTIE_CAN_SOURCES
     src/artie_can_core.c
+    src/backend_mcp2515.c
+    src/backend_tcp.c
+    src/rtacp.c
 )
 
 # Header files
 set(ARTIE_CAN_HEADERS
     include/artie_can.h
-    include/artie_can_backends.h
+    include/backend_mcp2515.h
+    include/backend_tcp.h
+    include/backend.h
+    include/err.h
+    include/frame.h
+    include/rtacp.h
 )
-
-# Tests
-if(BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
 
 # Function to apply common compile options to library targets
 function(set_artie_can_compile_options target)
@@ -85,6 +87,12 @@ if(BUILD_STATIC_LIBS)
         ARCHIVE DESTINATION lib
         PUBLIC_HEADER DESTINATION include/artie_can
     )
+endif()
+
+# Tests
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 # Print configuration summary

@@ -7,6 +7,7 @@
 artie_can_error_t artie_can_init_context_mcp2515(artie_can_mcp2515_context_t *context, uint8_t dummy)
 {
     // TODO
+    return ARTIE_CAN_ERR_NONE;
 }
 
 artie_can_error_t artie_can_init_mcp2515(artie_can_mcp2515_context_t *context, artie_can_backend_t *handle)

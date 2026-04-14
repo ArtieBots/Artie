@@ -7,6 +7,7 @@
 artie_can_error_t artie_can_init_context_tcp(artie_can_tcp_context_t *context, const char *host, uint16_t port, bool is_server)
 {
     // TODO
+    return ARTIE_CAN_ERR_NONE;
 }
 
 artie_can_error_t artie_can_init_tcp(artie_can_tcp_context_t *context, artie_can_backend_t *handle)

@@ -12,10 +12,11 @@
 #include <stdint.h>
 #include "err.h"
 
-#include "frame.h"
 #include "backend.h"
 #include "backend_mcp2515.h"
 #include "backend_tcp.h"
+#include "frame.h"
+#include "rtacp.h"
 
 /**
  * @brief Initialize the library with the given backend type and configuration.

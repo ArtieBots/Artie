@@ -11,12 +11,23 @@ target_include_directories(unity PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/unity
 )
 
+# Test utilities library
+add_library(test_utils STATIC
+    util.c
+    util.h
+)
+
+target_include_directories(test_utils PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+
 # Helper function to create test executables
 function(add_artie_can_test test_name)
     add_executable(${test_name} ${test_name}.c)
 
-    # Link against Unity and artie-can
-    target_link_libraries(${test_name} PRIVATE unity)
+    # Link against Unity, test utilities, and artie-can
+    target_link_libraries(${test_name} PRIVATE unity test_utils)
 
     # Link against the static library if it exists, otherwise shared
     if(TARGET artie_can_static)
@@ -51,8 +62,8 @@ function(add_artie_can_test test_name)
     )
 endfunction()
 
-# Add individual test files here
-add_artie_can_test(test_example)
+# Add individual test files here (no *.c suffix)
+add_artie_can_test(test_rtacp)
 
 # Print test information
 message(STATUS "Unity test framework configured")
