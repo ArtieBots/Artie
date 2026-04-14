@@ -42,6 +42,7 @@ typedef struct {
     char host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH];   /**< Hostname or IP address of the TCP server */
     uint16_t port;                                  /**< Port number of the TCP server */
     socket_t socket_fd;                             /**< File descriptor for the TCP socket */
+    bool is_server;                                 /**< Flag indicating whether this context is for a server (true) or client (false) */
 } artie_can_tcp_context_t;
 
 /**
@@ -49,6 +50,9 @@ typedef struct {
  *
  * If is_server is true, the context will be set up for a server that listens for incoming connections on the specified host and port.
  * This will be set up in a separate thread when the backend is initialized.
+ *
+ * Note that this function is not expected to call the node handle's init() function - that will be done
+ * after this function returns.
  *
  * @param context Pointer to the artie_can_tcp_context_t struct to initialize.
  * @param host Hostname or IP address of the TCP server.

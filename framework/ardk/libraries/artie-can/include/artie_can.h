@@ -28,7 +28,8 @@
  * has been initialized with artie_can_initialize_context_mcp2515() with the desired configuration for the MCP2515 backend.
  * For ARTIE_CAN_BACKEND_TCP, this should be a pointer to an artie_can_backend_tcp_context_t struct that
  * has been initialized with artie_can_initialize_context_tcp() with the desired configuration for the TCP backend.
- * This struct is copied into the backend handle, so the caller can free or reuse the original context struct after this function returns.
+ * We copy the pointer into the backend handle struct, so the caller must ensure the context data's lifetime
+ * matches the lifetime of the backend handle.
  * @param handle Pointer to an artie_can_backend_t struct that will be populated with the function pointers
  * and context for the initialized backend. This handle can then be used with the other functions in the library.
  * @return ARTIE_CAN_ERR_NONE on success, or an appropriate error code on failure.
@@ -65,6 +66,11 @@ artie_can_error_t artie_can_close(artie_can_backend_t *handle);
 /**
  * @brief Send the given CAN frame using the specified backend.
  *
+ * This function assumes you already have a prepared frame. To prepare the frame for your backend
+ * and protocol, use the appropriate frame initialization function for your protocol.
+ * For example, if you are using RTACP, you can use artie_can_rtacp_init_frame()
+ * to prepare your frame before sending it with this function.
+ *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend to use for sending the frame.
  * @param frame Pointer to the artie_can_frame_t struct representing the frame to send.
  * @return Error code indicating the result of the operation. If the frame was successfully sent,
@@ -77,6 +83,10 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
  * If timeout_ms is non-zero, this function will block up to that many milliseconds for a frame to be received before
  * returning with an ARTIE_CAN_ERROR_TIMEOUT. If timeout_ms is zero, this function will block forever until
  * a frame is received.
+ *
+ * This function's frame output is raw. To deconstruct it into useful data according to your protocol,
+ * use the appropriate frame parsing functions. For example, if you are using RTACP,
+ * you can use artie_can_rtacp_parse_frame() to get a more useful representation of the received data.
  *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend to use for receiving the frame.
  * @param frame Pointer to the artie_can_frame_t struct where the received frame will be stored.
@@ -99,6 +109,10 @@ artie_can_error_t artie_can_receive(artie_can_backend_t *handle, artie_can_frame
  * and NULL as its third argument. Unless the backend has been closed, the first argument should always be a valid
  * pointer to the backend context. If the backend has been closed by the time the callback is called, the first argument should be NULL,
  * and the error should be ARTIE_CAN_ERR_CLOSED.
+ *
+ * This function's frame output is raw. To deconstruct it into useful data according to your protocol,
+ * use the appropriate frame parsing functions. For example, if you are using RTACP,
+ * you can use artie_can_rtacp_parse_frame() to get a more useful representation of the received data.
  *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend to use for receiving the frame.
  * @param frame Pointer to the artie_can_frame_t struct where the received frame will be stored once it has been received.

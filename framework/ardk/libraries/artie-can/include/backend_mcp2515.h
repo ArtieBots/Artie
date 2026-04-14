@@ -33,6 +33,9 @@ artie_can_error_t artie_can_init_context_mcp2515(artie_can_mcp2515_context_t *co
 /**
  * @brief Initialize the Artie CAN backend struct with the MCP2515 backend, using the provided context for configuration.
  *
+ * Note that this function is not expected to call the node handle's init() function - that will be done
+ * after this function returns.
+ *
  * @param context Pointer to the artie_can_mcp2515_context_t struct.
  * @param handle Pointer to the artie_can_backend_t struct that will be
  * populated with the backend's function pointers and context.

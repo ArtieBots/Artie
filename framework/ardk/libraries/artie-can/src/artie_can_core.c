@@ -61,9 +61,9 @@ artie_can_error_t artie_can_init(void *context, artie_can_backend_t *handle, art
     switch (backend_type)
     {
         case ARTIE_CAN_BACKEND_MCP2515:
-            return artie_can_init_mcp2515((artie_can_mcp2515_context_t *)context, handle);
+            return _init_mcp2515((artie_can_mcp2515_context_t *)context, handle);
         case ARTIE_CAN_BACKEND_TCP:
-            return artie_can_init_tcp((artie_can_tcp_context_t *)context, handle);
+            return _init_tcp((artie_can_tcp_context_t *)context, handle);
         default:
             return ARTIE_CAN_ERR_INVALID_ARG;
     }
