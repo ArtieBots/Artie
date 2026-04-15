@@ -13,9 +13,9 @@
 
 // OS-dependent includes for socket programming
 #ifdef _WIN32
+    #include <windows.h>
     #include <winsock2.h>
     #include <ws2tcpip.h>
-    #include <windows.h>
     typedef SOCKET socket_t;
     typedef HANDLE thread_handle_t;
     #define CLOSE_SOCKET closesocket
@@ -53,6 +53,7 @@ typedef struct {
     bool is_server;                                 /**< Flag indicating whether this context is for a server (true) or client (false) */
     thread_handle_t accept_thread;                  /**< Thread handle for the server accept thread (server mode only) */
     volatile bool should_stop;                      /**< Flag to signal the accept thread to stop */
+    volatile bool server_ready;                     /**< Flag indicating the server is ready to accept connections */
 } artie_can_tcp_context_t;
 
 /**
