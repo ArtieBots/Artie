@@ -139,17 +139,31 @@ artie_can_error_t artie_can_receive(artie_can_backend_t *handle, artie_can_frame
     return handle->receive(handle->context, frame, timeout_ms);
 }
 
-artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, artie_can_frame_t *frame, uint32_t timeout_ms, artie_can_receive_callback_t callback)
+artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, artie_can_frame_t *frame, artie_can_receive_callback_t callback)
 {
     if (handle == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-    else if (frame == NULL)
+    else if (handle->receive_nonblocking == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-    else if (callback == NULL)
+    else if ((callback != NULL) && (frame == NULL))
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if ((callback == NULL) && (frame != NULL))
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    return handle->receive_nonblocking(handle->context, frame, callback);
+}
+
+artie_can_error_t artie_can_clear_callback(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -158,5 +172,6 @@ artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, art
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    return handle->receive_nonblocking(handle->context, frame, timeout_ms, callback);
+    // Clear the callback by calling receive_nonblocking with a NULL callback
+    return handle->receive_nonblocking(handle->context, NULL, NULL);
 }

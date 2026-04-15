@@ -45,12 +45,26 @@
 /** Target address bit mask */
 #define ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK (0x3F << ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION)
 
+// Detect compiler and define PACKED macros
+#if defined(_MSC_VER)
+    #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
+    #define PACKED_STRUCT_END   __pragma(pack(pop))
+    #define PACKED
+#else
+    #define PACKED_STRUCT_BEGIN
+    #define PACKED_STRUCT_END
+    #define PACKED __attribute__((packed))
+#endif
+
 /**
  * @brief Structure representing a CAN frame in the Artie CAN library.
  *
+ * This struct is packed to ensure it is serializable.
  */
-typedef struct {
+PACKED_STRUCT_BEGIN
+typedef struct PACKED {
     uint32_t id;                                    ///< CAN identifier (always 29 bits in Artie CAN)
     uint8_t dlc;                                    ///< Data Length Code (number of bytes in the data field, 0-8)
     uint8_t data[ARTIE_CAN_FRAME_MAX_DATA_LENGTH];  ///< Data field (up to 8 bytes)
 } artie_can_frame_t;
+PACKED_STRUCT_END

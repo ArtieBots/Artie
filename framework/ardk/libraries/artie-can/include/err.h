@@ -17,4 +17,5 @@ typedef enum {
     ARTIE_CAN_ERR_CLOSE_FAIL = -7,    /**< Failed to close backend */
     ARTIE_CAN_ERR_CLOSED = -8,        /**< Backend is closed */
     ARTIE_CAN_ERR_SEND_BUSY = -9,     /**< Bus is busy, cannot send frame */
+    ARTIE_CAN_NO_SPACE = -10,         /**< Cannot write to a buffer because there is no more space in it */
 } artie_can_error_t;

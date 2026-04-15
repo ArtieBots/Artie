@@ -36,15 +36,12 @@ typedef void (*artie_can_receive_callback_t)(void *ctx, artie_can_error_t error,
  * returning with an ARTIE_CAN_ERROR_TIMEOUT. If timeout_ms is zero, the backend should block indefinitely until a frame
  * is received.
  * @param receive_nonblocking Function pointer for non-blocking reception of a CAN frame.
- * The backend should attempt to receive a CAN frame without blocking. Unless there is an error,
- * the backend should immediately return ARTIE_CAN_ERR_NONE. If timeout_ms is zero, the backend should attempt
- * to receive a frame forever. If timeout_ms is non-zero, the backend should attempt to receive a frame for up to that many
- * milliseconds before calling the callback with a timeout error as its second argument. If a frame is received,
- * the backend will call the callback with ARTIE_CAN_ERR_NONE as its second argument and the received frame as its third argument.
- * If an error occurs, the backend will call the callback with the appropriate error code as its second argument
- * and NULL as its third argument. Unless the backend has been closed, the first argument should always be a valid
- * pointer to the backend context. If the backend has been closed by the time the callback is called, the first argument should be NULL,
- * and the error should be ARTIE_CAN_ERR_CLOSED.
+ * This function attempts to receive a CAN frame without blocking. Unless there is an error,
+ * this function returns immediately with ARTIE_CAN_ERR_NONE. Later, when a frame is received,
+ * the backend will call the provided callback with ARTIE_CAN_ERR_NONE as the error argument and the received frame as its third argument.
+ * If an error occurs, the backend will call the callback with the appropriate error code as its second argument and
+ * NULL as its third argument.
+ * In embeded systems, the callback will typically be called from an interrupt context.
  * @param close Function pointer for closing the backend.
  * The backend should handle any necessary cleanup and resource deallocation. This function will be called
  * when the backend is no longer needed, and the context should be considered invalid after this call.
@@ -56,7 +53,7 @@ typedef struct {
     artie_can_error_t (*init)(void *ctx);
     artie_can_error_t (*send)(void *ctx, const artie_can_frame_t *frame);
     artie_can_error_t (*receive)(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms);
-    artie_can_error_t (*receive_nonblocking)(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms, artie_can_receive_callback_t callback);
+    artie_can_error_t (*receive_nonblocking)(void *ctx, artie_can_frame_t *frame, artie_can_receive_callback_t callback);
     artie_can_error_t (*close)(void *ctx);
     void *context;
 } artie_can_backend_t;

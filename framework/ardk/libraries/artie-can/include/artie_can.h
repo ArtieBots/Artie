@@ -101,25 +101,43 @@ artie_can_error_t artie_can_receive(artie_can_backend_t *handle, artie_can_frame
  * @brief Attempt to receive a CAN frame without blocking.
  *
  * This function attempts to receive a CAN frame without blocking. Unless there is an error,
- * this function returns immediately with ARTIE_CAN_ERR_NONE. If timeout_ms is zero, the backend will asynchronously attempt
- * to receive a frame forever. If timeout_ms is non-zero, the backend will attempt to receive a frame for up to that many
- * milliseconds before calling the callback with a timeout error as its second argument. If a frame is received,
- * the backend will call the callback with ARTIE_CAN_ERR_NONE as its second argument and the received frame as its third argument.
+ * this function returns immediately with ARTIE_CAN_ERR_NONE.
+ *
+ * If a frame is received, the backend will call the provided callback with ARTIE_CAN_ERR_NONE as the error argument
+ * and the received frame as its third argument.
+ *
  * If an error occurs, the backend will call the callback with the appropriate error code as its second argument
- * and NULL as its third argument. Unless the backend has been closed, the first argument should always be a valid
- * pointer to the backend context. If the backend has been closed by the time the callback is called, the first argument should be NULL,
- * and the error should be ARTIE_CAN_ERR_CLOSED.
+ * and NULL as its third argument.
  *
  * This function's frame output is raw. To deconstruct it into useful data according to your protocol,
  * use the appropriate frame parsing functions. For example, if you are using RTACP,
  * you can use artie_can_rtacp_parse_frame() to get a more useful representation of the received data.
  *
+ * In embedded systems, the callback will typically be called from an interrupt context.
+ *
+ * Passing a NULL frame and NULL callback will clear previous callbacks. A convenience function
+ * artie_can_clear_callback() is also provided for this purpose.
+ *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend to use for receiving the frame.
  * @param frame Pointer to the artie_can_frame_t struct where the received frame will be stored once it has been received.
  * Until the callback is called, this frame should be considered uninitialized and should not be accessed by the caller
  * (the backend owns this memory until the callback is called).
- * @param timeout_ms Maximum time to attempt to receive a frame in milliseconds. If zero, attempt to receive indefinitely until a frame is received or an error occurs.
- * @param callback Callback function that the backend will call when a frame is received, an error occurs, or the backend is closed. The callback will be called with a pointer to the backend context as its first argument (or NULL if the backend is closed), an artie_can_error_t indicating the result of the receive attempt as its second argument, and a pointer to the received frame as its third argument (or NULL if no frame was received).
+ * @param callback Callback function that the backend will call when a frame is received or an error occurs.
+ * The callback will be called with a pointer to the backend context as its first argument
+ * an artie_can_error_t indicating the result of the receive attempt as its second argument,
+ * and a pointer to the received frame as its third argument (or NULL if no frame was received).
  * @return Error code indicating the result of the operation. If the receive attempt was successfully initiated, returns ARTIE_CAN_ERR_NONE. If there was an error initiating the receive attempt, returns an appropriate error code.
  */
-artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, artie_can_frame_t *frame, uint32_t timeout_ms, artie_can_receive_callback_t callback);
+artie_can_error_t artie_can_receive_nonblocking(artie_can_backend_t *handle, artie_can_frame_t *frame, artie_can_receive_callback_t callback);
+
+/**
+ * @brief Clear the callback function for the specified backend.
+ *
+ * This function clears the callback function that was previously set for receiving CAN frames.
+ * After calling this function, the backend will no longer call the callback when a frame is received
+ * or an error occurs.
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend for which to clear the callback.
+ * @return Error code indicating the result of the operation.
+ */
+artie_can_error_t artie_can_clear_callback(artie_can_backend_t *handle);

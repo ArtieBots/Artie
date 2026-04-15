@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include "backend.h"
+#include "frame.h"
 
 // OS-dependent includes for socket programming
 #ifdef _WIN32
@@ -51,9 +52,11 @@ typedef struct {
     socket_t socket_fd;                             /**< File descriptor for the TCP socket */
     socket_t listen_fd;                             /**< File descriptor for the listening socket (server mode only) */
     bool is_server;                                 /**< Flag indicating whether this context is for a server (true) or client (false) */
-    thread_handle_t accept_thread;                  /**< Thread handle for the server accept thread (server mode only) */
+    thread_handle_t server_thread;                  /**< Thread handle for the server accept thread (server mode only) */
     volatile bool should_stop;                      /**< Flag to signal the accept thread to stop */
     volatile bool server_ready;                     /**< Flag indicating the server is ready to accept connections */
+    artie_can_receive_callback_t receive_callback;  /**< Callback function to call when a frame is received */
+    artie_can_frame_t *receive_frame;               /**< Pointer to the frame struct where the received frame will be stored for the callback */
 } artie_can_tcp_context_t;
 
 /**
@@ -61,6 +64,8 @@ typedef struct {
  *
  * If is_server is true, the context will be set up for a server that listens for incoming connections on the specified host and port.
  * This will be set up in a separate thread when the backend is initialized.
+ *
+ * Please note that a server should be set up BEFORE any client nodes.
  *
  * @param context Pointer to the artie_can_tcp_context_t struct to initialize.
  * @param host Hostname or IP address of the TCP server.

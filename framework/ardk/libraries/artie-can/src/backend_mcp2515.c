@@ -22,7 +22,7 @@ static artie_can_error_t _receive_mcp2515(void *ctx, artie_can_frame_t *frame, u
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _receive_nonblocking_mcp2515(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms, artie_can_receive_callback_t callback)
+static artie_can_error_t _receive_nonblocking_mcp2515(void *ctx, artie_can_frame_t *frame, artie_can_receive_callback_t callback)
 {
     // TODO
     return ARTIE_CAN_ERR_NONE;
