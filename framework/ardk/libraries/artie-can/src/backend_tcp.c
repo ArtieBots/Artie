@@ -95,7 +95,7 @@ static DWORD WINAPI _server_thread_func(void *arg)
     closesocket(context->listen_fd);
     WSACleanup();
 
-    return ARTIE_CAN_ERR_NONE;
+    return (DWORD)ARTIE_CAN_ERR_NONE;
 }
 #else
 //Unix implementation
@@ -231,11 +231,6 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
     if (context == NULL || frame == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    if (context->socket_fd == INVALID_SOCKET)
-    {
-        return ARTIE_CAN_ERR_CLOSED;
     }
 
 #ifdef _WIN32
