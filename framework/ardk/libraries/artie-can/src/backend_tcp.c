@@ -9,9 +9,10 @@
 #include "err.h"
 
 #ifdef _WIN32
-    #include <windows.h>
+    #define WIN32_LEAN_AND_MEAN
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #include <windows.h>
 #else
     #include <sys/time.h>
 #endif
@@ -47,7 +48,7 @@ static DWORD WINAPI _server_thread_func(void *arg)
             {
                 closesocket(context->listen_fd);
                 WSACleanup();
-                return ARTIE_CAN_ERR_INIT_FAIL;
+                return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
             }
             connected = true;
         }
@@ -115,13 +116,15 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
     // do so in the server thread at cleanup.
     // This is one reason why the server must be started before the client.
     WSADATA wsa_data;
-    int err = WSAStartup(MAKEWORD(2,2), &wsa_data);
+    err = WSAStartup(MAKEWORD(2,2), &wsa_data);
     if (err != 0)
     {
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     // Resolve the server address and port
+    char port_str[6]; // Max port number is 65535, which is 5 digits plus null terminator
+    snprintf(port_str, sizeof(port_str), "%u", context->port);
     struct addrinfo hints;
     struct addrinfo *result = NULL;
     ZeroMemory(&hints, sizeof(hints));
@@ -129,7 +132,7 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
-    err = getaddrinfo(context->host, context->port, &hints, &result);
+    err = getaddrinfo(context->host, port_str, &hints, &result);
     if (err != 0)
     {
         WSACleanup();
@@ -176,6 +179,8 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
         WSACleanup();
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
+
+    return ARTIE_CAN_ERR_NONE;
 }
 #else
 // Unix implementation
@@ -190,6 +195,7 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
 static artie_can_error_t _init_client(artie_can_tcp_context_t *context)
 {
     // Nothing to do; all initialization is done in the send function.
+    return ARTIE_CAN_ERR_NONE;
 }
 #else
 // Unix implementation
@@ -236,13 +242,15 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
     int err;
 
     // Resolve the server address and port
+    char port_str[6]; // Max port number is 65535, which is 5 digits plus null terminator
+    snprintf(port_str, sizeof(port_str), "%u", context->port);
     struct addrinfo hints;
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     struct addrinfo *result = NULL;
-    err = getaddrinfo(context->host, context->port, &hints, &result);
+    err = getaddrinfo(context->host, port_str, &hints, &result);
     if (err != 0)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;

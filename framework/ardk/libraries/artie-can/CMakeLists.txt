@@ -18,6 +18,7 @@ set(ARTIE_CAN_SOURCES
     src/artie_can_core.c
     src/backend_mcp2515.c
     src/backend_tcp.c
+    src/circular_buffer.c
     src/rtacp.c
 )
 
@@ -27,6 +28,7 @@ set(ARTIE_CAN_HEADERS
     include/backend_mcp2515.h
     include/backend_tcp.h
     include/backend.h
+    include/circular_buffer.h
     include/err.h
     include/frame.h
     include/rtacp.h

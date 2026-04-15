@@ -153,15 +153,15 @@ void test_nonblocking_receive_with_callback(void)
     err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, 0);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    // Send the frame from node 1
-    err = artie_can_send(&_node1, &frame_to_send);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
     // Set up a spot to store the frame that we will receive
     artie_can_frame_t frame_received_in_callback;
 
     // Start non-blocking receive on node 2 with the callback
-    err = artie_can_receive_nonblocking(&_node2, &frame_received_in_callback, DEFAULT_TIMEOUT_MS, _receive_callback);
+    err = artie_can_receive_nonblocking(&_node2, &frame_received_in_callback, _receive_callback);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Send the frame from node 1
+    err = artie_can_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Wait for the callback to be called with timeout protection
