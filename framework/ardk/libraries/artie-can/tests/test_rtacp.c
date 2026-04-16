@@ -149,8 +149,18 @@ void test_nonblocking_receive_with_callback(void)
     artie_can_error_t err;
 
     // Create a frame to send
+    uint8_t data_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    artie_can_frame_rtacp_t rtacp_frame = {
+        .ack = false,
+        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
+        .source_address = 0x01,
+        .target_address = ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST,
+        .nbytes = sizeof(data_bytes),
+        .data = {0}
+    };
+    memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
     artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, 0);
+    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up a spot to store the frame that we will receive
