@@ -81,13 +81,31 @@ static DWORD WINAPI _server_thread_func(void *arg)
         // Accept a client socket (blocks until a client connects)
         if (!connected)
         {
-            context->socket_fd = accept(context->listen_fd, NULL, NULL);
-            if (context->socket_fd == INVALID_SOCKET)
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 100000; // 100ms
+
+            fd_set read_fds;
+            FD_ZERO(&read_fds);
+            FD_SET(context->listen_fd, &read_fds);
+
+            int sel = select(0, &read_fds, NULL, NULL, &tv);
+            if (sel == SOCKET_ERROR)
             {
                 closesocket(context->listen_fd);
                 return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
             }
-            connected = true;
+
+            if (sel > 0)
+            {
+                context->socket_fd = accept(context->listen_fd, NULL, NULL);
+                if (context->socket_fd == INVALID_SOCKET)
+                {
+                    closesocket(context->listen_fd);
+                    return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+                }
+                connected = true;
+            }
         }
 
         // Receive a buffer from the client (blocks until data is received)
@@ -277,11 +295,6 @@ static artie_can_error_t _receive_tcp(void *ctx, artie_can_frame_t *frame, uint3
     if (context == NULL || frame == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    if (context->socket_fd == INVALID_SOCKET)
-    {
-        return ARTIE_CAN_ERR_CLOSED;
     }
 
     // Start waiting for data to be received until we get a frame or timeout
