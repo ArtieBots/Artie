@@ -33,7 +33,45 @@ static void _complete_frame(artie_can_tcp_context_t *context, const char *recvbu
 // Windows implementation
 static DWORD WINAPI _server_thread_func(void *arg)
 {
+    int err;
     artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)arg;
+
+    // Create a socket for the server to listen for client connections.
+    context->listen_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (context->listen_fd == INVALID_SOCKET)
+    {
+        return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+    }
+
+    // Allow quick reuse of the port
+    int opt = 1;
+    setsockopt(context->listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+
+    // Set up server address structure
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, context->host, &server_addr.sin_addr);
+    server_addr.sin_port = htons(context->port);
+
+    // Bind the socket to the address
+    err = bind(context->listen_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if (err == SOCKET_ERROR)
+    {
+        closesocket(context->listen_fd);
+        return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+    }
+
+    // Start listening for client connections
+    err = listen(context->listen_fd, 1);
+    if (err == SOCKET_ERROR)
+    {
+        closesocket(context->listen_fd);
+        return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+    }
+
+    // Alert the main thread we are ready
+    context->server_ready = true;
 
     size_t bytes_received = 0;
     char recvbuf[sizeof(artie_can_frame_t)];
@@ -47,7 +85,6 @@ static DWORD WINAPI _server_thread_func(void *arg)
             if (context->socket_fd == INVALID_SOCKET)
             {
                 closesocket(context->listen_fd);
-                WSACleanup();
                 return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
             }
             connected = true;
@@ -55,15 +92,15 @@ static DWORD WINAPI _server_thread_func(void *arg)
 
         // Receive a buffer from the client (blocks until data is received)
         bool close = false;
-        int err = recv(context->socket_fd, recvbuf, sizeof(recvbuf), 0);
-        if (err > 0)
+        int recv_size = recv(context->socket_fd, recvbuf, sizeof(recvbuf), 0);
+        if (recv_size > 0)
         {
             // We received some data
-            bytes_received += err;
+            bytes_received += recv_size;
         }
         else
         {
-            // Error receiving from this client. Ignore.
+            // Error receiving from this client, or client disconnected.
             close = true;
         }
 
@@ -93,7 +130,6 @@ static DWORD WINAPI _server_thread_func(void *arg)
 
     // Close the listening socket
     closesocket(context->listen_fd);
-    WSACleanup();
 
     return (DWORD)ARTIE_CAN_ERR_NONE;
 }
@@ -109,75 +145,18 @@ static void *_server_thread_func(void *arg)
 // Windows implementation
 static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
 {
-    int err;
-
-    // Initialize Winsock.
-    // Every call to WSAStartup should have a corresponding call to WSACleanup, and we will
-    // do so in the server thread at cleanup.
-    // This is one reason why the server must be started before the client.
-    WSADATA wsa_data;
-    err = WSAStartup(MAKEWORD(2,2), &wsa_data);
-    if (err != 0)
-    {
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
-
-    // Resolve the server address and port
-    char port_str[6]; // Max port number is 65535, which is 5 digits plus null terminator
-    snprintf(port_str, sizeof(port_str), "%u", context->port);
-    struct addrinfo hints;
-    struct addrinfo *result = NULL;
-    ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-    err = getaddrinfo(context->host, port_str, &hints, &result);
-    if (err != 0)
-    {
-        WSACleanup();
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
-
-    // Create a SOCKET for the server to listen for client connections.
-    context->listen_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-    if (context->listen_fd == INVALID_SOCKET)
-    {
-        freeaddrinfo(result);
-        WSACleanup();
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
-
-    // Setup the TCP listening socket
-    err = bind(context->listen_fd, result->ai_addr, (int)result->ai_addrlen);
-    if (err == SOCKET_ERROR)
-    {
-        freeaddrinfo(result);
-        closesocket(context->listen_fd);
-        WSACleanup();
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
-
-    // We no longer need the addrinfo struct, so free it
-    freeaddrinfo(result);
-
-    // Start listening for client connections
-    err = listen(context->listen_fd, SOMAXCONN);
-    if (err == SOCKET_ERROR)
-    {
-        closesocket(context->listen_fd);
-        WSACleanup();
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
-
     // Start a thread that blocks until a client connects, then receives data until the client disconnects
     // Default security attributes, default stack size, default creation flags, and we don't need the thread identifier
     context->server_thread = CreateThread(NULL, 0, _server_thread_func, (void *)context, 0, NULL);
     if (context->server_thread == INVALID_THREAD_HANDLE)
     {
-        closesocket(context->listen_fd);
-        WSACleanup();
         return ARTIE_CAN_ERR_INIT_FAIL;
+    }
+
+    // Wait until the server thread has set up the listening socket and is ready to accept connections before returning
+    while (!context->server_ready)
+    {
+        Sleep(10);
     }
 
     return ARTIE_CAN_ERR_NONE;
@@ -194,7 +173,6 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
 // Windows implementation
 static artie_can_error_t _init_client(artie_can_tcp_context_t *context)
 {
-    // Nothing to do; all initialization is done in the send function.
     return ARTIE_CAN_ERR_NONE;
 }
 #else
@@ -213,6 +191,16 @@ static artie_can_error_t _init_tcp(void *ctx)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
+
+#if defined(_WIN32)
+    // Initialize Winsock library
+    WSADATA wsa_data;
+    int err = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+    if (err != 0)
+    {
+        return ARTIE_CAN_ERR_INIT_FAIL;
+    }
+#endif
 
     if (context->is_server)
     {
@@ -235,45 +223,24 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 
 #ifdef _WIN32
     int err;
-
-    // Resolve the server address and port
-    char port_str[6]; // Max port number is 65535, which is 5 digits plus null terminator
-    snprintf(port_str, sizeof(port_str), "%u", context->port);
-    struct addrinfo hints;
-    ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    struct addrinfo *result = NULL;
-    err = getaddrinfo(context->host, port_str, &hints, &result);
-    if (err != 0)
-    {
-        return ARTIE_CAN_ERR_SEND_FAIL;
-    }
-
     // Create the socket for connecting to the server
-    context->socket_fd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    context->socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (context->socket_fd == INVALID_SOCKET)
     {
-        freeaddrinfo(result);
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
     // Connect to server
-    err = connect(context->socket_fd, result->ai_addr, (int)result->ai_addrlen);
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, context->host, &server_addr.sin_addr);
+    server_addr.sin_port = htons(context->port);
+    err = connect(context->socket_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (err == SOCKET_ERROR)
     {
-        freeaddrinfo(result);
         closesocket(context->socket_fd);
         context->socket_fd = INVALID_SOCKET;
-        return ARTIE_CAN_ERR_SEND_FAIL;
-    }
-
-    freeaddrinfo(result);
-
-    // Check the socket
-    if (context->socket_fd == INVALID_SOCKET)
-    {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
@@ -433,6 +400,11 @@ static artie_can_error_t _close_tcp(void *ctx)
 
         context->server_thread = INVALID_THREAD_HANDLE;
     }
+
+    // Cleanup Winsock library
+    #ifdef _WIN32
+    WSACleanup();
+    #endif
 
     return ARTIE_CAN_ERR_NONE;
 }

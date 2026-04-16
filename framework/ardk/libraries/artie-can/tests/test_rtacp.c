@@ -65,7 +65,7 @@ void setUp(void)
     err = artie_can_init_context_tcp(&_node_context1, "127.0.0.1", 5000, false);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5001, true);
+    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5000, true);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes (start the server first)
