@@ -59,7 +59,7 @@ artie_can_error_t cb_write(const artie_can_frame_t *in)
     // Check if buffer is full
     if (_count >= ARTIE_CAN_TCP_BUFFER_N_FRAMES)
     {
-        return ARTIE_CAN_NO_SPACE;
+        return ARTIE_CAN_ERR_NO_SPACE;
     }
 
     // Byte-by-byte copy the frame into the buffer
