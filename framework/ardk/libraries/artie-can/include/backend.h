@@ -1,7 +1,6 @@
 /**
- * @file artie_can.h
- * @brief Public header file for Artie CAN library (C implementation).
- * @date 2026-04-12
+ * @file backend.h
+ * @brief Backend interface definitions for Artie CAN library.
  *
  */
 
@@ -9,14 +8,21 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "context.h"
 #include "err.h"
 #include "frame.h"
 
+/** The callback function that gets executed whenever a non-filtered CAN frame is received. */
+typedef void artie_can_rx_callback_t(artie_can_frame_t *frame);
+
 /**
- * @brief A typedef representing a callback for the non-blocking receive function in the CAN backend.
- * (See artie_can_backend_t.receive_nonblocking for more details on how this callback is used).
+ * @brief The callback function type for getting the current time in milliseconds.
+ * We don't actually care what the time is, we just use this for timeouts, so we just
+ * need a monotonically increasing value that represents the passage of time in milliseconds.
+ *
+ * @return The current time in milliseconds.
  */
-typedef void (*artie_can_receive_callback_t)(void *ctx, artie_can_error_t error, artie_can_frame_t *frame);
+typedef uint64_t artie_can_get_ms_t(void);
 
 /**
  * @brief Struct for CAN backend function pointers and context.
@@ -29,33 +35,27 @@ typedef void (*artie_can_receive_callback_t)(void *ctx, artie_can_error_t error,
  * This function is expected to be non-blocking, but even though it returns quickly, the message may not be sent until
  * the bus is free. If send is called again before the previous message has been sent,
  * the backend should return ARTIE_CAN_ERR_SEND_BUSY to indicate that this message cannot be sent, and it should
- * continue trying to send the previous message.
- * @param receive Function pointer for receiving a CAN frame.
- * The backend should handle the actual reception of the CAN frame. The frame data will be populated by the backend.
- * If timeout_ms is non-zero, the backend should block up to that many milliseconds for a frame to be received before
- * returning with an ARTIE_CAN_ERROR_TIMEOUT. If timeout_ms is zero, the backend should block indefinitely until a frame
- * is received.
- * @param receive_nonblocking Function pointer for non-blocking reception of a CAN frame.
- * This function attempts to receive a CAN frame without blocking. Unless there is an error,
- * this function returns immediately with ARTIE_CAN_ERR_NONE. Later, when a frame is received,
- * the backend will call the provided callback with ARTIE_CAN_ERR_NONE as the error argument and the received frame as its third argument.
- * If an error occurs, the backend will call the callback with the appropriate error code as its second argument and
- * NULL as its third argument.
- * In embeded systems, the callback will typically be called from an interrupt context.
+ * continue trying to send the previous message until some backend-specific timeout mechanism triggers
+ * that frees up the backend for sending new messages.
+ * @param receive_callback Function pointer to a user-supplied callback that the backend should call
+ * whenever a CAN frame is received that matches the filters configured in the backend's context. The backend should call this callback
+ * from the appropriate context, which may be an interrupt context in embedded systems.
  * @param close Function pointer for closing the backend.
  * The backend should handle any necessary cleanup and resource deallocation. This function will be called
  * when the backend is no longer needed, and the context should be considered invalid after this call.
  * After this function is called, the backend should not call any callbacks or attempt to send or receive any more messages.
- * @param context Pointer to backend-specific context data.
+ * @param get_ms Function pointer to a function that returns the current time in milliseconds.
+ * The backend can use this function for any timing-related needs, such as implementing timeouts for sending messages or for timestamping received messages. This function is provided by the user of the library to allow the backend to access a time source without depending on any specific platform's timing APIs.
+ * @param context Pointer to context data.
  *
  */
 typedef struct {
-    artie_can_error_t (*init)(void *ctx);
-    artie_can_error_t (*send)(void *ctx, const artie_can_frame_t *frame);
-    artie_can_error_t (*receive)(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms);
-    artie_can_error_t (*receive_nonblocking)(void *ctx, artie_can_frame_t *frame, artie_can_receive_callback_t callback);
-    artie_can_error_t (*close)(void *ctx);
-    void *context;
+    artie_can_error_t (*init)(artie_can_context_t *ctx);
+    artie_can_error_t (*send)(artie_can_context_t *ctx, const artie_can_frame_t *frame);
+    artie_can_rx_callback_t *receive_callback;
+    artie_can_error_t (*close)(artie_can_context_t *ctx);
+    artie_can_get_ms_t *get_ms;
+    artie_can_context_t *context;
 } artie_can_backend_t;
 
 /**

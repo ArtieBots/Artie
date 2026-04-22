@@ -23,8 +23,8 @@
 #define DEFAULT_TIMEOUT_MS 3000
 
 // A few nodes that the tests use for communication.
-static artie_can_tcp_context_t _node_context1;
-static artie_can_tcp_context_t _node_context2;
+static artie_can_context_t _node_context1;
+static artie_can_context_t _node_context2;
 static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
 
@@ -61,18 +61,25 @@ void setUp(void)
     // Reset the callback called flag before each test
     _callback_called = false;
 
-    // Set up the nodes with TCP contexts (first node is client, second node is server)
-    err = artie_can_init_context_tcp(&_node_context1, "127.0.0.1", 5000, false);
+    // Set up the nodes with TCP contexts
+    err = artie_can_init_context_tcp(&_node_context1, "127.0.0.1", 5000);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5000, true);
+    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5000);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    // Set up the backends for the nodes (start the server first)
-    err = artie_can_init(&_node_context2, &_node2, ARTIE_CAN_BACKEND_TCP);
+    // Set up the nodes to use RTACP
+    err = artie_can_init_context_rtacp(&_node_context1, 0x01); // Source address 0x01
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node_context1, &_node1, ARTIE_CAN_BACKEND_TCP);
+    err = artie_can_init_context_rtacp(&_node_context2, 0x02); // Source address 0x02
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Set up the backends for the nodes
+    err = artie_can_init(&_node_context1, &_node2, ARTIE_CAN_BACKEND_TCP);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init(&_node_context2, &_node1, ARTIE_CAN_BACKEND_TCP);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 
@@ -192,6 +199,34 @@ void test_nonblocking_receive_with_callback(void)
 
     // Check that the frame received in the callback matches the sent frame
     assert_frames_equal(&frame_to_send, &frame_received_in_callback);
+}
+
+/**
+ * @brief Test that we can send a message from one node to another and get an ACK back.
+ *
+ */
+void test_send_and_ack(void)
+{
+    artie_can_error_t err;
+
+    // Create a frame to send
+    uint8_t data_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    artie_can_frame_rtacp_t rtacp_frame = {
+        .ack = false,
+        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
+        .source_address = 0x01,
+        .target_address = 0x02, // Target specific node to ensure we get an ACK back
+        .nbytes = sizeof(data_bytes),
+        .data = {0}
+    };
+    memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
+    artie_can_frame_t frame_to_send;
+    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Send the frame from node 1 (no error means we got an ACK back successfully)
+    err = artie_can_send(&_node1, &frame_to_send);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 
 /**

@@ -97,7 +97,8 @@ layer for sending larger than 8-byte data.
 *ACK frame*:
 The data field should be identical to the ACK'ed MSG frame. If it is not, the sender should assume
 an error in transmission and retransmit the original MSG frame. If the ACK is not received
-by the MSG-sending node... what happens? I wrote this 2 years ago and apparently never finished my sentence...
+by the MSG-sending node within 150 microseconds, an error is returned up the stack
+to the caller so that it can take appropriate action.
 
 ## Remote Procedure Call Artie CAN Protocol (RPCACP)
 

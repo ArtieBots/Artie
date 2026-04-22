@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "backend.h"
+#include "context.h"
 #include "err.h"
 #include "frame.h"
 
@@ -17,6 +18,9 @@
 
 /** Maximum number of data bytes in an RTACP frame */
 #define ARTIE_CAN_RTACP_MAX_DATA_BYTES 8U
+
+/** The RTACP protocol ID */
+#define ARTIE_CAN_RTACP_PROTOCOL_ID 0x00U
 
 /**
  * @brief Enumeration for RTACP frame priorities.
@@ -43,6 +47,15 @@ typedef struct {
 } artie_can_frame_rtacp_t;
 
 /**
+ * @brief Initialize an RTACP context with the specified source address.
+ *
+ * @param ctx Pointer to the artie_can_context_t struct to initialize.
+ * @param source_address Source address to use for the RTACP context.
+ * @return artie_can_error_t Error code indicating the result of the initialization.
+ */
+artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *ctx, uint8_t source_address);
+
+/**
  * @brief Initialize an RTACP frame with the appropriate headers and metadata for a given backend and frame.
  *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend.
@@ -66,3 +79,14 @@ artie_can_error_t artie_can_rtacp_init_frame(artie_can_backend_t *handle, artie_
  * @return Error code indicating the result of the operation.
  */
 artie_can_error_t artie_can_rtacp_parse_frame(artie_can_backend_t *handle, const artie_can_frame_t *in, artie_can_frame_rtacp_t *out);
+
+/**
+ * @brief Send an RTACP frame using the specified backend. Puts the frame into the backend's
+ * RTACP state machine, which will handle the ACK and retransmission logic.
+ * This function will block until the frame is sent and acknowledged (if it's not a broadcast frame).
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend.
+ * @param frame Pointer to the artie_can_frame_t struct representing the frame to send.
+ * @return Error code indicating the result of the operation.
+ */
+artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);

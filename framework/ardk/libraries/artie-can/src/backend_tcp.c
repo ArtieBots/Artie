@@ -6,6 +6,7 @@
 #include "backend.h"
 #include "backend_tcp.h"
 #include "circular_buffer.h"
+#include "context.h"
 #include "err.h"
 
 #ifdef _WIN32
@@ -26,6 +27,9 @@ static void _complete_frame(artie_can_tcp_context_t *context, const char *recvbu
         // Read from the circular buffer into a frame struct to pass to the callback
         cb_read(context->receive_frame);
         context->receive_callback((void *)context, err, context->receive_frame);
+
+        // Clear the callback
+        context->receive_callback = NULL;
     }
 }
 
@@ -288,107 +292,6 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 #endif
 }
 
-static artie_can_error_t _receive_tcp(void *ctx, artie_can_frame_t *frame, uint32_t timeout_ms)
-{
-    artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)ctx;
-
-    if (context == NULL || frame == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    // Start waiting for data to be received until we get a frame or timeout
-    if (timeout_ms > 0)
-    {
-        // Get the start time
-        #ifdef _WIN32
-        ULONGLONG start_time = GetTickCount64();
-        #else
-        struct timeval start_tv;
-        gettimeofday(&start_tv, NULL);
-        uint64_t start_time = (uint64_t)start_tv.tv_sec * 1000 + (uint64_t)start_tv.tv_usec / 1000;
-        #endif
-
-        while (true)
-        {
-            if (cb_get_count() > 0)
-            {
-                // Read a frame from the circular buffer into the provided frame pointer
-                return cb_read(frame);
-            }
-
-            // Check if we've exceeded the timeout
-            #ifdef _WIN32
-            ULONGLONG current_time = GetTickCount64();
-            ULONGLONG elapsed_ms = current_time - start_time;
-            #else
-            struct timeval current_tv;
-            gettimeofday(&current_tv, NULL);
-            uint64_t current_time = (uint64_t)current_tv.tv_sec * 1000 + (uint64_t)current_tv.tv_usec / 1000;
-            uint64_t elapsed_ms = current_time - start_time;
-            #endif
-
-            if (elapsed_ms >= timeout_ms)
-            {
-                return ARTIE_CAN_ERR_TIMEOUT;
-            }
-
-            // Otherwise, sleep for a moment to avoid busy waiting
-            // Sleep for the minimum of 100ms or remaining time
-            uint32_t remaining_ms = timeout_ms - (uint32_t)elapsed_ms;
-            uint32_t sleep_ms = (remaining_ms < 100) ? remaining_ms : 100;
-
-            #ifdef _WIN32
-            Sleep(sleep_ms);
-            #else
-            usleep(sleep_ms * 1000);
-            #endif
-        }
-    }
-    else
-    {
-        // Block forever until we receive a frame
-        while (cb_get_count() == 0)
-        {
-            // Sleep for a moment to avoid busy waiting
-            uint32_t sleep_ms = 100;
-            #ifdef _WIN32
-            Sleep(sleep_ms);
-            #else
-            usleep(sleep_ms * 1000);
-            #endif
-        }
-
-        return cb_read(frame);
-    }
-
-    return ARTIE_CAN_ERR_NONE;
-}
-
-static artie_can_error_t _receive_nonblocking_tcp(void *ctx, artie_can_frame_t *frame, artie_can_receive_callback_t callback)
-{
-    if (ctx == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)ctx;
-
-    if (callback == NULL)
-    {
-        // Clear the callback
-        context->receive_callback = NULL;
-        context->receive_frame = NULL;
-    }
-    else
-    {
-        context->receive_frame = frame;
-        context->receive_callback = callback;
-    }
-
-    return ARTIE_CAN_ERR_NONE;
-}
-
 static artie_can_error_t _close_tcp(void *ctx)
 {
     artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)ctx;
@@ -422,7 +325,7 @@ static artie_can_error_t _close_tcp(void *ctx)
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_init_context_tcp(artie_can_tcp_context_t *context, const char *host, uint16_t port, bool is_server)
+artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const char *host, uint16_t port)
 {
     if (context == NULL)
     {
@@ -437,23 +340,20 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_tcp_context_t *context, c
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    // Copy the args into the struct
-    strncpy(context->host, host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH);
-    context->host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
-    context->port = port;
-    context->is_server = is_server;
-    context->socket_fd = INVALID_SOCKET;
-    context->listen_fd = INVALID_SOCKET;
-    context->server_thread = INVALID_THREAD_HANDLE;
-    context->should_stop = false;
-    context->server_ready = false;
-    context->receive_callback = NULL;
-    context->receive_frame = NULL;
+    // Initialize the TCP context within the provided artie_can_context_t
+    context->backend_context.tcp = (tcp_context_t){
+         .host = {0},
+         .port = port,
+    };
+
+    // Copy the hostname
+    strncpy(context->backend_context.tcp.host, host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH);
+    context->backend_context.tcp.host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
 
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_init_tcp(artie_can_tcp_context_t *context, artie_can_backend_t *handle)
+artie_can_error_t artie_can_init_tcp(artie_can_tcp_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
 {
     if (context == NULL)
     {
@@ -467,10 +367,10 @@ artie_can_error_t artie_can_init_tcp(artie_can_tcp_context_t *context, artie_can
     // Initialize the backend function pointers and context
     handle->init = _init_tcp;
     handle->send = _send_tcp;
-    handle->receive = _receive_tcp;
-    handle->receive_nonblocking = _receive_nonblocking_tcp;
     handle->close = _close_tcp;
     handle->context = context;
+    handle->receive_callback = rx_callback;
+    handle->get_ms = get_ms_fn;
 
     return ARTIE_CAN_ERR_NONE;
 }
