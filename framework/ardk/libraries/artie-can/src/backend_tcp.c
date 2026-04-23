@@ -225,8 +225,9 @@ static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
 
 #ifdef _WIN32
 // Windows implementation
-static artie_can_error_t _init_client(artie_can_tcp_context_t *context)
+static artie_can_error_t _init_client(artie_can_context_t *context)
 {
+    // Currently, we don't do anything
     return ARTIE_CAN_ERR_NONE;
 }
 #else
@@ -328,29 +329,27 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 #endif
 }
 
-static artie_can_error_t _close_tcp(void *ctx)
+static artie_can_error_t _close_tcp(artie_can_context_t *context)
 {
-    artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)ctx;
-
     if (context == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
     // Alert the server thread that we should stop
-    context->should_stop = true;
+    context->backend_context.tcp.should_stop = true;
 
     // Wait until the server thread has stopped
-    if (context->server_thread != INVALID_THREAD_HANDLE)
+    if (context->backend_context.tcp.server_thread != INVALID_THREAD_HANDLE)
     {
         #ifdef _WIN32
-        WaitForSingleObject(context->server_thread, INFINITE);
-        CloseHandle(context->server_thread);
+        WaitForSingleObject(context->backend_context.tcp.server_thread, INFINITE);
+        CloseHandle(context->backend_context.tcp.server_thread);
         #else
-        pthread_join(context->server_thread, NULL);
+        pthread_join(context->backend_context.tcp.server_thread, NULL);
         #endif
 
-        context->server_thread = INVALID_THREAD_HANDLE;
+        context->backend_context.tcp.server_thread = INVALID_THREAD_HANDLE;
     }
 
     // Cleanup Winsock library

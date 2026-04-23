@@ -58,7 +58,6 @@ artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *ctx, uint8_t
 /**
  * @brief Initialize an RTACP frame with the appropriate headers and metadata for a given backend and frame.
  *
- * @param handle Pointer to the artie_can_backend_t struct representing the backend.
  * @param out Pointer to the artie_can_frame_t struct representing the frame to initialize.
  * @param in Pointer to the artie_can_frame_rtacp_t struct representing the RTACP frame to use for initialization.
  * All data in the 'in' struct will be copied into the 'out' struct appropriately,
@@ -66,19 +65,18 @@ artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *ctx, uint8_t
  * @return Error code indicating the result of the operation.
  *
  */
-artie_can_error_t artie_can_rtacp_init_frame(artie_can_backend_t *handle, artie_can_frame_t *out, const artie_can_frame_rtacp_t *in);
+artie_can_error_t artie_can_rtacp_init_frame(artie_can_frame_t *out, const artie_can_frame_rtacp_t *in);
 
 /**
  * @brief Parse a received CAN frame into the RTACP format, extracting the relevant metadata and data bytes.
  *
- * @param handle Pointer to the artie_can_backend_t struct representing the backend.
  * @param in Pointer to the artie_can_frame_t struct representing the received CAN frame.
  * @param out Pointer to the artie_can_frame_rtacp_t struct where the parsed RTACP frame will be stored.
  * All data in the 'in' struct will be parsed and copied into the 'out' struct appropriately, and the data
  * in the 'in' struct will no longer be needed after this function returns, so the caller can free or reuse it if desired.
  * @return Error code indicating the result of the operation.
  */
-artie_can_error_t artie_can_rtacp_parse_frame(artie_can_backend_t *handle, const artie_can_frame_t *in, artie_can_frame_rtacp_t *out);
+artie_can_error_t artie_can_rtacp_parse_frame(const artie_can_frame_t *in, artie_can_frame_rtacp_t *out);
 
 /**
  * @brief Send an RTACP frame using the specified backend. Puts the frame into the backend's
@@ -90,3 +88,13 @@ artie_can_error_t artie_can_rtacp_parse_frame(artie_can_backend_t *handle, const
  * @return Error code indicating the result of the operation.
  */
 artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);
+
+/**
+ * @brief Handle a received RTACP frame within an ISR context.
+ * This function will be called by the backend when a new frame is received that matches the RTACP protocol.
+ *
+ * @param context Pointer to the artie_can_context_t struct representing the context.
+ * @param frame Pointer to the artie_can_frame_t struct representing the received frame.
+ * This should be copied out of the backend's receive buffer and into the RTACP state machine for processing.
+ */
+void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame);

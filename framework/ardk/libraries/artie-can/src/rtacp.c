@@ -29,13 +29,9 @@ artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *context, uin
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_rtacp_init_frame(artie_can_backend_t *handle, artie_can_frame_t *out, const artie_can_frame_rtacp_t *in)
+artie_can_error_t artie_can_rtacp_init_frame(artie_can_frame_t *out, const artie_can_frame_rtacp_t *in)
 {
-    if (handle == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-    else if (out == NULL)
+    if (out == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -67,13 +63,9 @@ artie_can_error_t artie_can_rtacp_init_frame(artie_can_backend_t *handle, artie_
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_rtacp_parse_frame(artie_can_backend_t *handle, const artie_can_frame_t *in, artie_can_frame_rtacp_t *out)
+artie_can_error_t artie_can_rtacp_parse_frame(const artie_can_frame_t *in, artie_can_frame_rtacp_t *out)
 {
-    if (handle == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-    else if (in == NULL)
+    if (in == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -162,4 +154,9 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
         }
     }
     return ARTIE_CAN_ERR_NONE;
+}
+
+void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame)
+{
+    // TODO
 }

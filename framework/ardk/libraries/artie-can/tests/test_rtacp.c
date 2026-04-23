@@ -128,7 +128,7 @@ void test_broadcast(void)
     };
     memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
     artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
+    err = artie_can_rtacp_init_frame(&frame_to_send, &rtacp_frame);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
@@ -145,7 +145,7 @@ void test_broadcast(void)
 
     // Parse the received frame back into RTACP format and check that it matches the original RTACP frame
     artie_can_frame_rtacp_t rtacp_frame_received;
-    err = artie_can_rtacp_parse_frame(&_node2, &frame_received, &rtacp_frame_received);
+    err = artie_can_rtacp_parse_frame(&frame_received, &rtacp_frame_received);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     assert_rtacp_frames_equal(&rtacp_frame, &rtacp_frame_received);
 }
