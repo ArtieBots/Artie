@@ -56,7 +56,7 @@ artie_can_error_t artie_can_rtacp_init_frame(artie_can_backend_t *handle, artie_
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    out->id = ((uint32_t)(0) << ARTIE_CAN_FRAME_ID_PRIORITY_LOCATION) |
+    out->id = ((uint32_t)(ARTIE_CAN_RTACP_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION) |
               ((uint32_t)(in->ack ? 1 : 0) << ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION) |
               ((uint32_t)(in->priority) << ARTIE_CAN_FRAME_ID_USER_PRIORITY_LOCATION) |
               ((uint32_t)(in->source_address) << ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) |

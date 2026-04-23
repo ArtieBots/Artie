@@ -12,9 +12,6 @@
 #include "err.h"
 #include "frame.h"
 
-/** The callback function that gets executed whenever a non-filtered CAN frame is received. */
-typedef void artie_can_rx_callback_t(artie_can_frame_t *frame);
-
 /**
  * @brief The callback function type for getting the current time in milliseconds.
  * We don't actually care what the time is, we just use this for timeouts, so we just
@@ -37,9 +34,6 @@ typedef uint64_t artie_can_get_ms_t(void);
  * the backend should return ARTIE_CAN_ERR_SEND_BUSY to indicate that this message cannot be sent, and it should
  * continue trying to send the previous message until some backend-specific timeout mechanism triggers
  * that frees up the backend for sending new messages.
- * @param receive_callback Function pointer to a user-supplied callback that the backend should call
- * whenever a CAN frame is received that matches the filters configured in the backend's context. The backend should call this callback
- * from the appropriate context, which may be an interrupt context in embedded systems.
  * @param close Function pointer for closing the backend.
  * The backend should handle any necessary cleanup and resource deallocation. This function will be called
  * when the backend is no longer needed, and the context should be considered invalid after this call.
@@ -52,7 +46,6 @@ typedef uint64_t artie_can_get_ms_t(void);
 typedef struct {
     artie_can_error_t (*init)(artie_can_context_t *ctx);
     artie_can_error_t (*send)(artie_can_context_t *ctx, const artie_can_frame_t *frame);
-    artie_can_rx_callback_t *receive_callback;
     artie_can_error_t (*close)(artie_can_context_t *ctx);
     artie_can_get_ms_t *get_ms;
     artie_can_context_t *context;

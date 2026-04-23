@@ -8,7 +8,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "translationlayer.h"
 
+/** The callback function that gets executed whenever a non-filtered CAN frame is received. */
+typedef void artie_can_rx_callback_t(artie_can_frame_t *frame);
 
 /**
  * @brief Context for RTACP protocol handling within the Artie CAN library.
@@ -28,6 +31,12 @@ typedef struct {
 typedef struct {
     char host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH];   ///< Hostname or IP address of the TCP server
     uint16_t port;                                  ///< Port number of the TCP server
+    thread_handle_t server_thread;                  ///< Handle for the server thread
+    bool server_ready;                              ///< Flag to indicate when the server thread is ready to accept connections
+    bool should_stop;                               ///< Flag to signal the server thread to stop
+    socket_t rx_fd;                                 ///< Socket file descriptor for receiving data from the client
+    socket_t tx_fd;                                 ///< Socket file descriptor for sending data to the client
+    artie_can_rx_callback_t *rx_callback;           ///< Callback function to call when a frame is received
 } tcp_context_t;
 
 /**

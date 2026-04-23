@@ -31,21 +31,24 @@ static artie_can_backend_t _node2;
 // A flag to indicate whether the callback has been called for tests that use the callback.
 static volatile bool _callback_called = false;
 
-/** The callback to use with non-blocking receive tests */
-static void _receive_callback(void *ctx, artie_can_error_t error, artie_can_frame_t *frame)
+/** The callback that node1 uses to receive messages. */
+static void _receive_callback_node1(artie_can_frame_t *frame)
 {
-    if (error != ARTIE_CAN_ERR_NONE)
-    {
-        TEST_FAIL_MESSAGE("Error in receive callback");
-    }
-    else if (frame == NULL)
-    {
-        TEST_FAIL_MESSAGE("Received NULL frame in callback");
-    }
-    else
-    {
-        _callback_called = true;
-    }
+    // TODO
+}
+
+/** The callback that node2 uses to receive messages. */
+static void _receive_callback_node2(artie_can_frame_t *frame)
+{
+    // TODO
+}
+
+/** The function to get the current time in milliseconds. */
+static uint64_t _get_time_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)(ts.tv_sec) * 1000 + (ts.tv_nsec / 1000000);
 }
 
 /**
@@ -76,10 +79,10 @@ void setUp(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes
-    err = artie_can_init(&_node_context1, &_node2, ARTIE_CAN_BACKEND_TCP);
+    err = artie_can_init(&_node_context1, &_node1, ARTIE_CAN_BACKEND_TCP, _receive_callback_node1, _get_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node_context2, &_node1, ARTIE_CAN_BACKEND_TCP);
+    err = artie_can_init(&_node_context2, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, _get_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 

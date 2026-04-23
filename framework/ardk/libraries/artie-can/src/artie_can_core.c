@@ -11,7 +11,7 @@
 #include "err.h"
 #include "rtacp.h"
 
-static artie_can_error_t _init_mcp2515(artie_can_mcp2515_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
+static artie_can_error_t _init_mcp2515(artie_can_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
 {
     artie_can_error_t err;
 
@@ -30,7 +30,7 @@ static artie_can_error_t _init_mcp2515(artie_can_mcp2515_context_t *context, art
     }
 }
 
-static artie_can_error_t _init_tcp(artie_can_tcp_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
+static artie_can_error_t _init_tcp(artie_can_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
 {
     artie_can_error_t err;
 
@@ -59,13 +59,25 @@ artie_can_error_t artie_can_init(artie_can_context_t *context, artie_can_backend
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
+    else if (context->protocol_flags == 0)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (rx_callback == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (get_ms_fn == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
 
     switch (backend_type)
     {
         case ARTIE_CAN_BACKEND_MCP2515:
-            return _init_mcp2515((artie_can_mcp2515_context_t *)context, handle, rx_callback, get_ms_fn);
+            return _init_mcp2515(context, handle, rx_callback, get_ms_fn);
         case ARTIE_CAN_BACKEND_TCP:
-            return _init_tcp((artie_can_tcp_context_t *)context, handle, rx_callback, get_ms_fn);
+            return _init_tcp(context, handle, rx_callback, get_ms_fn);
         default:
             return ARTIE_CAN_ERR_INVALID_ARG;
     }

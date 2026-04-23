@@ -15,11 +15,11 @@
 /** Length of the CAN ID in bits */
 #define ARTIE_CAN_FRAME_ID_LENGTH (29U)
 
-/** Location of the priority bits in the CAN ID */
-#define ARTIE_CAN_FRAME_ID_PRIORITY_LOCATION ((ARTIE_CAN_FRAME_ID_LENGTH) - 3U)
+/** Location of the protocol bits in the CAN ID */
+#define ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION ((ARTIE_CAN_FRAME_ID_LENGTH) - 3U)
 
 /** Location of the frame type bits in the CAN ID */
-#define ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION ((ARTIE_CAN_FRAME_ID_PRIORITY_LOCATION) - 4U)
+#define ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION ((ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION) - 4U)
 
 /** Location of the user-assigned priority bits in the CAN ID */
 #define ARTIE_CAN_FRAME_ID_USER_PRIORITY_LOCATION ((ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION) - 2U)
@@ -30,8 +30,8 @@
 /** Location of the target address bits in the CAN ID */
 #define ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION ((ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) - 6U)
 
-/** MSB 3 bits of CAN ID specifies protocol priority */
-#define ARTIE_CAN_FRAME_ID_PROTOCOL_PRIORITY_MASK (0x07 << ARTIE_CAN_FRAME_ID_PRIORITY_LOCATION)
+/** MSB 3 bits of CAN ID specifies protocol (and priority) */
+#define ARTIE_CAN_FRAME_ID_PROTOCOL_MASK (0x07 << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION)
 
 /** Frame type bit mask */
 #define ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK (0x0F << ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION)
