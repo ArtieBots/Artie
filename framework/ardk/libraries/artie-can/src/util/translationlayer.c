@@ -38,3 +38,44 @@ bool join_thread(thread_handle_t handle, uint32_t timeout_ms)
     return (pthread_join(handle, NULL) == 0);
 #endif
 }
+
+bool socket_subsystem_init(void)
+{
+#ifdef _WIN32
+    WSADATA wsa_data;
+    int err = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+    return (err == 0);
+#else
+    // No initialization needed on POSIX systems
+    return true;
+#endif
+}
+
+void socket_subsystem_cleanup(void)
+{
+#ifdef _WIN32
+    WSACleanup();
+#else
+    // No cleanup needed on POSIX systems
+#endif
+}
+
+int close_socket(socket_t sock)
+{
+#ifdef _WIN32
+    return closesocket(sock);
+#else
+    return close(sock);
+#endif
+}
+
+int shutdown_socket(socket_t sock, int how)
+{
+#ifdef _WIN32
+    // Windows uses SD_RECEIVE (0), SD_SEND (1), SD_BOTH (2)
+    return shutdown(sock, how);
+#else
+    // POSIX uses SHUT_RD (0), SHUT_WR (1), SHUT_RDWR (2)
+    return shutdown(sock, how);
+#endif
+}

@@ -27,10 +27,19 @@
 #ifdef _WIN32
     typedef SOCKET socket_t;
     #define INVALID_SOCKET_VALUE INVALID_SOCKET
+    #define SOCKET_ERROR_VALUE SOCKET_ERROR
 #else
     typedef int socket_t;
     #define INVALID_SOCKET_VALUE -1
+    #define SOCKET_ERROR_VALUE -1
 #endif
+
+// Platform-independent socket shutdown modes
+typedef enum {
+    SHUTDOWN_RECEIVE = 0,  ///< Stop receiving data
+    SHUTDOWN_SEND = 1,     ///< Stop sending data
+    SHUTDOWN_BOTH = 2      ///< Stop both sending and receiving
+} socket_shutdown_mode_t;
 
 // Platform-specific definitions for threads
 #ifdef _WIN32
@@ -77,3 +86,29 @@ bool create_thread(thread_handle_t *handle, thread_func_t func, void *arg);
  * @return true if the thread completed, false on timeout or error.
  */
 bool join_thread(thread_handle_t handle, uint32_t timeout_ms);
+
+/**
+ * @brief Initialize the socket subsystem (required on Windows, no-op on POSIX).
+ * @return true on success, false on failure.
+ */
+bool socket_subsystem_init(void);
+
+/**
+ * @brief Cleanup the socket subsystem (required on Windows, no-op on POSIX).
+ */
+void socket_subsystem_cleanup(void);
+
+/**
+ * @brief Close a socket.
+ * @param sock The socket to close.
+ * @return 0 on success, -1 on error.
+ */
+int close_socket(socket_t sock);
+
+/**
+ * @brief Shutdown a socket for sending, receiving, or both.
+ * @param sock The socket to shutdown.
+ * @param how How to shutdown: 0 = receive, 1 = send, 2 = both.
+ * @return 0 on success, -1 on error.
+ */
+int shutdown_socket(socket_t sock, int how);

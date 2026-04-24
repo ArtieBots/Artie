@@ -3,21 +3,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include "backend.h"
 #include "backend_tcp.h"
 #include "circular_buffer.h"
 #include "context.h"
 #include "err.h"
 #include "rtacp.h"
-
-#ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <windows.h>
-#else
-    #include <sys/time.h>
-#endif
+#include "translationlayer.h"
 
 static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 {
@@ -53,18 +46,18 @@ static artie_can_error_t _server_connect(artie_can_context_t *context)
     FD_SET(tcp_ctx->rx_fd, &read_fds);
 
     int sel = select(0, &read_fds, NULL, NULL, &tv);
-    if (sel == SOCKET_ERROR)
+    if (sel == SOCKET_ERROR_VALUE)
     {
-        closesocket(tcp_ctx->rx_fd);
+        close_socket(tcp_ctx->rx_fd);
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     if (sel > 0)
     {
         tcp_ctx->tx_fd = accept(tcp_ctx->rx_fd, NULL, NULL);
-        if (tcp_ctx->tx_fd == INVALID_SOCKET)
+        if (tcp_ctx->tx_fd == INVALID_SOCKET_VALUE)
         {
-            closesocket(tcp_ctx->rx_fd);
+            close_socket(tcp_ctx->rx_fd);
             return ARTIE_CAN_ERR_INIT_FAIL;
         }
     }
@@ -80,6 +73,10 @@ static artie_can_error_t _server_connect(artie_can_context_t *context)
 #ifdef _WIN32
 // Windows implementation
 static DWORD WINAPI _server_thread_func(void *arg)
+#else
+// Unix implementation
+static void *_server_thread_func(void *arg)
+#endif
 {
     int err;
     artie_can_context_t *context = (artie_can_context_t *)arg;
@@ -87,9 +84,13 @@ static DWORD WINAPI _server_thread_func(void *arg)
 
     // Create a socket for the server to listen for client connections.
     tcp_ctx->rx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (tcp_ctx->rx_fd == INVALID_SOCKET)
+    if (tcp_ctx->rx_fd == INVALID_SOCKET_VALUE)
     {
+#ifdef _WIN32
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+#else
+        return (void *)(intptr_t)ARTIE_CAN_ERR_INIT_FAIL;
+#endif
     }
 
     // Allow quick reuse of the port
@@ -105,18 +106,26 @@ static DWORD WINAPI _server_thread_func(void *arg)
 
     // Bind the socket to the address
     err = bind(tcp_ctx->rx_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    if (err == SOCKET_ERROR)
+    if (err == SOCKET_ERROR_VALUE)
     {
-        closesocket(tcp_ctx->rx_fd);
+        close_socket(tcp_ctx->rx_fd);
+#ifdef _WIN32
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+#else
+        return (void *)(intptr_t)ARTIE_CAN_ERR_INIT_FAIL;
+#endif
     }
 
     // Start listening for client connections
     err = listen(tcp_ctx->rx_fd, 1);
-    if (err == SOCKET_ERROR)
+    if (err == SOCKET_ERROR_VALUE)
     {
-        closesocket(tcp_ctx->rx_fd);
+        close_socket(tcp_ctx->rx_fd);
+#ifdef _WIN32
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
+#else
+        return (void *)(intptr_t)ARTIE_CAN_ERR_INIT_FAIL;
+#endif
     }
 
     // Alert the main thread we are ready
@@ -139,7 +148,11 @@ static DWORD WINAPI _server_thread_func(void *arg)
             else if (artie_err != ARTIE_CAN_ERR_NONE)
             {
                 // Fatal error accepting client connection, so exit the thread
+#ifdef _WIN32
                 return (DWORD)artie_err;
+#else
+                return (void *)(intptr_t)artie_err;
+#endif
             }
             else
             {
@@ -174,10 +187,10 @@ static DWORD WINAPI _server_thread_func(void *arg)
         // Close the connection
         if (close)
         {
-            err = shutdown(tcp_ctx->tx_fd, SD_SEND);
-            if (err == SOCKET_ERROR)
+            err = shutdown_socket(tcp_ctx->tx_fd, SHUTDOWN_SEND);
+            if (err == SOCKET_ERROR_VALUE)
             {
-                closesocket(tcp_ctx->tx_fd);
+                close_socket(tcp_ctx->tx_fd);
             }
 
             // Reset for next connection
@@ -187,29 +200,22 @@ static DWORD WINAPI _server_thread_func(void *arg)
     }
 
     // Close the listening socket
-    closesocket(tcp_ctx->rx_fd);
-
-    return (DWORD)ARTIE_CAN_ERR_NONE;
-}
-#else
-//Unix implementation
-static void *_server_thread_func(void *arg)
-{
-
-}
-#endif
+    close_socket(tcp_ctx->rx_fd);
 
 #ifdef _WIN32
-// Windows implementation
+    return (DWORD)ARTIE_CAN_ERR_NONE;
+#else
+    return (void *)(intptr_t)ARTIE_CAN_ERR_NONE;
+#endif
+}
+
 static artie_can_error_t _init_server(artie_can_context_t *context)
 {
     // Cast context
     tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
 
     // Start a thread that blocks until a client connects, then receives data until the client disconnects
-    // Default security attributes, default stack size, default creation flags, and we don't need the thread identifier
-    tcp_ctx->server_thread = CreateThread(NULL, 0, _server_thread_func, (void *)context, 0, NULL);
-    if (tcp_ctx->server_thread == INVALID_THREAD_HANDLE)
+    if (!create_thread(&tcp_ctx->server_thread, _server_thread_func, (void *)context))
     {
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
@@ -217,35 +223,18 @@ static artie_can_error_t _init_server(artie_can_context_t *context)
     // Wait until the server thread has set up the listening socket and is ready to accept connections before returning
     while (!tcp_ctx->server_ready)
     {
-        Sleep(10);
+        SLEEP_MS(10);
     }
 
     return ARTIE_CAN_ERR_NONE;
 }
-#else
-// Unix implementation
-static artie_can_error_t _init_server(artie_can_tcp_context_t *context)
-{
 
-}
-#endif
-
-#ifdef _WIN32
-// Windows implementation
 static artie_can_error_t _init_client(artie_can_context_t *context)
 {
     // Currently, we don't do anything
     return ARTIE_CAN_ERR_NONE;
 }
-#else
-// Unix implementation
-static artie_can_error_t _init_client(artie_can_tcp_context_t *context)
-{
 
-}
-#endif
-
-#ifdef _WIN32
 static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const artie_can_frame_t *frame, size_t node_index)
 {
     // Cast context
@@ -253,7 +242,7 @@ static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const a
 
     // Create the socket for connecting to the server
     socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock == INVALID_SOCKET)
+    if (sock == INVALID_SOCKET_VALUE)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
@@ -265,33 +254,27 @@ static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const a
     inet_pton(AF_INET, tcp_ctx->address_mapping[node_index].host, &server_addr.sin_addr);
     server_addr.sin_port = htons(tcp_ctx->address_mapping[node_index].port);
     int err = connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    if (err == SOCKET_ERROR)
+    if (err == SOCKET_ERROR_VALUE)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
     // Send the frame
     err = send(sock, (const char *)frame, sizeof(artie_can_frame_t), 0);
-    if (err == SOCKET_ERROR)
+    if (err == SOCKET_ERROR_VALUE)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
     // Shutdown the connection since no more data will be sent
-    err = shutdown(sock, SD_SEND);
-    if (err == SOCKET_ERROR)
+    err = shutdown_socket(sock, SHUTDOWN_SEND);
+    if (err == SOCKET_ERROR_VALUE)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
     return ARTIE_CAN_ERR_NONE;
 }
-#else
-static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const artie_can_frame_t *frame, size_t node_index)
-{
-    // TODO
-}
-#endif
 
 static artie_can_error_t _init_tcp(artie_can_context_t *context)
 {
@@ -300,15 +283,11 @@ static artie_can_error_t _init_tcp(artie_can_context_t *context)
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-#if defined(_WIN32)
-    // Initialize Winsock library
-    WSADATA wsa_data;
-    int err = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-    if (err != 0)
+    // Initialize socket subsystem (Winsock on Windows, no-op on POSIX)
+    if (!socket_subsystem_init())
     {
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
-#endif
 
     artie_can_error_t err;
     err = _init_server(context);
@@ -339,7 +318,7 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 
     // Create the socket for connecting to the server
     tcp_ctx->tx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (tcp_ctx->tx_fd == INVALID_SOCKET)
+    if (tcp_ctx->tx_fd == INVALID_SOCKET_VALUE)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
@@ -362,8 +341,8 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
         }
     }
 
-    closesocket(tcp_ctx->tx_fd);
-    tcp_ctx->tx_fd = INVALID_SOCKET;
+    close_socket(tcp_ctx->tx_fd);
+    tcp_ctx->tx_fd = INVALID_SOCKET_VALUE;
 
     return err;
 }
@@ -384,20 +363,12 @@ static artie_can_error_t _close_tcp(artie_can_context_t *context)
     // Wait until the server thread has stopped
     if (tcp_ctx->server_thread != INVALID_THREAD_HANDLE)
     {
-        #ifdef _WIN32
-        WaitForSingleObject(tcp_ctx->server_thread, INFINITE);
-        CloseHandle(tcp_ctx->server_thread);
-        #else
-        pthread_join(tcp_ctx->server_thread, NULL);
-        #endif
-
+        join_thread(tcp_ctx->server_thread, 0);  // 0 = infinite wait
         tcp_ctx->server_thread = INVALID_THREAD_HANDLE;
     }
 
-    // Cleanup Winsock library
-    #ifdef _WIN32
-    WSACleanup();
-    #endif
+    // Cleanup socket subsystem (Winsock on Windows, no-op on POSIX)
+    socket_subsystem_cleanup();
 
     return ARTIE_CAN_ERR_NONE;
 }
@@ -442,8 +413,8 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const
          .server_thread = INVALID_THREAD_HANDLE,
          .server_ready = false,
          .should_stop = false,
-         .rx_fd = INVALID_SOCKET,
-         .tx_fd = INVALID_SOCKET,
+         .rx_fd = INVALID_SOCKET_VALUE,
+         .tx_fd = INVALID_SOCKET_VALUE,
          .rx_callback = NULL,
          .num_nodes = num_nodes,
          .address_mapping = {0},
