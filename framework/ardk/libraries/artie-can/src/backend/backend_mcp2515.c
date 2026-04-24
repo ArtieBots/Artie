@@ -44,8 +44,11 @@ artie_can_error_t mcp2515_init(artie_can_context_t *context, artie_can_backend_t
     handle->send = _send_mcp2515;
     handle->close = _close_mcp2515;
     handle->context = context;
-    handle->receive_callback = rx_callback;
     handle->get_ms = get_ms_fn;
+
+    // Initialize the rx callback in the backend context pointer
+    mcp2515_context_t *mcp_ctx = (mcp2515_context_t *)(&(context->backend_context));
+    mcp_ctx->rx_callback = rx_callback;
 
     return ARTIE_CAN_ERR_NONE;
 }

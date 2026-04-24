@@ -98,3 +98,12 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
  * This should be copied out of the backend's receive buffer and into the RTACP state machine for processing.
  */
 void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame);
+
+/**
+ * @brief Tick function for the RTACP protocol. This function should be called periodically
+ * to allow the RTACP state machine to process timeouts, retransmissions, and other protocol-specific tasks.
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend.
+ * @return artie_can_error_t Error code indicating the result of the operation.
+ */
+artie_can_error_t rtacp_tick(artie_can_backend_t *handle);

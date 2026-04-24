@@ -147,3 +147,67 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
             return ARTIE_CAN_ERR_INVALID_ARG;
     }
 }
+
+artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else
+    {
+        // No valid protocol configured
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    // For each protocol that this node is configured to use,
+    // call that state machine's tick function.
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+    for (size_t i = 0; i < ARTIE_CAN_PROTOCOL_COUNT; i++)
+    {
+        if ((handle->context->protocol_flags & (1 << i)) != 0)
+        {
+            switch (i)
+            {
+                case ARTIE_CAN_PROTOCOL_FLAG_RTACP:
+                    err |= rtacp_tick(handle);
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_RPCACP:
+                    // TODO
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_PSACP:
+                    // TODO
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_BWACP:
+                    // TODO
+                    break;
+                default:
+                    // Invalid protocol ID in flags
+                    return ARTIE_CAN_ERR_INVALID_ARG;
+            }
+        }
+    }
+
+    return err;
+}
+
+artie_can_error_t artie_can_start_event_loop(artie_can_backend_t *handle, uint32_t tick_interval_us)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (tick_interval_us == 0)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+}

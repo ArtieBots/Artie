@@ -110,53 +110,45 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
+    else if (handle->context->rtacp_context.state == RTACP_STATE_WAITING_ACK)
+    {
+        // We are already waiting for an ACK for a previously sent frame,
+        // we can't send another frame until we get the ACK back or timeout
+        return ARTIE_CAN_ERR_SEND_BUSY;
+    }
 
     artie_can_error_t err;
-
     err = handle->send(handle->context, frame);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
-
-    // If the frame is a broadcast frame, we are done. Otherwise, we wait for the ACK.
-    if (((frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) == ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST)
+    else if (((frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) == ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST)
     {
+        // If the frame is a broadcast frame, we are done.
         return ARTIE_CAN_ERR_NONE;
     }
-
-    // Wait for an ACK for up to 1 ms
-    // TODO: Start the timer
-    artie_can_frame_t ack_frame;
-    while (check_for_timeout)
+    else
     {
-        err = handle->receive(handle->context, &ack_frame, 1);
-        if ((err == ARTIE_CAN_ERR_NONE) && ((ack_frame.id & ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK) >> ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION) == ARTIE_CAN_RTACP_PROTOCOL_ID)
-        {
-            // We got a frame that is an RTACP frame, check if it's the ACK we are waiting for
-            if (ack_frame.dlc != frame->dlc)
-            {
-                // Not the ACK we are waiting for, keep waiting
-            }
-            else
-            {
-                // Check the data bytes to see if this is the ACK we are waiting for (ACK frames should have the same data as the original frame)
-                if (memcmp(ack_frame.data, frame->data, frame->dlc) == 0)
-                {
-                    // This is the ACK we are waiting for, we are done
-                    return ARTIE_CAN_ERR_NONE;
-                }
-                else
-                {
-                    // Not the ACK we are waiting for, keep waiting
-                }
-            }
-        }
+        // Otherwise, we wait for the ACK.
+        handle->context->rtacp_context.state = RTACP_STATE_WAITING_ACK;
+        return ARTIE_CAN_ERR_NONE;
     }
-    return ARTIE_CAN_ERR_NONE;
 }
 
 void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
     // TODO
+}
+
+artie_can_error_t rtacp_tick(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
 }

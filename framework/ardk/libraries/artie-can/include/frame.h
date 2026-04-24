@@ -45,6 +45,9 @@
 /** Target address bit mask */
 #define ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK (0x3F << ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION)
 
+/** Maximum nodes in the address space (subtract one for broadcast address) */
+#define ARTIE_CAN_MAX_NODES ((ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) - 1U)
+
 // Detect compiler and define PACKED macros
 #if defined(_MSC_VER)
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))

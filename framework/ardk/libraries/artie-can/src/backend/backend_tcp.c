@@ -41,27 +41,30 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 
 static artie_can_error_t _server_connect(artie_can_context_t *context)
 {
+    // Cast context
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+
     struct timeval tv;
     tv.tv_sec = 0;
     tv.tv_usec = 100000; // 100ms
 
     fd_set read_fds;
     FD_ZERO(&read_fds);
-    FD_SET(context->backend_context.tcp.rx_fd, &read_fds);
+    FD_SET(tcp_ctx->rx_fd, &read_fds);
 
     int sel = select(0, &read_fds, NULL, NULL, &tv);
     if (sel == SOCKET_ERROR)
     {
-        closesocket(context->backend_context.tcp.rx_fd);
+        closesocket(tcp_ctx->rx_fd);
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     if (sel > 0)
     {
-        context->backend_context.tcp.tx_fd = accept(context->backend_context.tcp.rx_fd, NULL, NULL);
-        if (context->backend_context.tcp.tx_fd == INVALID_SOCKET)
+        tcp_ctx->tx_fd = accept(tcp_ctx->rx_fd, NULL, NULL);
+        if (tcp_ctx->tx_fd == INVALID_SOCKET)
         {
-            closesocket(context->backend_context.tcp.rx_fd);
+            closesocket(tcp_ctx->rx_fd);
             return ARTIE_CAN_ERR_INIT_FAIL;
         }
     }
@@ -80,48 +83,49 @@ static DWORD WINAPI _server_thread_func(void *arg)
 {
     int err;
     artie_can_context_t *context = (artie_can_context_t *)arg;
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
 
     // Create a socket for the server to listen for client connections.
-    context->backend_context.tcp.rx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (context->backend_context.tcp.rx_fd == INVALID_SOCKET)
+    tcp_ctx->rx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (tcp_ctx->rx_fd == INVALID_SOCKET)
     {
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     // Allow quick reuse of the port
     int opt = 1;
-    setsockopt(context->backend_context.tcp.rx_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
+    setsockopt(tcp_ctx->rx_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
 
     // Set up server address structure
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    inet_pton(AF_INET, context->backend_context.tcp.host, &server_addr.sin_addr);
-    server_addr.sin_port = htons(context->backend_context.tcp.port);
+    inet_pton(AF_INET, tcp_ctx->address_mapping[tcp_ctx->address_index].host, &server_addr.sin_addr);
+    server_addr.sin_port = htons(tcp_ctx->address_mapping[tcp_ctx->address_index].port);
 
     // Bind the socket to the address
-    err = bind(context->backend_context.tcp.rx_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    err = bind(tcp_ctx->rx_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
     if (err == SOCKET_ERROR)
     {
-        closesocket(context->backend_context.tcp.rx_fd);
+        closesocket(tcp_ctx->rx_fd);
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     // Start listening for client connections
-    err = listen(context->backend_context.tcp.rx_fd, 1);
+    err = listen(tcp_ctx->rx_fd, 1);
     if (err == SOCKET_ERROR)
     {
-        closesocket(context->backend_context.tcp.rx_fd);
+        closesocket(tcp_ctx->rx_fd);
         return (DWORD)ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     // Alert the main thread we are ready
-    context->backend_context.tcp.server_ready = true;
+    tcp_ctx->server_ready = true;
 
     size_t bytes_received = 0;
     char recvbuf[sizeof(artie_can_frame_t)];
     bool connected = false;
-    while (!context->backend_context.tcp.should_stop)
+    while (!tcp_ctx->should_stop)
     {
         // Accept a client socket (blocks until a client connects)
         if (!connected)
@@ -146,7 +150,7 @@ static DWORD WINAPI _server_thread_func(void *arg)
 
         // Receive a buffer from the client (blocks until data is received)
         bool close = false;
-        int recv_size = recv(context->backend_context.tcp.tx_fd, recvbuf, sizeof(recvbuf), 0);
+        int recv_size = recv(tcp_ctx->tx_fd, recvbuf, sizeof(recvbuf), 0);
         if (recv_size > 0)
         {
             // We received some data
@@ -170,10 +174,10 @@ static DWORD WINAPI _server_thread_func(void *arg)
         // Close the connection
         if (close)
         {
-            err = shutdown(context->backend_context.tcp.tx_fd, SD_SEND);
+            err = shutdown(tcp_ctx->tx_fd, SD_SEND);
             if (err == SOCKET_ERROR)
             {
-                closesocket(context->backend_context.tcp.tx_fd);
+                closesocket(tcp_ctx->tx_fd);
             }
 
             // Reset for next connection
@@ -183,7 +187,7 @@ static DWORD WINAPI _server_thread_func(void *arg)
     }
 
     // Close the listening socket
-    closesocket(context->backend_context.tcp.rx_fd);
+    closesocket(tcp_ctx->rx_fd);
 
     return (DWORD)ARTIE_CAN_ERR_NONE;
 }
@@ -199,16 +203,19 @@ static void *_server_thread_func(void *arg)
 // Windows implementation
 static artie_can_error_t _init_server(artie_can_context_t *context)
 {
+    // Cast context
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+
     // Start a thread that blocks until a client connects, then receives data until the client disconnects
     // Default security attributes, default stack size, default creation flags, and we don't need the thread identifier
-    context->backend_context.tcp.server_thread = CreateThread(NULL, 0, _server_thread_func, (void *)context, 0, NULL);
-    if (context->backend_context.tcp.server_thread == INVALID_THREAD_HANDLE)
+    tcp_ctx->server_thread = CreateThread(NULL, 0, _server_thread_func, (void *)context, 0, NULL);
+    if (tcp_ctx->server_thread == INVALID_THREAD_HANDLE)
     {
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
     // Wait until the server thread has set up the listening socket and is ready to accept connections before returning
-    while (!context->backend_context.tcp.server_ready)
+    while (!tcp_ctx->server_ready)
     {
         Sleep(10);
     }
@@ -235,6 +242,54 @@ static artie_can_error_t _init_client(artie_can_context_t *context)
 static artie_can_error_t _init_client(artie_can_tcp_context_t *context)
 {
 
+}
+#endif
+
+#ifdef _WIN32
+static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const artie_can_frame_t *frame, size_t node_index)
+{
+    // Cast context
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+
+    // Create the socket for connecting to the server
+    socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock == INVALID_SOCKET)
+    {
+        return ARTIE_CAN_ERR_SEND_FAIL;
+    }
+
+    // Connect to server
+    struct sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, tcp_ctx->address_mapping[node_index].host, &server_addr.sin_addr);
+    server_addr.sin_port = htons(tcp_ctx->address_mapping[node_index].port);
+    int err = connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    if (err == SOCKET_ERROR)
+    {
+        return ARTIE_CAN_ERR_SEND_FAIL;
+    }
+
+    // Send the frame
+    err = send(sock, (const char *)frame, sizeof(artie_can_frame_t), 0);
+    if (err == SOCKET_ERROR)
+    {
+        return ARTIE_CAN_ERR_SEND_FAIL;
+    }
+
+    // Shutdown the connection since no more data will be sent
+    err = shutdown(sock, SD_SEND);
+    if (err == SOCKET_ERROR)
+    {
+        return ARTIE_CAN_ERR_SEND_FAIL;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+#else
+static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const artie_can_frame_t *frame, size_t node_index)
+{
+    // TODO
 }
 #endif
 
@@ -273,60 +328,44 @@ static artie_can_error_t _init_tcp(artie_can_context_t *context)
 
 static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 {
-    artie_can_tcp_context_t *context = (artie_can_tcp_context_t *)ctx;
-
-    if (context == NULL || frame == NULL)
+    if (ctx == NULL || frame == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-#ifdef _WIN32
-    int err;
+    // Cast context
+    artie_can_context_t *context = (artie_can_context_t *)ctx;
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+
     // Create the socket for connecting to the server
-    context->socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (context->socket_fd == INVALID_SOCKET)
+    tcp_ctx->tx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (tcp_ctx->tx_fd == INVALID_SOCKET)
     {
         return ARTIE_CAN_ERR_SEND_FAIL;
     }
 
-    // Connect to server
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    inet_pton(AF_INET, context->host, &server_addr.sin_addr);
-    server_addr.sin_port = htons(context->port);
-    err = connect(context->socket_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    if (err == SOCKET_ERROR)
+    // For each tcp node on the 'bus' (other than us), connect to the node and send the frame
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+    for (size_t i = 0; i < tcp_ctx->num_nodes; i++)
     {
-        closesocket(context->socket_fd);
-        context->socket_fd = INVALID_SOCKET;
-        return ARTIE_CAN_ERR_SEND_FAIL;
+        if (i == tcp_ctx->address_index)
+        {
+            // Don't connect to ourselves
+            continue;
+        }
+
+        artie_can_error_t send_err = _send_tcp_to_node(context, frame, i);
+        if (send_err != ARTIE_CAN_ERR_NONE)
+        {
+            // We don't want to stop sending to other nodes if one fails.
+            err |= send_err;
+        }
     }
 
-    // Send the frame
-    err = send(context->socket_fd, (const char *)frame, sizeof(artie_can_frame_t), 0);
-    if (err == SOCKET_ERROR)
-    {
-        closesocket(context->socket_fd);
-        context->socket_fd = INVALID_SOCKET;
-        return ARTIE_CAN_ERR_SEND_FAIL;
-    }
+    closesocket(tcp_ctx->tx_fd);
+    tcp_ctx->tx_fd = INVALID_SOCKET;
 
-    // Shutdown the connection since no more data will be sent
-    err = shutdown(context->socket_fd, SD_SEND);
-    if (err == SOCKET_ERROR)
-    {
-        closesocket(context->socket_fd);
-        context->socket_fd = INVALID_SOCKET;
-        return ARTIE_CAN_ERR_SEND_FAIL;
-    }
-
-    return ARTIE_CAN_ERR_NONE;
-#else // Unix implementation
-    // TODO
-
-    return ARTIE_CAN_ERR_NONE;
-#endif
+    return err;
 }
 
 static artie_can_error_t _close_tcp(artie_can_context_t *context)
@@ -336,20 +375,23 @@ static artie_can_error_t _close_tcp(artie_can_context_t *context)
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
+    // Cast context
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+
     // Alert the server thread that we should stop
-    context->backend_context.tcp.should_stop = true;
+    tcp_ctx->should_stop = true;
 
     // Wait until the server thread has stopped
-    if (context->backend_context.tcp.server_thread != INVALID_THREAD_HANDLE)
+    if (tcp_ctx->server_thread != INVALID_THREAD_HANDLE)
     {
         #ifdef _WIN32
-        WaitForSingleObject(context->backend_context.tcp.server_thread, INFINITE);
-        CloseHandle(context->backend_context.tcp.server_thread);
+        WaitForSingleObject(tcp_ctx->server_thread, INFINITE);
+        CloseHandle(tcp_ctx->server_thread);
         #else
-        pthread_join(context->backend_context.tcp.server_thread, NULL);
+        pthread_join(tcp_ctx->server_thread, NULL);
         #endif
 
-        context->backend_context.tcp.server_thread = INVALID_THREAD_HANDLE;
+        tcp_ctx->server_thread = INVALID_THREAD_HANDLE;
     }
 
     // Cleanup Winsock library
@@ -360,30 +402,69 @@ static artie_can_error_t _close_tcp(artie_can_context_t *context)
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const char *host, uint16_t port)
+artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const artie_can_tcp_addr_t *own_address, const artie_can_tcp_addr_t *all_node_addresses, size_t num_nodes)
 {
     if (context == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-    else if (host == NULL)
+    else if (own_address == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-    else if (strlen(host) >= ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH)
+    else if (all_node_addresses == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
+    else if (num_nodes == 0)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (num_nodes > ARTIE_CAN_MAX_TCP_NODES)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (strlen(own_address->host) == 0)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (strlen(own_address->host) >= ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    // We are TCP backend
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
 
     // Initialize the TCP context within the provided artie_can_context_t
-    context->backend_context.tcp = (tcp_context_t){
-         .host = {0},
-         .port = port,
+    *tcp_ctx = (tcp_context_t){
+         .address_index = 0, // Will be set properly below
+         .server_thread = INVALID_THREAD_HANDLE,
+         .server_ready = false,
+         .should_stop = false,
+         .rx_fd = INVALID_SOCKET,
+         .tx_fd = INVALID_SOCKET,
+         .rx_callback = NULL,
+         .num_nodes = num_nodes,
+         .address_mapping = {0},
     };
 
-    // Copy the hostname
-    strncpy(context->backend_context.tcp.host, host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH);
-    context->backend_context.tcp.host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
+    // Copy the address mapping information into the context's TCP context
+    for (size_t i = 0; i < num_nodes; i++)
+    {
+        tcp_ctx->address_mapping[i] = {
+            .host = {0},
+            .port = all_node_addresses[i].port,
+        };
+        strncpy(tcp_ctx->address_mapping[i].host, all_node_addresses[i].host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1);
+        tcp_ctx->address_mapping[i].host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
+
+        // If this address matches our own address, set the address index in the context
+        if ((strcmp(all_node_addresses[i].host, own_address->host) == 0) && (all_node_addresses[i].port == own_address->port))
+        {
+            tcp_ctx->address_index = i;
+        }
+    }
 
     return ARTIE_CAN_ERR_NONE;
 }
@@ -413,7 +494,10 @@ artie_can_error_t tcp_init(artie_can_context_t *context, artie_can_backend_t *ha
     handle->close = _close_tcp;
     handle->context = context;
     handle->get_ms = get_ms_fn;
-    handle->context->backend_context.tcp.rx_callback = rx_callback;
+
+    // Initialize the rx callback in the backend context pointer
+    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    tcp_ctx->rx_callback = rx_callback;
 
     return ARTIE_CAN_ERR_NONE;
 }

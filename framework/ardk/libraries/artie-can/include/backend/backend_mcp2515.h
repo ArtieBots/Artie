@@ -18,6 +18,15 @@
 #include "err.h"
 
 /**
+ * @brief Structure representing the context object for the Artie CAN MCP2515 backend.
+ *
+ */
+typedef struct {
+    bool dummy; ///< Placeholder member for now
+    artie_can_rx_callback_t rx_callback; ///< The callback function that the backend should call whenever a CAN frame is received.
+} mcp2515_context_t;
+
+/**
  * @brief Initialize an artie_can_mcp2515_context_t struct with the provided parameters.
  *
  * @param context

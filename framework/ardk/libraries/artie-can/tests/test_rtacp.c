@@ -23,8 +23,10 @@
 #define DEFAULT_TIMEOUT_MS 3000
 
 // A few nodes that the tests use for communication.
-static artie_can_context_t _node_context1;
-static artie_can_context_t _node_context2;
+static const artie_can_tcp_addr_t node1_addr = { .host = "127.0.0.1", .port = 5000 };
+static const artie_can_tcp_addr_t node2_addr = { .host = "127.0.0.1", .port = 5001 };
+static artie_can_context_t _node1_context;
+static artie_can_context_t _node2_context;
 static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
 
@@ -64,25 +66,35 @@ void setUp(void)
     // Reset the callback called flag before each test
     _callback_called = false;
 
+    // An array of node address information. Okay for it to be on the stack.
+    artie_can_tcp_addr_t node_addresses[] = {node1_addr, node2_addr};
+
     // Set up the nodes with TCP contexts
-    err = artie_can_init_context_tcp(&_node_context1, "127.0.0.1", 5000);
+    err = artie_can_init_context_tcp(&_node1_context, &node1_addr, node_addresses, ARRAY_LENGTH(node_addresses));
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_tcp(&_node_context2, "127.0.0.1", 5000);
+    err = artie_can_init_context_tcp(&_node2_context, &node2_addr, node_addresses, ARRAY_LENGTH(node_addresses));
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the nodes to use RTACP
-    err = artie_can_init_context_rtacp(&_node_context1, 0x01); // Source address 0x01
+    err = artie_can_init_context_rtacp(&_node1_context, 0x01); // Source address 0x01
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_rtacp(&_node_context2, 0x02); // Source address 0x02
+    err = artie_can_init_context_rtacp(&_node2_context, 0x02); // Source address 0x02
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes
-    err = artie_can_init(&_node_context1, &_node1, ARTIE_CAN_BACKEND_TCP, _receive_callback_node1, _get_time_ms);
+    err = artie_can_init(&_node1_context, &_node1, ARTIE_CAN_BACKEND_TCP, _receive_callback_node1, _get_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node_context2, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, _get_time_ms);
+    err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, _get_time_ms);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Set up a thread to run the eventloop for the nodes
+    err = artie_can_start_event_loop(&_node1);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_start_event_loop(&_node2);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 

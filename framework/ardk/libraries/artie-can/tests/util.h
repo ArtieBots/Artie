@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include "artie_can.h"
 
+/** Good ol' array length macro. */
+#define ARRAY_LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 /**
  * @brief Test that two CAN frames are equal.
  *
