@@ -11,6 +11,9 @@
 #include "rtacp_context.h"
 #include "translationlayer.h"
 
+/** The callback function that gets executed whenever a non-filtered CAN frame is received. */
+typedef void artie_can_rx_callback_t(artie_can_frame_t *frame);
+
 /**
  * @brief Enumeration of supported protocols in the Artie CAN library.
  */
@@ -38,8 +41,9 @@ typedef struct {
  *
  */
 typedef struct {
-    void *backend_context;               ///< Pointer to backend-specific context data (which could be custom)
-    rtacp_context_t rtacp_context;       ///< Context for RTACP protocol handling.
-    uint16_t protocol_flags;             ///< Mask of protocols that we are interested in. Use OR'd members of the artie_can_protocol_t enum.
-    event_loop_data_t event_loop;        ///< Event loop thread management (only used if artie_can_start_event_loop is called)
+    void *backend_context;                  ///< Pointer to backend-specific context data (which could be custom)
+    rtacp_context_t rtacp_context;          ///< Context for RTACP protocol handling.
+    uint16_t protocol_flags;                ///< Mask of protocols that we are interested in. Use OR'd members of the artie_can_protocol_t enum.
+    event_loop_data_t event_loop;           ///< Event loop thread management (only used if artie_can_start_event_loop is called)
+    artie_can_rx_callback_t *rx_callback;   ///< Callback function for received CAN frames
 } artie_can_context_t;

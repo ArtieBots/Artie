@@ -464,11 +464,8 @@ artie_can_error_t tcp_init(artie_can_context_t *context, artie_can_backend_t *ha
     handle->send = _send_tcp;
     handle->close = _close_tcp;
     handle->context = context;
+    handle->context->rx_callback = rx_callback;
     handle->get_ms = get_ms_fn;
-
-    // Initialize the rx callback in the backend context pointer
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
-    tcp_ctx->rx_callback = rx_callback;
 
     return ARTIE_CAN_ERR_NONE;
 }

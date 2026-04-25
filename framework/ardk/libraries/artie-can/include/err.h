@@ -26,4 +26,5 @@ typedef enum {
     ARTIE_CAN_ERR_CLOSED = (1 << 7),        /**< Backend is closed */
     ARTIE_CAN_ERR_SEND_BUSY = (1 << 8),     /**< Bus is busy, cannot send frame */
     ARTIE_CAN_ERR_NO_SPACE = (1 << 9),      /**< Cannot write to a buffer because there is no more space in it */
+    ARTIE_CAN_ERR_INTERNAL = (1 << 10),     /**< An internal error occurred. This is a catch-all for errors that don't fit into the other categories, and typically indicates a bug in the library. */
 } artie_can_error_t;

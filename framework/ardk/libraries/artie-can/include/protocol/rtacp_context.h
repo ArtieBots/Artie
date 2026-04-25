@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "frame.h"
 
 /**
  * @brief States that the RTACP state machine can be in for a given node.
@@ -23,6 +24,8 @@ typedef enum {
  *
  */
 typedef struct {
-    uint8_t node_address;  ///< The RTACP address of this node on the CAN bus
-    rtacp_state_t state;   ///< The current state of the RTACP protocol for this node
+    uint8_t node_address;               ///< The RTACP address of this node on the CAN bus
+    uint32_t ack_start_time_ms;         ///< The time in milliseconds when we started waiting for an ACK for a sent frame. Used to check for ACK timeouts.
+    artie_can_frame_t in_flight_frame;  ///< The frame that is currently in flight and waiting for an ACK
+    rtacp_state_t state;                ///< The current state of the RTACP protocol for this node
 } rtacp_context_t;

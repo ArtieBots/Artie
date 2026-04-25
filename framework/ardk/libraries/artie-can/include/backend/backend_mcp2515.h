@@ -23,7 +23,6 @@
  */
 typedef struct {
     bool dummy; ///< Placeholder member for now
-    artie_can_rx_callback_t rx_callback; ///< The callback function that the backend should call whenever a CAN frame is received.
 } mcp2515_context_t;
 
 /**

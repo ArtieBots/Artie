@@ -90,11 +90,11 @@ void setUp(void)
     err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, _get_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    // Set up a thread to run the eventloop for the nodes
-    err = artie_can_start_event_loop(&_node1);
+    // Set up a thread to run the eventloop for the nodes (tick every 150us)
+    err = artie_can_start_event_loop(&_node1, 150);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_start_event_loop(&_node2);
+    err = artie_can_start_event_loop(&_node2, 150);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 

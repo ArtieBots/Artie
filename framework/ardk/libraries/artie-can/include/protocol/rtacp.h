@@ -22,6 +22,18 @@
 /** The RTACP protocol ID */
 #define ARTIE_CAN_RTACP_PROTOCOL_ID 0x00U
 
+/** The timeout in ms for waiting for an ACK */
+#define ARTIE_CAN_RTACP_ACK_TIMEOUT_MS 1U
+
+/**
+ * @brief Enumeration for RTACP frame types.
+ *
+ */
+typedef enum {
+    ARTIE_CAN_FRAME_TYPE_RTACP_DATA = 0,   ///< Regular RTACP data frame
+    ARTIE_CAN_FRAME_TYPE_RTACP_ACK = 1,    ///< RTACP ACK frame
+} artie_can_frame_type_rtacp_t;
+
 /**
  * @brief Enumeration for RTACP frame priorities.
  *
@@ -92,6 +104,8 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
 /**
  * @brief Handle a received RTACP frame within an ISR context.
  * This function will be called by the backend when a new frame is received that matches the RTACP protocol.
+ * We assume that the backend only calls this function for frames that match the RTACP protocol ID in their frame ID.
+ * We further assume that the context and frame pointers are valid and that the frame data is well-formed.
  *
  * @param context Pointer to the artie_can_context_t struct representing the context.
  * @param frame Pointer to the artie_can_frame_t struct representing the received frame.
