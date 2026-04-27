@@ -261,12 +261,39 @@ void test_broadcast(void)
     assert_rtacp_frames_equal(&rtacp_frame, &_frame_received_in_callback3);
 }
 
-// Tests that need to be implemented:
-// - Test that we can send a message from one node to another (not broadcast) and receive it.
-// - Test echo
-// - Test that if we send a message to a specific target address, only the node with that address receives it and not other nodes.
-// - Update broadcast test to include multiple recipient nodes and check that they all receive the message.
-// - Test sending multiple messages in a row to a single address
+/**
+ * @brief Test that we can send a message from one node to another (not broadcast) and receive it.
+ *
+ */
+void test_send_to_specific_address(void)
+{
+}
+
+/**
+ * @brief Test that if we send a message to a specific target address, only the node with that address receives it and not other nodes.
+ *
+ */
+void test_send_to_specific_address_only_received_by_target(void)
+{
+}
+
+/**
+ * @brief Test sending multiple messages in a row. Receipt of all messages is required,
+ * but order is not guaranteed according to RTACP.
+ *
+ */
+void test_send_multiple_messages(void)
+{
+}
+
+/**
+ * @brief Test sending a message to a node and then having that node echo back the message.
+ * This tests both sending and receiving in the same node.
+ *
+ */
+void test_echo_message(void)
+{
+}
 
 /**
  * @brief Main function - runs all tests.
