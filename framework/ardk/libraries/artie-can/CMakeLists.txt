@@ -35,6 +35,7 @@ set(ARTIE_CAN_HEADERS
     include/protocol/rtacp_context.h
     include/protocol/rtacp.h
     include/util/circular_buffer.h
+    include/util/log.h
     include/util/translationlayer.h
     include/artie_can.h
     include/backend.h
@@ -60,6 +61,11 @@ function(set_artie_can_compile_options target)
         target_compile_options(${target} PRIVATE -Wno-unused-parameter)
         # Ignore -Werror=stringop-truncation
         target_compile_options(${target} PRIVATE -Wno-error=stringop-truncation)
+    endif()
+
+    # Pass through logging enable
+    if(ARTIE_CAN_LOGGING_ENABLED)
+        target_compile_definitions(${target} PRIVATE ARTIE_CAN_LOGGING_ENABLED=1)
     endif()
 endfunction()
 

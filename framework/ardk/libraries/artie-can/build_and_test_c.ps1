@@ -9,7 +9,7 @@ if (-not (Test-Path -Path "$PSScriptRoot/build")) {
 # cd into the build directory, clean, and run CMake to configure and build (including tests)
 Set-Location $PSScriptRoot/build
 Remove-Item * -Recurse -Force -ErrorAction SilentlyContinue
-cmake .. -DBUILD_TESTS=ON
+cmake .. -DBUILD_TESTS=ON -DARTIE_CAN_LOGGING_ENABLED=1
 cmake --build . --config Debug
 
 # Run tests with verbose output
