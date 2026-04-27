@@ -262,7 +262,7 @@ static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const a
     }
 
     // Send the frame
-    ARTIE_CAN_LOG(context, "Sending frame to node %zu at %s:%d\n", node_index, tcp_ctx->address_mapping[node_index].host, tcp_ctx->address_mapping[node_index].port);
+    ARTIE_CAN_LOG(context, "Sending frame with dest addr %u to TCP server at %s:%d\n", ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION), tcp_ctx->address_mapping[node_index].host, tcp_ctx->address_mapping[node_index].port);
     err = send(sock, (const char *)frame, sizeof(artie_can_frame_t), 0);
     if (err == SOCKET_ERROR_VALUE)
     {
