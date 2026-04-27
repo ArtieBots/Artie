@@ -8,6 +8,7 @@
 #include "circular_buffer.h"
 #include "context.h"
 #include "err.h"
+#include "log.h"
 #include "rtacp.h"
 #include "translationlayer.h"
 
@@ -15,6 +16,7 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 {
     // Convert from raw buffer to frame struct
     artie_can_frame_t *frame = (artie_can_frame_t *)recvbuf;
+    ARTIE_CAN_LOG(context, "Completing frame from received buffer\n");
 
     // Check the frame's protocol against the context's protocol flags to see if we should
     // feed it back up the stack to its appropriate state machine.
@@ -167,6 +169,7 @@ static void *_server_thread_func(void *arg)
         {
             // We received some data
             bytes_received += recv_size;
+            ARTIE_CAN_LOG(context, "Received %d bytes, total received for this frame: %zu\n", recv_size, bytes_received);
         }
         else
         {
@@ -259,6 +262,7 @@ static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const a
     }
 
     // Send the frame
+    ARTIE_CAN_LOG(context, "Sending frame to node %zu at %s:%d\n", node_index, tcp_ctx->address_mapping[node_index].host, tcp_ctx->address_mapping[node_index].port);
     err = send(sock, (const char *)frame, sizeof(artie_can_frame_t), 0);
     if (err == SOCKET_ERROR_VALUE)
     {
