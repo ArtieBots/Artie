@@ -29,6 +29,8 @@ static artie_can_context_t _node1_context;
 static artie_can_context_t _node2_context;
 static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
+static artie_can_tcp_context_t _node1_tcp_context;
+static artie_can_tcp_context_t _node2_tcp_context;
 
 // A flag to indicate whether the callback has been called for tests that use the callback.
 static volatile bool _callback_called1 = false;
@@ -115,10 +117,10 @@ void setUp(void)
     artie_can_tcp_addr_t node_addresses[] = {node1_addr, node2_addr};
 
     // Set up the nodes with TCP contexts
-    err = artie_can_init_context_tcp(&_node1_context, &node1_addr, node_addresses, ARRAY_LENGTH(node_addresses));
+    err = artie_can_init_context_tcp(&_node1_context, &_node1_tcp_context, &node1_addr, node_addresses, ARRAY_LENGTH(node_addresses));
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init_context_tcp(&_node2_context, &node2_addr, node_addresses, ARRAY_LENGTH(node_addresses));
+    err = artie_can_init_context_tcp(&_node2_context, &_node2_tcp_context, &node2_addr, node_addresses, ARRAY_LENGTH(node_addresses));
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the nodes to use RTACP
