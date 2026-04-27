@@ -34,7 +34,7 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 static artie_can_error_t _server_connect(artie_can_context_t *context)
 {
     // Cast context
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     struct timeval tv;
     tv.tv_sec = 0;
@@ -79,7 +79,7 @@ static void *_server_thread_func(void *arg)
 {
     int err;
     artie_can_context_t *context = (artie_can_context_t *)arg;
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     // Create a socket for the server to listen for client connections.
     tcp_ctx->rx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -211,7 +211,7 @@ static void *_server_thread_func(void *arg)
 static artie_can_error_t _init_server(artie_can_context_t *context)
 {
     // Cast context
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     // Start a thread that blocks until a client connects, then receives data until the client disconnects
     if (!create_thread(&tcp_ctx->server_thread, _server_thread_func, (void *)context))
@@ -237,7 +237,7 @@ static artie_can_error_t _init_client(artie_can_context_t *context)
 static artie_can_error_t _send_tcp_to_node(artie_can_context_t *context, const artie_can_frame_t *frame, size_t node_index)
 {
     // Cast context
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     // Create the socket for connecting to the server
     socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -313,7 +313,7 @@ static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 
     // Cast context
     artie_can_context_t *context = (artie_can_context_t *)ctx;
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     // Create the socket for connecting to the server
     tcp_ctx->tx_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -354,7 +354,7 @@ static artie_can_error_t _close_tcp(artie_can_context_t *context)
     }
 
     // Cast context
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    artie_can_tcp_context_t *tcp_ctx = (artie_can_tcp_context_t *)(context->backend_context);
 
     // Alert the server thread that we should stop
     tcp_ctx->should_stop = true;
@@ -372,7 +372,7 @@ static artie_can_error_t _close_tcp(artie_can_context_t *context)
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const artie_can_tcp_addr_t *own_address, const artie_can_tcp_addr_t *all_node_addresses, size_t num_nodes)
+artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, artie_can_tcp_context_t *tcp_context, const artie_can_tcp_addr_t *own_address, const artie_can_tcp_addr_t *all_node_addresses, size_t num_nodes)
 {
     if (context == NULL)
     {
@@ -402,12 +402,13 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-
-    // We are TCP backend
-    tcp_context_t *tcp_ctx = (tcp_context_t *)(&(context->backend_context));
+    else if (tcp_context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
 
     // Initialize the TCP context within the provided artie_can_context_t
-    *tcp_ctx = (tcp_context_t){
+    *tcp_context = (artie_can_tcp_context_t){
          .address_index = 0, // Will be set properly below
          .server_thread = INVALID_THREAD_HANDLE,
          .server_ready = false,
@@ -422,19 +423,22 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const
     // Copy the address mapping information into the context's TCP context
     for (size_t i = 0; i < num_nodes; i++)
     {
-        tcp_ctx->address_mapping[i] = (artie_can_tcp_addr_t){
+        tcp_context->address_mapping[i] = (artie_can_tcp_addr_t){
             .host = {0},
             .port = all_node_addresses[i].port,
         };
-        strncpy(tcp_ctx->address_mapping[i].host, all_node_addresses[i].host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1);
-        tcp_ctx->address_mapping[i].host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
+        strncpy(tcp_context->address_mapping[i].host, all_node_addresses[i].host, ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1);
+        tcp_context->address_mapping[i].host[ARTIE_CAN_TCP_HOSTNAME_MAX_LENGTH - 1] = '\0'; // Ensure null termination
 
         // If this address matches our own address, set the address index in the context
         if ((strcmp(all_node_addresses[i].host, own_address->host) == 0) && (all_node_addresses[i].port == own_address->port))
         {
-            tcp_ctx->address_index = i;
+            tcp_context->address_index = i;
         }
     }
+
+    // Now that the tcp context is initialized, add it into the main context's backend context pointer
+    context->backend_context = (void *)tcp_context;
 
     return ARTIE_CAN_ERR_NONE;
 }

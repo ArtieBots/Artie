@@ -44,21 +44,23 @@ typedef struct {
     artie_can_rx_callback_t *rx_callback;                   ///< Callback function to call when a frame is received
     size_t num_nodes;                                       ///< The number of nodes in the TCP network (including this node)
     artie_can_tcp_addr_t address_mapping[ARTIE_CAN_MAX_TCP_NODES];    ///< Mapping of node IDs to TCP addresses
-} tcp_context_t;
+} artie_can_tcp_context_t;
 
 /**
- * @brief Initialize an artie_can_tcp_context_t struct with the provided parameters.
+ * @brief Initialize an artie_can_context_t struct with the provided parameters.
  *
- * Please note that a server should be set up BEFORE any client nodes.
+ * Please note that the context struct must have already been allocated by the caller
+ * and it should have a lifetime that matches the lifetime of the backend handle that will be using it.
  *
- * @param context Pointer to the artie_can_tcp_context_t struct to initialize.
+ * @param context Pointer to the artie_can_context_t struct to initialize.
+ * @param tcp_context Pointer to the artie_can_tcp_context_t struct that will be initialized with the provided parameters.
  * @param own_address Pointer to the artie_can_tcp_addr_t struct representing this node's own TCP address.
  * @param all_node_addresses Pointer to an array of artie_can_tcp_addr_t structs representing the TCP addresses of all nodes in the network (including this node).
  * @param num_nodes The number of nodes in the all_node_addresses array.
  * @return artie_can_error_t Error code indicating the result of the initialization.
  *
  */
-artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const artie_can_tcp_addr_t *own_address, const artie_can_tcp_addr_t *all_node_addresses, size_t num_nodes);
+artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, artie_can_tcp_context_t *tcp_context, const artie_can_tcp_addr_t *own_address, const artie_can_tcp_addr_t *all_node_addresses, size_t num_nodes);
 
 /**
  * @brief Initialize the Artie CAN backend struct with the TCP backend, using the provided context for configuration.
