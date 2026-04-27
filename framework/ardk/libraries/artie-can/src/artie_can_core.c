@@ -97,7 +97,7 @@ artie_can_error_t artie_can_init_custom(artie_can_context_t *context, artie_can_
     }
 
     handle->context = context;
-    handle->receive_callback = rx_callback;
+    handle->context->rx_callback = rx_callback;
     handle->get_ms = get_ms_fn;
 
     return handle->init(handle->context);
@@ -158,10 +158,10 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
     }
 
     // Depending on the type of frame, we route to different send functions.
-    switch ((frame->id & ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK) >> ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION)
+    switch ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION)
     {
         case ARTIE_CAN_RTACP_PROTOCOL_ID:
-            rtacp_send(handle, frame);
+            return rtacp_send(handle, frame);
             break;
         default:
             // Invalid frame ID type
@@ -179,7 +179,7 @@ artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-    else
+    else if (handle->context->protocol_flags == 0)
     {
         // No valid protocol configured
         return ARTIE_CAN_ERR_INVALID_ARG;

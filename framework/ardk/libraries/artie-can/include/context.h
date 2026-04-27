@@ -12,7 +12,7 @@
 #include "translationlayer.h"
 
 /** The callback function that gets executed whenever a non-filtered CAN frame is received. */
-typedef void artie_can_rx_callback_t(artie_can_frame_t *frame);
+typedef void artie_can_rx_callback_t(const artie_can_frame_t *frame);
 
 /**
  * @brief Enumeration of supported protocols in the Artie CAN library.

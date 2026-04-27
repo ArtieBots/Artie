@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
 #include "backend.h"
 #include "backend_tcp.h"
 #include "circular_buffer.h"
@@ -423,7 +422,7 @@ artie_can_error_t artie_can_init_context_tcp(artie_can_context_t *context, const
     // Copy the address mapping information into the context's TCP context
     for (size_t i = 0; i < num_nodes; i++)
     {
-        tcp_ctx->address_mapping[i] = {
+        tcp_ctx->address_mapping[i] = (artie_can_tcp_addr_t){
             .host = {0},
             .port = all_node_addresses[i].port,
         };

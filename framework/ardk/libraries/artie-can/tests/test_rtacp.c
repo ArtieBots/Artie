@@ -31,26 +31,66 @@ static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
 
 // A flag to indicate whether the callback has been called for tests that use the callback.
-static volatile bool _callback_called = false;
+static volatile bool _callback_called1 = false;
+static volatile bool _callback_called2 = false;
+static volatile artie_can_frame_rtacp_t _frame_received_in_callback1;
+static volatile artie_can_frame_rtacp_t _frame_received_in_callback2;
 
 /** The callback that node1 uses to receive messages. */
-static void _receive_callback_node1(artie_can_frame_t *frame)
+static void _receive_callback_node1(const artie_can_frame_t *frame)
 {
-    // TODO
+    // Parse the received frame into RTACP format and store it in the callback storage variable for node 1.
+    artie_can_frame_rtacp_t rtacp_frame_received;
+    artie_can_error_t err = artie_can_rtacp_parse_frame(frame, &rtacp_frame_received);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // Due to volatile qualifier, we can't use memcpy here, so we have to copy member by member.
+        _frame_received_in_callback1.ack = rtacp_frame_received.ack;
+        _frame_received_in_callback1.priority = rtacp_frame_received.priority;
+        _frame_received_in_callback1.source_address = rtacp_frame_received.source_address;
+        _frame_received_in_callback1.target_address = rtacp_frame_received.target_address;
+        _frame_received_in_callback1.nbytes = rtacp_frame_received.nbytes;
+        for (uint8_t i = 0; i < rtacp_frame_received.nbytes; i++)
+        {
+            _frame_received_in_callback1.data[i] = rtacp_frame_received.data[i];
+        }
+        _callback_called1 = true;
+    }
 }
 
 /** The callback that node2 uses to receive messages. */
-static void _receive_callback_node2(artie_can_frame_t *frame)
+static void _receive_callback_node2(const artie_can_frame_t *frame)
 {
-    // TODO
+    // Parse the received frame into RTACP format and store it in the callback storage variable for node 2.
+    artie_can_frame_rtacp_t rtacp_frame_received;
+    artie_can_error_t err = artie_can_rtacp_parse_frame(frame, &rtacp_frame_received);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // Due to volatile qualifier, we can't use memcpy here, so we have to copy member by member.
+        _frame_received_in_callback2.ack = rtacp_frame_received.ack;
+        _frame_received_in_callback2.priority = rtacp_frame_received.priority;
+        _frame_received_in_callback2.source_address = rtacp_frame_received.source_address;
+        _frame_received_in_callback2.target_address = rtacp_frame_received.target_address;
+        _frame_received_in_callback2.nbytes = rtacp_frame_received.nbytes;
+        for (uint8_t i = 0; i < rtacp_frame_received.nbytes; i++)
+        {
+            _frame_received_in_callback2.data[i] = rtacp_frame_received.data[i];
+        }
+        _callback_called2 = true;
+    }
 }
 
-/** The function to get the current time in milliseconds. */
-static uint64_t _get_time_ms(void)
+static void _reset_frame(volatile artie_can_frame_rtacp_t *frame)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)(ts.tv_sec) * 1000 + (ts.tv_nsec / 1000000);
+    frame->ack = false;
+    frame->priority = 0;
+    frame->source_address = 0;
+    frame->target_address = 0;
+    frame->nbytes = 0;
+    for (size_t i = 0; i < ARTIE_CAN_RTACP_MAX_DATA_BYTES; i++)
+    {
+        frame->data[i] = 0;
+    }
 }
 
 /**
@@ -63,8 +103,13 @@ void setUp(void)
 {
     artie_can_error_t err;
 
-    // Reset the callback called flag before each test
-    _callback_called = false;
+    // Reset the callback items
+    _callback_called1 = false;
+    _callback_called2 = false;
+
+    // Due to volatile qualifier, we can't use memset here, so we have to reset member by member.
+    _reset_frame(&_frame_received_in_callback1);
+    _reset_frame(&_frame_received_in_callback2);
 
     // An array of node address information. Okay for it to be on the stack.
     artie_can_tcp_addr_t node_addresses[] = {node1_addr, node2_addr};
@@ -84,10 +129,10 @@ void setUp(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes
-    err = artie_can_init(&_node1_context, &_node1, ARTIE_CAN_BACKEND_TCP, _receive_callback_node1, _get_time_ms);
+    err = artie_can_init(&_node1_context, &_node1, ARTIE_CAN_BACKEND_TCP, _receive_callback_node1, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, _get_time_ms);
+    err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, _receive_callback_node2, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up a thread to run the eventloop for the nodes (tick every 150us)
@@ -147,101 +192,12 @@ void test_broadcast(void)
     err = artie_can_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    // Blocking receive on node 2 to get the frame (with a 3 second timeout)
-    artie_can_frame_t frame_received;
-    err = artie_can_receive(&_node2, &frame_received, DEFAULT_TIMEOUT_MS);
+    // Blocking receive on node 2 to get the frame
+    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Check that the received frame matches the sent frame
-    assert_frames_equal(&frame_to_send, &frame_received);
-
-    // Parse the received frame back into RTACP format and check that it matches the original RTACP frame
-    artie_can_frame_rtacp_t rtacp_frame_received;
-    err = artie_can_rtacp_parse_frame(&frame_received, &rtacp_frame_received);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-    assert_rtacp_frames_equal(&rtacp_frame, &rtacp_frame_received);
-}
-
-/**
- * @brief Test non-blocking receive with callback.
- *
- */
-void test_nonblocking_receive_with_callback(void)
-{
-    artie_can_error_t err;
-
-    // Create a frame to send
-    uint8_t data_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
-    artie_can_frame_rtacp_t rtacp_frame = {
-        .ack = false,
-        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
-        .source_address = 0x01,
-        .target_address = ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST,
-        .nbytes = sizeof(data_bytes),
-        .data = {0}
-    };
-    memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
-    artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    // Set up a spot to store the frame that we will receive
-    artie_can_frame_t frame_received_in_callback;
-
-    // Start non-blocking receive on node 2 with the callback
-    err = artie_can_receive_nonblocking(&_node2, &frame_received_in_callback, _receive_callback);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    // Send the frame from node 1
-    err = artie_can_send(&_node1, &frame_to_send);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    // Wait for the callback to be called with timeout protection
-    time_t start_time = time(NULL);
-    time_t timeout_seconds = (DEFAULT_TIMEOUT_MS / 1000) > 0 ? (DEFAULT_TIMEOUT_MS / 1000) : 1;
-
-    while (!_callback_called)
-    {
-        // Check if we've exceeded the timeout
-        if (difftime(time(NULL), start_time) > timeout_seconds)
-        {
-            TEST_FAIL_MESSAGE("Timeout waiting for callback to be called");
-        }
-
-        // Sleep briefly to avoid busy waiting (10ms)
-        SLEEP_MS(10);
-    }
-
-    // Check that the frame received in the callback matches the sent frame
-    assert_frames_equal(&frame_to_send, &frame_received_in_callback);
-}
-
-/**
- * @brief Test that we can send a message from one node to another and get an ACK back.
- *
- */
-void test_send_and_ack(void)
-{
-    artie_can_error_t err;
-
-    // Create a frame to send
-    uint8_t data_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
-    artie_can_frame_rtacp_t rtacp_frame = {
-        .ack = false,
-        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
-        .source_address = 0x01,
-        .target_address = 0x02, // Target specific node to ensure we get an ACK back
-        .nbytes = sizeof(data_bytes),
-        .data = {0}
-    };
-    memcpy(rtacp_frame.data, data_bytes, sizeof(data_bytes));
-    artie_can_frame_t frame_to_send;
-    err = artie_can_rtacp_init_frame(&_node1, &frame_to_send, &rtacp_frame);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    // Send the frame from node 1 (no error means we got an ACK back successfully)
-    err = artie_can_send(&_node1, &frame_to_send);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    assert_rtacp_frames_equal(&rtacp_frame, &_frame_received_in_callback2);
 }
 
 /**
@@ -256,7 +212,6 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_broadcast);
-    RUN_TEST(test_nonblocking_receive_with_callback);
 
     // Finish and return results
     return UNITY_END();

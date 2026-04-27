@@ -17,6 +17,7 @@
 typedef enum {
     RTACP_STATE_IDLE,          ///< The node is idle and not currently processing any frames.
     RTACP_STATE_WAITING_ACK,   ///< The node has sent a frame and is waiting for an ACK.
+    RTACP_STATE_SENDING_ACK,   ///< The node has received a frame that it should ACK, but has not yet sent that ACK.
 } rtacp_state_t;
 
 /**
@@ -25,7 +26,8 @@ typedef enum {
  */
 typedef struct {
     uint8_t node_address;               ///< The RTACP address of this node on the CAN bus
-    uint32_t ack_start_time_ms;         ///< The time in milliseconds when we started waiting for an ACK for a sent frame. Used to check for ACK timeouts.
+    uint64_t ack_start_time_ms;         ///< The time in milliseconds when we started waiting for an ACK for a sent frame. Used to check for ACK timeouts.
     artie_can_frame_t in_flight_frame;  ///< The frame that is currently in flight and waiting for an ACK
     rtacp_state_t state;                ///< The current state of the RTACP protocol for this node
+    artie_can_frame_t ack_frame;        ///< The ACK frame that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
 } rtacp_context_t;

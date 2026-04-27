@@ -11,27 +11,36 @@ option(BUILD_STATIC_LIBS "Build static libraries" ON)
 option(BUILD_TESTS "Build tests" OFF)
 
 # Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/backend
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/protocol
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/util
+)
 
 # Source files
 set(ARTIE_CAN_SOURCES
+    src/backend/backend_mcp2515.c
+    src/backend/backend_tcp.c
+    src/protocol/rtacp.c
+    src/util/circular_buffer.c
+    src/util/translationlayer.c
     src/artie_can_core.c
-    src/backend_mcp2515.c
-    src/backend_tcp.c
-    src/circular_buffer.c
-    src/rtacp.c
 )
 
 # Header files
 set(ARTIE_CAN_HEADERS
+    include/backend/backend_mcp2515.h
+    include/backend/backend_tcp.h
+    include/protocol/rtacp_context.h
+    include/protocol/rtacp.h
+    include/util/circular_buffer.h
+    include/util/translationlayer.h
     include/artie_can.h
-    include/backend_mcp2515.h
-    include/backend_tcp.h
     include/backend.h
-    include/circular_buffer.h
+    include/context.h
     include/err.h
     include/frame.h
-    include/rtacp.h
 )
 
 # Function to apply common compile options to library targets
