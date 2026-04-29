@@ -78,6 +78,7 @@ artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *context, uin
     // Fill in the RTACP details and enable the RTACP protocol for this node
     context->rtacp_context.node_address = node_address;
     context->protocol_flags |= ARTIE_CAN_PROTOCOL_FLAG_RTACP;
+    context->node_address = node_address;
 
     return ARTIE_CAN_ERR_NONE;
 }

@@ -104,6 +104,16 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
 artie_can_error_t artie_can_tick(artie_can_backend_t *handle);
 
 /**
+ * @brief This function should be called from a microcontroller interrupt service routine
+ * when the CAN peripheral generates an interrupt.
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend to run the event loop for.
+ * @return artie_can_error_t Error code indicating the result of the operation. If the tick ran successfully,
+ * returns ARTIE_CAN_ERR_NONE. If there was an error, returns an appropriate error code.
+ */
+artie_can_error_t artie_can_tick_isr(artie_can_backend_t *handle);
+
+/**
  * @brief Start the event loop for the specified backend in a separate thread.
  * This function creates a new thread to run the event loop, allowing the backend to process
  * events concurrently with the main program. The event loop will continue running until

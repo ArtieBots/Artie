@@ -21,8 +21,12 @@ include_directories(
 # Source files
 set(ARTIE_CAN_SOURCES
     src/backend/backend_mcp2515.c
+    src/backend/driver_mcp2515.c
     src/backend/backend_tcp.c
     src/protocol/rtacp.c
+    src/protocol/bwacp.c
+    src/protocol/rpcacp.c
+    src/protocol/psacp.c
     src/util/circular_buffer.c
     src/util/translationlayer.c
     src/artie_can_core.c
@@ -32,8 +36,15 @@ set(ARTIE_CAN_SOURCES
 set(ARTIE_CAN_HEADERS
     include/backend/backend_mcp2515.h
     include/backend/backend_tcp.h
+    include/backend/driver_mcp2515.h
     include/protocol/rtacp_context.h
     include/protocol/rtacp.h
+    include/protocol/bwacp_context.h
+    include/protocol/bwacp.h
+    include/protocol/rpcacp_context.h
+    include/protocol/rpcacp.h
+    include/protocol/psacp_context.h
+    include/protocol/psacp.h
     include/util/circular_buffer.h
     include/util/log.h
     include/util/translationlayer.h
@@ -51,7 +62,9 @@ function(set_artie_can_compile_options target)
         target_compile_options(${target} PRIVATE /W4 /WX)
         # Ignore the following warnings:
         # C4100: unreferenced formal parameter (common in callback implementations)
+        # C4206: nonstandard extension used: translation unit is empty
         target_compile_options(${target} PRIVATE /wd4100)
+        target_compile_options(${target} PRIVATE /wd4206)
         # Disable warnings about unsafe functions like strncpy
         target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
     else()

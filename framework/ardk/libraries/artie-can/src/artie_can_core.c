@@ -252,6 +252,25 @@ static void* event_loop_thread_func(void* arg)
 #endif
 }
 
+artie_can_error_t artie_can_tick_isr(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context->protocol_flags == 0)
+    {
+        // No valid protocol configured
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    return handle->context->isr_handler(handle->context);
+}
+
 artie_can_error_t artie_can_start_event_loop(artie_can_backend_t *handle, uint32_t tick_interval_us)
 {
     if (handle == NULL)
