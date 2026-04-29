@@ -41,7 +41,7 @@ typedef struct {
     bool should_stop;                                       ///< Flag to signal the server thread to stop
     socket_t rx_fd;                                         ///< Socket file descriptor for receiving data from the client
     socket_t tx_fd;                                         ///< Socket file descriptor for sending data to the client
-    artie_can_rx_callback_t *rx_callback;                   ///< Callback function to call when a frame is received
+    artie_can_rx_callback_t rx_callback;                    ///< Callback function to call when a frame is received
     size_t num_nodes;                                       ///< The number of nodes in the TCP network (including this node)
     artie_can_tcp_addr_t address_mapping[ARTIE_CAN_MAX_TCP_NODES];    ///< Mapping of node IDs to TCP addresses
 } artie_can_tcp_context_t;

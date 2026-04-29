@@ -20,7 +20,7 @@ RTACP's purpose is to enable small messages that can meet hard real time require
 of this protocol are:
 
 * Strict real time: assuming reliable CAN wiring, any given single message using this protocol should reach
-  at least one target within 150 microseconds of transmit.
+  at least one target within 150 microseconds of transmit at a 500 kHz CAN bus.
 * Can broadcast or send to a single remote address.
 * In case of sending to a remote address (instead of a broadcast), we can guarantee receipt.
 * At most one CAN's frame worth of data payload (8 bytes maximum).
@@ -349,7 +349,7 @@ The ID field looks like this:
 
 ```
 [101] - specifies BWACP.
-[0xx1] - 0001: REPEAT, 0011: READY, 0111: DATA
+[0xx1] - 0001: REPEAT, 0011: READY, 0111: DATA, 0101: COMPLETE
 [pp] - 2 bits of user-assigned priority: LOW (11), MED-LOW (10), MED-HIGH (01), HIGH (00)
 [ssssss] - 6 bits of sender address, which must be unique among all nodes on the CAN bus
 [tttttt] - 6 bits of target address
@@ -362,16 +362,24 @@ The ID field looks like this:
 ```
 
 * *REPEAT frame 0xx1=0001*: This frame is sent at any time during a data transfer from any remote node
-  to indicate that either the last frame should be repeated or that the entire sequence should be repeated/restarted.
+  to indicate that the last frame should be repeated. If this is sent after a COMPLETE frame,
+  it indicates that the entire data write should be sent again.
 * *READY frame 0xx1=0011*: This frame is sent from a writing node to a single device (tttttt != 0x3F)
   or to a class of devices (tttttt = 0x3F, cccccc = Bit mask, see below) to initiate a data transfer.
   If this is sent with its interrupt bit set, it means all target nodes should discard the current block
-  transfer and restart on this frame.
+  transfer and restart on this frame. This may happen as a result of a receiver node sending back-to-back
+  REPEAT frames, and will usually happen after a cooldown period.
 * *DATA frame 0xx1=0111*: This frame is sent from a writing node to a single device or to a class of
   devices and contains up to 8 data bytes. If the repeat bit is set, it means this frame is a repeat
   of the last frame and should be discarded by any devices that did not send back a REPEAT on the last
   DATA frame. The parity bit should be set to 0 for the first DATA frame, then to 1, then back to 0,
   etc., and should be used by remote devices to determine if they have missed a frame.
+* *COMPLETE frame 0xx1=0101*: This frame is sent from a writing node to indicate the entire write is
+  complete and reciever nodes should now check their received bytes according to the CRC (see data section
+  below). If a receiver node finds that their data was not received properly, they should send a REPEAT
+  frame, which indicates that the entire write should be redone. The writing node must honor these
+  requests until a suitable cooldown has transpired, or until their BWACP state machine becomes tied
+  up with receiving or sending a different bulk write.
 
 Multicasting:
 
