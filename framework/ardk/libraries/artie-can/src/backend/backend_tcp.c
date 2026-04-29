@@ -310,7 +310,11 @@ static artie_can_error_t _init_tcp(artie_can_context_t *context)
 
 static artie_can_error_t _send_tcp(void *ctx, const artie_can_frame_t *frame)
 {
-    if (ctx == NULL || frame == NULL)
+    if (ctx == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (frame == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }

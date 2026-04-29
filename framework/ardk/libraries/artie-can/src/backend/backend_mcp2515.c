@@ -1,22 +1,38 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "backend.h"
+#include "backend_mcp2515_context.h"
 #include "backend_mcp2515.h"
+#include "driver_mcp2515.h"
 #include "err.h"
 
-static artie_can_error_t _init_mcp2515(void *ctx)
+static artie_can_error_t _init_mcp2515(artie_can_context_t *context)
 {
-    // TODO
+
     return ARTIE_CAN_ERR_NONE;
 }
 
 static artie_can_error_t _send_mcp2515(void *ctx, const artie_can_frame_t *frame)
 {
-    // TODO
+    if (ctx == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (frame == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+
+    // Cast context
+    artie_can_context_t *context = (artie_can_context_t *)context;
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+
+
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _close_mcp2515(void *ctx)
+static artie_can_error_t _close_mcp2515(artie_can_context_t *context)
 {
     // TODO
     return ARTIE_CAN_ERR_NONE;
@@ -35,6 +51,14 @@ artie_can_error_t mcp2515_init(artie_can_context_t *context, artie_can_backend_t
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
     else if (handle == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (rx_callback == NULL)
+    {
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (get_ms_fn == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
