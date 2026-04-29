@@ -111,13 +111,159 @@ static artie_can_error_t _read_instruction(artie_can_context_t *context, uint8_t
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _read_rx_buffer_instruction(artie_can_context_t *context, uint8_t *bytes_to_read, size_t nbytes)
+/** buffer index is either 0 or 1. start_at_id true means start reading from the SIDH portion, otherwise start reading at D0. After this instruction, the RXnIF is cleared. */
+static artie_can_error_t _read_rx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, bool start_at_id, uint8_t *bytes_to_read, size_t nbytes)
 {
-    // TODO
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+    // Pull CS low to select the device
+    artie_can_error_t err;
+    err = mcp2515_ctx->write_cs_pin(false);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Send the READ RX BUFFER instruction byte over SPI
+    uint8_t instruction_byte = MCP2515_INSTRUCTION_READ_RX_BUFFER | (buffer_index << 2) | ((uint8_t)start_at_id << 1);
+    err = mcp2515_ctx->write_byte(instruction_byte);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        // Pull CS high to deselect the device before returning
+        mcp2515_ctx->write_cs_pin(true);
+        return err;
+    }
+
+    // For each byte we want to read, read a byte from SPI and store it in the provided buffer
+    for (size_t i = 0; i < nbytes; i++)
+    {
+        // Send a dummy byte to clock the SPI bus
+        err = mcp2515_ctx->write_byte(0x00);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            // Pull CS high to deselect the device before returning
+            mcp2515_ctx->write_cs_pin(true);
+            return err;
+        }
+
+        // The byte read from SPI should have been inserted into the context pointer
+        // by the write_byte function, so we can just read it from there and put it in the output buffer.
+        bytes_to_read[i] = *(mcp2515_ctx->read_byte);
+    }
+
+    // Pull CS high to deselect the device (this also clears the RXnIF flag in the device)
+    err = mcp2515_ctx->write_cs_pin(true);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
     return ARTIE_CAN_ERR_NONE;
 }
 
-// TODO: Finish implementing the rest of the instructions
+static artie_can_error_t _write_instruction(artie_can_context_t *context, uint8_t start_addr, const uint8_t *bytes_to_write, size_t nbytes)
+{
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+    // Pull CS low to select the device
+    artie_can_error_t err;
+    err = mcp2515_ctx->write_cs_pin(false);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Send the WRITE instruction byte over SPI
+    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_WRITE);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        // Pull CS high to deselect the device before returning
+        mcp2515_ctx->write_cs_pin(true);
+        return err;
+    }
+
+    // Send the starting address byte over SPI
+    err = mcp2515_ctx->write_byte(start_addr);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        // Pull CS high to deselect the device before returning
+        mcp2515_ctx->write_cs_pin(true);
+        return err;
+    }
+
+    // For each byte we want to write, write the byte to SPI
+    for (size_t i = 0; i < nbytes; i++)
+    {
+        err = mcp2515_ctx->write_byte(bytes_to_write[i]);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            // Pull CS high to deselect the device before returning
+            // All bytes except this one will likely have been written.
+            mcp2515_ctx->write_cs_pin(true);
+            return err;
+        }
+    }
+
+    // Pull CS high to deselect the device
+    err = mcp2515_ctx->write_cs_pin(true);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+/** buffer_index is either 0, 1, or 2. start_at_id = true means start at SIDH otherwise D0. */
+static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, bool start_at_id, const uint8_t *bytes_to_write, size_t nbytes)
+{
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+    // Pull CS low to select the device
+    artie_can_error_t err;
+    err = mcp2515_ctx->write_cs_pin(false);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Send the LOAD TX BUFFER instruction byte over SPI
+    uint8_t instruction_byte = MCP2515_INSTRUCTION_LOAD_TX_BUFFER | (buffer_index << 2) | ((uint8_t)start_at_id << 1);
+    err = mcp2515_ctx->write_byte(instruction_byte);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        // Pull CS high to deselect the device before returning
+        mcp2515_ctx->write_cs_pin(true);
+        return err;
+    }
+
+    // For each byte we want to write, write the byte to SPI
+    for (size_t i = 0; i < nbytes; i++)
+    {
+        err = mcp2515_ctx->write_byte(bytes_to_write[i]);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            // Pull CS high to deselect the device before returning
+            // All bytes except this one will likely have been written.
+            mcp2515_ctx->write_cs_pin(true);
+            return err;
+        }
+    }
+
+    // Pull CS high to deselect the device
+    err = mcp2515_ctx->write_cs_pin(true);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+// TODO: Implement remaining instructions
 
 static artie_can_error_t _set_mode(artie_can_context_t *context, mcp2515_mode_t mode)
 {
