@@ -722,9 +722,15 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     // The prescaler bits need to be set so to: (((1/2) * ((1/16) * 2e-6)) * osc_freq) - 1
 
     // CNF3
-    // PHSEG[2:0] bits set the length (in time quanta) of t_ps2 if the BTLMODE bit (CNF2[7]) is set to 1
+    // PHSEG[2:0] bits set the length (in time quanta) of t_ps2 if the BTLMODE bit (CNF2[7]) is set to 1 (register value + 1 is the number of time quanta)
     //                                                no effect if the BTLMODE bit (CNF2[7]) is set to 0
     uint8_t cnf3_value = 0x00;
+    cnf3_value |= (0x05 & 0x07); // Set t_ps2 to 6 time quanta (we add 1 because the register value is one less than the number of time quanta)
+    err = _write_instruction(context, MCP2515_REG_CNF3, &cnf3_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // CNF2
     // PRSEG[2:0] bits set t_propseg in units of time quanta
@@ -733,6 +739,14 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     // BTLMODE bit controls how t_ps2 is determined. If 1, t_ps2 is determined by CNF3:PHSEG[2:0]
     //                                               If 0, t_ps2 is greater than t_ps1. I'm not sure what this means.
     uint8_t cnf2_value = 0x00;
+    cnf2_value |= 0x07; // Set t_propseg to 8 time quanta (value is register value + 1)
+    cnf2_value |= (0x00 << 3); // Set t_ps1 to 1 time quantum (value is register value + 1)
+    cnf2_value |= (0x01 << 7); // Set BTLMODE to 1 so that t_ps2 is determined by CNF3:PHSEG[2:0]
+    err = _write_instruction(context, MCP2515_REG_CNF2, &cnf2_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // CNF1 (baud rate prescaler)
     // BRP[5:0] bits control the baudrate prescaler. These bits set the length of Tq relative to the oscillator frequency.
@@ -749,10 +763,29 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     }
 
     // CANINTE
+    // The Artie CAN library requires the following interrupts:
+    // - RX buffer 0 full interrupt (RX0IE in CANINTE[0])
+    // - RX buffer 1 full interrupt (RX1IE in CANINTE[1])
+    // - Error interrupt flag (ERRIE in CANINTE[5])
+    // TODO: Decide if we want the TX interrupts
+    uint8_t caninte_value = 0x00;
+    caninte_value |= (1 << 0); // Enable RX buffer 0 full interrupt
+    caninte_value |= (1 << 1); // Enable RX buffer 1 full interrupt
+    caninte_value |= (1 << 5); // Enable error interrupt
+    err = _write_instruction(context, MCP2515_REG_CANINTE, &caninte_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // CANINTF
-
-    // EFLG
+    // Clear all interrupt flags to start with a clean slate
+    uint8_t canintf_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_CANINTF, &canintf_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // TXB0CTRL
 
@@ -790,6 +823,8 @@ artie_can_error_t driver_mcp2515_deinit(artie_can_context_t *context)
 artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
     // TODO
+
+    // Check the error flags on the device first to ensure we can actually send right now
 
     return ARTIE_CAN_ERR_NONE;
 }
