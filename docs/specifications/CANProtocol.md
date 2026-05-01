@@ -20,7 +20,7 @@ RTACP's purpose is to enable small messages that can meet hard real time require
 of this protocol are:
 
 * Strict real time: assuming reliable CAN wiring, any given single message using this protocol should reach
-  at least one target within 150 microseconds of transmit.
+  at least one target within 150 microseconds of transmit at a 500 kHz CAN bus.
 * Can broadcast or send to a single remote address.
 * In case of sending to a remote address (instead of a broadcast), we can guarantee receipt.
 * At most one CAN's frame worth of data payload (8 bytes maximum).
