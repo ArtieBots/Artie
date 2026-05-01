@@ -73,3 +73,14 @@ artie_can_error_t driver_mcp2515_receive(artie_can_context_t *context, artie_can
  * @return artie_can_error_t Error code indicating the result of the reset attempt.
  */
 artie_can_error_t driver_mcp2515_reset(artie_can_context_t *context);
+
+/**
+ * @brief The function we call when the microcontroller receives an interrupt from the MCP2515.
+ *
+ * @param context The Artie CAN context struct that is being used with this driver.
+ * @return artie_can_error_t Error code indicating the result of processing.
+ * If this function is called from within a greater ISR, this may be useful
+ * to the MCU. If this function is called directly from the hardware as the ISR,
+ * then this error code will not be returned to any caller.
+ */
+artie_can_error_t driver_mcp2515_isr(artie_can_context_t *context);

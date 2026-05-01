@@ -70,6 +70,7 @@ artie_can_error_t mcp2515_init(artie_can_context_t *context, artie_can_backend_t
     handle->context = context;
     handle->context->rx_callback = rx_callback;
     handle->get_ms = get_ms_fn;
+    handle->context->isr_handler = driver_mcp2515_isr;
 
     return ARTIE_CAN_ERR_NONE;
 }

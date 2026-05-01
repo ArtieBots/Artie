@@ -527,89 +527,38 @@ static artie_can_error_t _bit_modify_instruction(artie_can_context_t *context, u
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _get_mode(artie_can_context_t *context, mcp2515_mode_t *mode)
+static artie_can_error_t _write_byte_and_verify(artie_can_context_t *context, uint8_t addr, uint8_t data, uint8_t mask)
 {
-    // Read the CANSTAT register to determine the current mode (bits 7-5)
-    uint8_t read_byte;
-    artie_can_error_t err = _read_instruction(context, MCP2515_REG_CANSTAT, &read_byte, 1);
+    artie_can_error_t err;
+
+    // Write the data to the device
+    err = _write_instruction(context, addr, data, 1);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
-    // Get the mode from the CANSTAT register (bits 7-5)
-    uint8_t precast_mode = ((read_byte & 0xE0) >> 5);
-    if (precast_mode > MCP2515_MODE_CONFIGURATION)
+    // Read back the data from the device
+    uint8_t read_back_data;
+    err = _read_instruction(context, addr, &read_back_data, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
     {
-        // This should never happen since the mode bits should only ever be 0-4, but we'll check just in case.
+        return err;
+    }
+
+    // Verify that the read back data matches what we wrote (after applying the mask)
+    if ((read_back_data & mask) != (data & mask))
+    {
         return ARTIE_CAN_ERR_DRIVER;
     }
 
-    // Convert to the enum type and return via output parameter
-    *mode = (mcp2515_mode_t)precast_mode;
-
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _set_mode(artie_can_context_t *context, mcp2515_mode_t mode)
-{
-    // Check if the device is already in the requested mode
-    artie_can_error_t err;
-    mcp2515_mode_t current_mode;
-    err = _get_mode(context, &current_mode);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        return err;
-    }
-
-    // If we're already in the requested mode, do nothing
-    if (current_mode == mode)
-    {
-        return ARTIE_CAN_ERR_NONE;
-    }
-
-    // Otherwise, set the mode by writing to the CANCTRL register (bits 7-5)
-    uint8_t mode_bits = ((uint8_t)mode << 5) & 0xE0;
-    err = _bit_modify_instruction(context, MCP2515_REG_CANCTRL, 0xE0, mode_bits);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        return err;
-    }
-
-    return ARTIE_CAN_ERR_NONE;
-}
-
-artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
+static artie_can_error_t _configure_bfpctrl(artie_can_context_t *context, driver_mcp2515_config_t *config)
 {
     artie_can_error_t err;
 
-    // TODO
-
-    // Reset the device to ensure it's in a known state
-    err = _reset_instruction(context);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        return err;
-    }
-
-    return ARTIE_CAN_ERR_NONE;
-}
-
-artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp2515_config_t *config)
-{
-    artie_can_error_t err;
-
-    // Save the configuration to the context
-    // TODO
-
-    // Set device to configuration mode
-    err = _set_mode(context, MCP2515_MODE_CONFIGURATION);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        return err;
-    }
-
-    // Set the contents of BFPCTRL
     uint8_t bfpctrl_value = 0x00;
     if (config->bfp0_int_enabled)
     {
@@ -631,15 +580,13 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
         return err;
     }
 
-    // Set the contents of TXRTSCTRL (we do not make use of the RTS pins, so we'll just disable them)
-    uint8_t txrtsctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_TXRTSCTRL, &txrtsctrl_value, 1);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        return err;
-    }
+    return ARTIE_CAN_ERR_NONE;
+}
 
-    // Set the contents of CANCTRL
+static artie_can_error_t _configure_canctrl(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
     uint8_t canctrl_value = 0x00;
     canctrl_value |= ((uint8_t)config->mode << 5) & 0xE0; // Set the mode bits (bits 7-5)
     canctrl_value &= ~(1 << 4); // Do not abort any ongoing transmission
@@ -650,6 +597,28 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     {
         return err;
     }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_txrtsctrl(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
+    // Set the contents of TXRTSCTRL (we do not make use of the RTS pins, so we'll just disable them)
+    uint8_t txrtsctrl_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_TXRTSCTRL, &txrtsctrl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_bit_timing(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
 
     // CNF1 through 3 configure bit rate timing. All nodes on a CAN bus must have the same bit rate,
     // though their clocks are not necessarily the same.
@@ -762,6 +731,13 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
         return err;
     }
 
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_interrupts(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
     // CANINTE
     // The Artie CAN library requires the following interrupts:
     // - RX buffer 0 full interrupt (RX0IE in CANINTE[0])
@@ -787,21 +763,469 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
         return err;
     }
 
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_buffer_control_registers(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
+    // If we are configured to use RTACP, we will dedicate TX buffer 2 to RTACP messages and should set
+    // that buffer's priority bits accordingly. The other buffers will be used for all other protocols,
+    // so their priority bits can be set to the same value as one another.
+
     // TXB0CTRL
+    uint8_t txb0ctrl_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_TXB0CTRL, &txb0ctrl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // TXB1CTRL
+    uint8_t txb1ctrl_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_TXB1CTRL, &txb1ctrl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // TXB2CTRL
+    uint8_t txb2ctrl_value = 0x00;
+    if (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP)
+    {
+        // Set TX buffer 2 to have the highest priority since it's dedicated to RTACP messages
+        txb2ctrl_value |= 0x03;
+    }
+    else
+    {
+        // If we're not using RTACP, we can set all buffers to the same priority since they're all used for the same protocols
+        txb2ctrl_value |= 0x00;
+    }
 
-    // RXB0CTRL
+    // RXB0CTRL (set everything here to 0)
+    uint8_t rxb0ctrl_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_RXB0CTRL, &rxb0ctrl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // RXB1CTRL
+    uint8_t rxb1ctrl_value = 0x00;
+    err = _write_instruction(context, MCP2515_REG_RXB1CTRL, &rxb1ctrl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
-    // Set up CAN baudrate
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static void _get_two_highest_priority_filters(artie_can_context_t *context, uint32_t *filters_out)
+{
+    // We will set the filters based on the two highest priority protocols that are enabled in the context.
+    // The priority order is RTACP > RPCACP > PSACP > BWACP
+    // If only one protocol is enabled, both filters will be set to the same value.
+    // Additionally, we set the EIDE bit and address bits in the filters.
+
+    // First set the address bits and EIDE bit.
+    filters_out[0] = ((node_address << 8) & 0x0001F800) | (1 << 19);
+
+    // How many protocols are enabled?
+    size_t num_protocols_enabled = 0;
+    bool enabled_protocols_in_priority_order[5] = {false};
+    uint32_t filters[5] = {filters_out[0], filters_out[0], filters_out[0], filters_out[0], filters_out[0]};
+    if (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP)
+    {
+        num_protocols_enabled++;
+        enabled_protocols_in_priority_order[0] = true;
+        filters[0] |= 0x00000000; // 000 priority
+    }
+
+    if (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RPCACP)
+    {
+        num_protocols_enabled++;
+        enabled_protocols_in_priority_order[1] = true;
+        filters[1] |= 0x40000000; // 010 priority
+    }
+
+    if (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_PSACP)
+    {
+        num_protocols_enabled++;
+        enabled_protocols_in_priority_order[2] = true;
+        filters[2] |= 0x80000000; // 100 priority
+        enabled_protocols_in_priority_order[3] = true;
+        filters[3] |= 0xC0000000; // 110 priority; PSACP has two different priorities
+    }
+
+    if (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_BWACP)
+    {
+        num_protocols_enabled++;
+        enabled_protocols_in_priority_order[4] = true;
+        filters[4] |= 0xA0000000; // 101 priority
+    }
+
+    // Take the first 2 filters in priority order
+    size_t out_index = 0;
+    for (size_t i = 0; i < 5; i++)
+    {
+        if (enabled_protocols_in_priority_order[i])
+        {
+            filters_out[out_index] = filters[i];
+            out_index++;
+        }
+
+        if (out_index >= 2)
+        {
+            break;
+        }
+    }
+}
+
+static artie_can_error_t _write_filter_or_mask(artie_can_context_t *context, uint8_t start_addr, uint32_t filter_or_mask)
+{
+    artie_can_error_t err;
+
+    uint8_t sidh_value = (filter_or_mask & 0xFF000000) >> 24;
+    err = _write_instruction(context, start_addr + 0, &sidh_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    uint8_t sidl_value = (filter_or_mask & 0x00FF0000) >> 16;
+    err = _write_instruction(context, start_addr + 1, &sidl_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    uint8_t eid8_value = (filter_or_mask & 0x0000FF00) >> 8;
+    err = _write_instruction(context, start_addr + 2, &eid8_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    uint8_t eid0_value = (filter_or_mask & 0x000000FF) >> 0;
+    err = _write_instruction(context, start_addr + 3, &eid0_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_filters_rfx0(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
 
     // Initialize the filter bits based on node address and protocol flags in the context
+    // We filter based on which protocols we are configured to use (we only accept frames that
+    // are of a protocol that we are configured to use) and we filter based on target address
+    // so that we can ignore all messages not meant for us.
+    // However, the pub/sub address space is quite large. If we are configured to use pub/sub,
+    // we always accept all frames of any protocol that we are interested in, regardless of address.
+    uint32_t filter_mask = (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_PSACP) ? 0xE0000000 : 0xE001F800;
+    err = _write_filter_or_mask(context, MCP2515_REG_RXM0SIDH, filter_mask);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
-    // Configure interrupts
+    // RXF0 and RXF1 are the filter bits for RX buffer 0. We will set these based on the node address and protocol flags in the context.
+    // Since there are only two filters for RX buffer 0, we will use them to filter for the two highest priority protocols.
+    uint32_t filters[2] = {0, 0};
+    _get_two_highest_priority_filters(context, filters); // Also fills the address bits and EIDE bit, regardless of the protocol. If only one protocol is enabled, both filters are identical.
+    uint32_t filter_rxf0 = filters[0];
+    uint32_t filter_rxf1 = filters[1];
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF0SIDH, filter_rxf0);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF1SIDH, filter_rxf1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _configure_filters_rfx1(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
+    // Initialize the filter bits based on node address and protocol flags in the context
+    // We filter based on which protocols we are configured to use (we only accept frames that
+    // are of a protocol that we are configured to use) and we filter based on target address
+    // so that we can ignore all messages not meant for us.
+    // However, the pub/sub address space is quite large. If we are configured to use pub/sub,
+    // we always accept all frames of any protocol that we are interested in, regardless of address.
+    uint32_t filter_mask = (context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_PSACP) ? 0xE0000000 : 0xE001F800;
+
+    // If we are configured for every type of protocol, we don't have enough filters, so just accept all messages
+    // in this buffer.
+    if (context->protocol_flags == (ARTIE_CAN_PROTOCOL_FLAG_RTACP | ARTIE_CAN_PROTOCOL_FLAG_PSACP | ARTIE_CAN_PROTOCOL_FLAG_RPCACP | ARTIE_CAN_PROTOCOL_FLAG_BWACP))
+    {
+        filter_mask = 0x00000000;
+    }
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXM1SIDH, filter_mask);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // If we accept all messages, we are done
+    if (filter_mask == 0x00000000)
+    {
+        return ARTIE_CAN_ERR_NONE;
+    }
+
+    // Otherwise, we can configure our four available filters
+
+    // Lazy: find the highest priority protocol and set them all equal to that to begin with.
+    uint32_t filters[2] = {0, 0};
+    _get_two_highest_priority_filters(context, filters); // Also fills the address bits and EIDE bit, regardless of the protocol. If only one protocol is enabled, both filters are identical.
+    uint32_t filter_rxf2 = filters[0];
+    uint32_t filter_rxf3 = filters[0];
+    uint32_t filter_rxf4 = filters[0];
+    uint32_t filter_rxf5 = filters[0];
+
+    // Now filter on the other protocols, if available
+    artie_can_protocol_t protocols[4] = {ARTIE_CAN_PROTOCOL_FLAG_RTACP, ARTIE_CAN_PROTOCOL_FLAG_PSACP, ARTIE_CAN_PROTOCOL_FLAG_RPCACP, ARTIE_CAN_PROTOCOL_FLAG_BWACP};
+    uint32_t all_filters[4] = {filter_rxf2, filter_rxf3, filter_rxf4, filter_rxf5};
+    size_t filter_index = 0;
+    for (int i = 0; i < 4; i++)
+    {
+        if (context->protocol_flags & protocols[i])
+        {
+            switch (protocols[i])
+            {
+                case ARTIE_CAN_PROTOCOL_FLAG_RTACP:
+                    if (filter_index >= 4)
+                    {
+                        // This should never happen since we check for the case of all protocols being enabled above, but we'll check just in case.
+                        return ARTIE_CAN_ERR_INTERNAL;
+                    }
+                    all_filters[filter_index] &= ~(ARTIE_CAN_FRAME_ID_PROTOCOL_MASK);
+                    all_filters[filter_index] |= (ARTIE_CAN_RTACP_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+                    filter_index += 1;
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_PSACP:
+                    if (filter_index >= 3)
+                    {
+                        // This should never happen since we check for the case of all protocols being enabled above, but we'll check just in case.
+                        return ARTIE_CAN_ERR_INTERNAL;
+                    }
+                    // Takes up two filters (one high priority and one low priority)
+                    all_filters[filter_index] &= ~(ARTIE_CAN_FRAME_ID_PROTOCOL_MASK);
+                    all_filters[filter_index] |= (ARTIE_CAN_PSACP_HIGH_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+                    filter_index += 1;
+                    all_filters[filter_index] &= ~(ARTIE_CAN_FRAME_ID_PROTOCOL_MASK);
+                    all_filters[filter_index] |= (ARTIE_CAN_PSACP_LOW_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+                    filter_index += 1;
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_RPCACP:
+                    if (filter_index >= 4)
+                    {
+                        // This should never happen since we check for the case of all protocols being enabled above, but we'll check just in case.
+                        return ARTIE_CAN_ERR_INTERNAL;
+                    }
+                    all_filters[filter_index] &= ~(ARTIE_CAN_FRAME_ID_PROTOCOL_MASK);
+                    all_filters[filter_index] |= (ARTIE_CAN_RPCACP_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+                    filter_index += 1;
+                    break;
+                case ARTIE_CAN_PROTOCOL_FLAG_BWACP:
+                    if (filter_index >= 4)
+                    {
+                        // This should never happen since we check for the case of all protocols being enabled above, but we'll check just in case.
+                        return ARTIE_CAN_ERR_INTERNAL;
+                    }
+                    all_filters[filter_index] &= ~(ARTIE_CAN_FRAME_ID_PROTOCOL_MASK);
+                    all_filters[filter_index] |= (ARTIE_CAN_BWACP_PROTOCOL_ID) << ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+                    filter_index += 1;
+                    break;
+                default:
+                    return ARTIE_CAN_ERR_INTERNAL;
+            }
+        }
+    }
+
+    // Now write all four filters
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF2SIDH, all_filters[0]);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF3SIDH, all_filters[1]);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF4SIDH, all_filters[2]);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    err = _write_filter_or_mask(context, MCP2515_REG_RXF5SIDH, all_filters[3]);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _get_mode(artie_can_context_t *context, mcp2515_mode_t *mode)
+{
+    // Read the CANSTAT register to determine the current mode (bits 7-5)
+    uint8_t read_byte;
+    artie_can_error_t err = _read_instruction(context, MCP2515_REG_CANSTAT, &read_byte, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Get the mode from the CANSTAT register (bits 7-5)
+    uint8_t precast_mode = ((read_byte & 0xE0) >> 5);
+    if (precast_mode > MCP2515_MODE_CONFIGURATION)
+    {
+        // This should never happen since the mode bits should only ever be 0-4, but we'll check just in case.
+        return ARTIE_CAN_ERR_DRIVER;
+    }
+
+    // Convert to the enum type and return via output parameter
+    *mode = (mcp2515_mode_t)precast_mode;
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _set_mode(artie_can_context_t *context, mcp2515_mode_t mode)
+{
+    // Check if the device is already in the requested mode
+    artie_can_error_t err;
+    mcp2515_mode_t current_mode;
+    err = _get_mode(context, &current_mode);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // If we're already in the requested mode, do nothing
+    if (current_mode == mode)
+    {
+        return ARTIE_CAN_ERR_NONE;
+    }
+
+    // Otherwise, set the mode by writing to the CANCTRL register (bits 7-5)
+    uint8_t mode_bits = ((uint8_t)mode << 5) & 0xE0;
+    err = _bit_modify_instruction(context, MCP2515_REG_CANCTRL, 0xE0, mode_bits);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
+{
+    artie_can_error_t err;
+
+    // TODO
+
+    // Reset the device to ensure it's in a known state
+    err = _reset_instruction(context);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp2515_config_t *config)
+{
+    artie_can_error_t err;
+
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+    // Save the configuration to the context
+    // TODO
+
+    // Set device to configuration mode
+    err = _set_mode(context, MCP2515_MODE_CONFIGURATION);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set the contents of BFPCTRL
+    err = _configure_bfpctrl(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set the contents of TXRTSCTRL (we do not make use of the RTS pins, so we'll just disable them)
+    err = _configure_txrtsctrl(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set the contents of CANCTRL
+    err = _configure_canctrl(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set the contents of CNF1, CNF2, and CNF3 to configure the bit timing
+    err = _configure_bit_timing(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set up the interrupt configuration
+    err = _configure_interrupts(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set up the TX and RX buffer control registers
+    err = _configure_buffer_control_registers(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set up the filters for RFX0 (high priority buffer)
+    err = _configure_filters_rfx0(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
+    // Set up the filters for RFX1 (low priority buffer)
+    err = _configure_filters_rfx1(context, config);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // Switch to selected mode
     err = _set_mode(context, config->mode);
@@ -809,6 +1233,8 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     {
         return err;
     }
+
+    // TODO: Go back through this function and ensure that we verify each write.
 
     return ARTIE_CAN_ERR_NONE;
 }
@@ -825,6 +1251,37 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     // TODO
 
     // Check the error flags on the device first to ensure we can actually send right now
+
+    // Choose which TXBnCTRL register based on the frame protocol. We allocate TXB2 for
+    // RTACP frames (if this node is configured for RTACP). The other buffers are used
+    // for the other protocols.
+
+    // Check TXBnCTRL register
+
+    // Load TXBnSIDH
+
+    // Load TXBnSIDL, including the EXIDE bit
+
+    // Load TXBnEIDm
+
+    // Load TXBnDLC
+
+    // If data is present, load TXBnDm
+
+    // Send RTS instruction for the appropriate buffer
+
+    return ARTIE_CAN_ERR_NONE;
+}
+
+artie_can_error_t driver_mcp2515_isr(artie_can_context_t *context)
+{
+    // TODO
+
+    // Read the CANINTF register to determine which interrupt(s) occurred
+
+    // If it was a RX buffer full interrupt, read the frame from the appropriate RX buffer and call the receive callback with the frame data
+
+    // If it was an error interrupt, read the error flags from EFLG and return an appropriate error code
 
     return ARTIE_CAN_ERR_NONE;
 }
