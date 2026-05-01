@@ -670,7 +670,8 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     // t_ps1 is programmable from 1 to 8 time quanta
     // t_ps2 is programmable from 2 to 8 time quanta
     //
-    // The time quantum (Tq) is defined as ((2 * bit-rate-prescaler) / frequency of oscillator)
+    // The time quantum (Tq) is defined as:
+    //          Tq = 2 * (BRP[5:0] + 1) / oscillator frequency
     //
     // There is also a synchronization jump width (SJW), which is the resolution of lengthening or shortening
     // of PS1 or PS2 done as a result of resynchronization. We choose a base PS1 and PS2, and an SJW,
@@ -692,6 +693,33 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     // For Artie implementations, we require a CAN bus baudrate of 500 kHz.
     // The frequency of the oscillator is defined in the config struct. For most common MCP2515 breakout boards,
     //     the populated oscillator is 8 MHz.
+    // f_bit = 500,000
+    // t_bit = 1/500,000 = 2us = t_syncseg + t_propseg + t_ps1 + t_ps2
+    // 2us = (1 + t_propseg + t_ps1 + t_ps2)Tq
+    // (t_propseg + t_ps1) >= t_ps2
+    // 1Tq <= t_ps1 <= 8Tq
+    // 2Tq <= t_ps2 <= 8Tq
+    //
+    // It seems like we are free to choose how many Tq are in our 2us, so let's go with 16.
+    //
+    // 2us = 16Tq = (1 + t_propseg + t_ps1 + t_ps2)Tq
+    // 16 = (1 + t_propseg + t_ps1 + t_ps2)
+    //
+    // t_propseg should be the amount of delay introduced by wire length and hardware speed,
+    // the datasheet uses 2 Tq @ 500 ns per Tq, which is a full microsecond, or 8 Tq in our
+    // values.
+    // That gives us 8 more Tq to play with.
+    // The datasheet says the sampling occurs right after the PS1 segment of t_bit and that
+    // this should be at about 60-70% of t_bit. That means 1 + t_propseg + t_ps1 should equal
+    // 10. If t_propseg is 8, that means t_ps1 should be 1.
+    // That leaves 6 Tq for PS2.
+    // Putting it all together we have:
+    //
+    // PS2 should be set to 6
+    // PS1 should be set to 1
+    // PRSEG should be set to 8
+    //
+    // The prescaler bits need to be set so to: (((1/2) * ((1/16) * 2e-6)) * osc_freq) - 1
 
     // CNF3
     // PHSEG[2:0] bits set the length (in time quanta) of t_ps2 if the BTLMODE bit (CNF2[7]) is set to 1
@@ -710,6 +738,15 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
     // BRP[5:0] bits control the baudrate prescaler. These bits set the length of Tq relative to the oscillator frequency.
     //          Tq = 2 * (BRP[5:0] + 1) / oscillator frequency
     // SJW[1:0] bits select the SJW in terms of number of time quanta.
+    uint8_t cnf1_value = 0x00;
+    uint8_t brp_value = (int8_t)(((1.0/2.0) * ((1.0/16.0) * 2e-6) * config->oscillator_freq_hz) - 1);
+    cnf1_value |= (brp_value & 0x3F);
+    cnf1_value |= (0x01 << 6); // Set SJW to 2 time quanta
+    err = _write_instruction(context, MCP2515_REG_CNF1, &cnf1_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // CANINTE
 
