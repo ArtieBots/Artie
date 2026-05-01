@@ -283,8 +283,8 @@ static artie_can_error_t _write_instruction(artie_can_context_t *context, uint8_
     return ARTIE_CAN_ERR_NONE;
 }
 
-/** buffer_index is either 0, 1, or 2. start_at_id = true means start at SIDH otherwise D0. */
-static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, bool start_at_id, const uint8_t *bytes_to_write, size_t nbytes)
+/** buffer_index is either 0, 1, or 2. */
+static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, const uint8_t *bytes_to_write, size_t nbytes)
 {
     // Cast context
     artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
@@ -297,8 +297,8 @@ static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *contex
         return err;
     }
 
-    // Send the LOAD TX BUFFER instruction byte over SPI
-    uint8_t instruction_byte = MCP2515_INSTRUCTION_LOAD_TX_BUFFER | (buffer_index << 2) | ((uint8_t)start_at_id << 1);
+    // Send the LOAD TX BUFFER instruction byte over SPI; start at SIDH
+    uint8_t instruction_byte = MCP2515_INSTRUCTION_LOAD_TX_BUFFER | (buffer_index << 2) | ((uint8_t)1 << 1);
     err = mcp2515_ctx->write_byte(instruction_byte);
     if (err != ARTIE_CAN_ERR_NONE)
     {
@@ -574,7 +574,8 @@ static artie_can_error_t _configure_bfpctrl(artie_can_context_t *context, driver
         bfpctrl_value |= (1 << 3);
     }
 
-    err = _write_instruction(context, MCP2515_REG_BFPCTRL, &bfpctrl_value, 1);
+    // Set the contents of BFPCTRL and compare all 6 bits of the register.
+    err = _write_byte_and_verify(context, MCP2515_REG_BFPCTRL, bfpctrl_value, 0x3F);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -592,7 +593,9 @@ static artie_can_error_t _configure_canctrl(artie_can_context_t *context, driver
     canctrl_value &= ~(1 << 4); // Do not abort any ongoing transmission
     canctrl_value &= ~(1 << 3); // No one-shot mode
     canctrl_value &= ~(1 << 2); // Disable CLKOUT pin
-    err = _write_instruction(context, MCP2515_REG_CANCTRL, &canctrl_value, 1);
+
+    // Set the contents of CANCTRL
+    err = _write_byte_and_verify(context, MCP2515_REG_CANCTRL, canctrl_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -607,7 +610,7 @@ static artie_can_error_t _configure_txrtsctrl(artie_can_context_t *context, driv
 
     // Set the contents of TXRTSCTRL (we do not make use of the RTS pins, so we'll just disable them)
     uint8_t txrtsctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_TXRTSCTRL, &txrtsctrl_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_TXRTSCTRL, txrtsctrl_value, 0x07);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -695,7 +698,7 @@ static artie_can_error_t _configure_bit_timing(artie_can_context_t *context, dri
     //                                                no effect if the BTLMODE bit (CNF2[7]) is set to 0
     uint8_t cnf3_value = 0x00;
     cnf3_value |= (0x05 & 0x07); // Set t_ps2 to 6 time quanta (we add 1 because the register value is one less than the number of time quanta)
-    err = _write_instruction(context, MCP2515_REG_CNF3, &cnf3_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_CNF3, cnf3_value, 0xC7);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -711,7 +714,7 @@ static artie_can_error_t _configure_bit_timing(artie_can_context_t *context, dri
     cnf2_value |= 0x07; // Set t_propseg to 8 time quanta (value is register value + 1)
     cnf2_value |= (0x00 << 3); // Set t_ps1 to 1 time quantum (value is register value + 1)
     cnf2_value |= (0x01 << 7); // Set BTLMODE to 1 so that t_ps2 is determined by CNF3:PHSEG[2:0]
-    err = _write_instruction(context, MCP2515_REG_CNF2, &cnf2_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_CNF2, cnf2_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -725,7 +728,7 @@ static artie_can_error_t _configure_bit_timing(artie_can_context_t *context, dri
     uint8_t brp_value = (int8_t)(((1.0/2.0) * ((1.0/16.0) * 2e-6) * config->oscillator_freq_hz) - 1);
     cnf1_value |= (brp_value & 0x3F);
     cnf1_value |= (0x01 << 6); // Set SJW to 2 time quanta
-    err = _write_instruction(context, MCP2515_REG_CNF1, &cnf1_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_CNF1, cnf1_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -748,7 +751,7 @@ static artie_can_error_t _configure_interrupts(artie_can_context_t *context, dri
     caninte_value |= (1 << 0); // Enable RX buffer 0 full interrupt
     caninte_value |= (1 << 1); // Enable RX buffer 1 full interrupt
     caninte_value |= (1 << 5); // Enable error interrupt
-    err = _write_instruction(context, MCP2515_REG_CANINTE, &caninte_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_CANINTE, caninte_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -756,6 +759,7 @@ static artie_can_error_t _configure_interrupts(artie_can_context_t *context, dri
 
     // CANINTF
     // Clear all interrupt flags to start with a clean slate
+    // Don't read back for verification.
     uint8_t canintf_value = 0x00;
     err = _write_instruction(context, MCP2515_REG_CANINTF, &canintf_value, 1);
     if (err != ARTIE_CAN_ERR_NONE)
@@ -776,7 +780,7 @@ static artie_can_error_t _configure_buffer_control_registers(artie_can_context_t
 
     // TXB0CTRL
     uint8_t txb0ctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_TXB0CTRL, &txb0ctrl_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_TXB0CTRL, txb0ctrl_value, 0x0B);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -784,7 +788,7 @@ static artie_can_error_t _configure_buffer_control_registers(artie_can_context_t
 
     // TXB1CTRL
     uint8_t txb1ctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_TXB1CTRL, &txb1ctrl_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_TXB1CTRL, txb1ctrl_value, 0x0B);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -802,10 +806,15 @@ static artie_can_error_t _configure_buffer_control_registers(artie_can_context_t
         // If we're not using RTACP, we can set all buffers to the same priority since they're all used for the same protocols
         txb2ctrl_value |= 0x00;
     }
+    err = _write_byte_and_verify(context, MCP2515_REG_TXB2CTRL, txb2ctrl_value, 0x0B);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // RXB0CTRL (set everything here to 0)
     uint8_t rxb0ctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_RXB0CTRL, &rxb0ctrl_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_RXB0CTRL, rxb0ctrl_value, 0x64);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -813,7 +822,7 @@ static artie_can_error_t _configure_buffer_control_registers(artie_can_context_t
 
     // RXB1CTRL
     uint8_t rxb1ctrl_value = 0x00;
-    err = _write_instruction(context, MCP2515_REG_RXB1CTRL, &rxb1ctrl_value, 1);
+    err = _write_byte_and_verify(context, MCP2515_REG_RXB1CTRL, rxb1ctrl_value, 0x60);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -888,28 +897,28 @@ static artie_can_error_t _write_filter_or_mask(artie_can_context_t *context, uin
     artie_can_error_t err;
 
     uint8_t sidh_value = (filter_or_mask & 0xFF000000) >> 24;
-    err = _write_instruction(context, start_addr + 0, &sidh_value, 1);
+    err = _write_byte_and_verify(context, start_addr + 0, sidh_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     uint8_t sidl_value = (filter_or_mask & 0x00FF0000) >> 16;
-    err = _write_instruction(context, start_addr + 1, &sidl_value, 1);
+    err = _write_byte_and_verify(context, start_addr + 1, sidl_value, 0xEB);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     uint8_t eid8_value = (filter_or_mask & 0x0000FF00) >> 8;
-    err = _write_instruction(context, start_addr + 2, &eid8_value, 1);
+    err = _write_byte_and_verify(context, start_addr + 2, eid8_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     uint8_t eid0_value = (filter_or_mask & 0x000000FF) >> 0;
-    err = _write_instruction(context, start_addr + 3, &eid0_value, 1);
+    err = _write_byte_and_verify(context, start_addr + 3, eid0_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -1234,8 +1243,6 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
         return err;
     }
 
-    // TODO: Go back through this function and ensure that we verify each write.
-
     return ARTIE_CAN_ERR_NONE;
 }
 
@@ -1250,6 +1257,22 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
 {
     // TODO
 
+    // Transfer the frame into an array of bytes in the format expected by the MCP2515 (SIDH, SIDL, EID8, EID0, DLC, data bytes)
+    uint8_t frame_buffer[13] = {0}; // 4 bytes for ID, 1 byte for DLC, and 8 bytes for data
+    frame_buffer[0] = (uint8_t)(frame->id >> 21); // SIDH: bits 28-21
+    frame_buffer[1] = (uint8_t)(((frame->id >> 18) & 0x07) << 5) | // SIDL: bits 20-18 (SID2-0)
+                      (1 << 3) | // EXIDE bit (must be 1 for extended IDs)
+                      (uint8_t)((frame->id >> 16) & 0x03); // EID17-16
+    frame_buffer[2] = (uint8_t)(frame->id >> 8); // EID15-8
+    frame_buffer[3] = (uint8_t)(frame->id); // EID7-0
+    frame_buffer[4] = frame->dlc & 0x0F; // DLC: bits 3-0
+
+    // Copy data bytes into the frame buffer
+    for (uint8_t i = 0; i < frame->dlc && i < ARTIE_CAN_FRAME_MAX_DATA_LENGTH; i++)
+    {
+        frame_buffer[5 + i] = frame->data[i];
+    }
+
     // Check the error flags on the device first to ensure we can actually send right now
 
     // Choose which TXBnCTRL register based on the frame protocol. We allocate TXB2 for
@@ -1257,14 +1280,6 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     // for the other protocols.
 
     // Check TXBnCTRL register
-
-    // Load TXBnSIDH
-
-    // Load TXBnSIDL, including the EXIDE bit
-
-    // Load TXBnEIDm
-
-    // Load TXBnDLC
 
     // If data is present, load TXBnDm
 
