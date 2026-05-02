@@ -6,6 +6,18 @@
 #include "context.h"
 #include "err.h"
 
+/** Bits from the EFLG register. */
+typedef enum {
+    MCP2515_EFLG_EWARN = (1 << 0),
+    MCP2515_EFLG_RXWAR = (1 << 1),
+    MCP2515_EFLG_TXWAR = (1 << 2),
+    MCP2515_EFLG_RXEP  = (1 << 3),
+    MCP2515_EFLG_TXEP  = (1 << 4),
+    MCP2515_EFLG_TXBO  = (1 << 5),
+    MCP2515_EFLG_RX0OVR = (1 << 6),
+    MCP2515_EFLG_RX1OVR = (1 << 7)
+} mcp2515_err_flags_t;
+
 /** Painstakingly not AI-generated register addresses copied from the datasheet. */
 typedef enum {
     MCP2515_REG_RXF0SIDH  = 0x00, MCP2515_REG_RXF3SIDH = 0x10, MCP2515_REG_RXM0SIDH = 0x20, MCP2515_REG_TXB0CTRL = 0x30, MCP2515_REG_TXB1CTRL = 0x40, MCP2515_REG_TXB2CTRL = 0x50, MCP2515_REG_RXB0CTRL = 0x60, MCP2515_REG_RXB1CTRL = 0x70,
@@ -1147,6 +1159,12 @@ static artie_can_error_t _set_mode(artie_can_context_t *context, mcp2515_mode_t 
     return ARTIE_CAN_ERR_NONE;
 }
 
+/** Find the next available TX buffer to use, starting at start_buffer_index and decrementing until we find one that is not full. */
+static artie_can_error_t _find_next_available_tx_buffer(artie_can_context_t *context, uint8_t start_buffer_index, uint8_t *buffer_index_out)
+{
+
+}
+
 artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
 {
     artie_can_error_t err;
@@ -1255,7 +1273,7 @@ artie_can_error_t driver_mcp2515_deinit(artie_can_context_t *context)
 
 artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
-    // TODO
+    artie_can_error_t err;
 
     // Transfer the frame into an array of bytes in the format expected by the MCP2515 (SIDH, SIDL, EID8, EID0, DLC, data bytes)
     uint8_t frame_buffer[13] = {0}; // 4 bytes for ID, 1 byte for DLC, and 8 bytes for data
@@ -1268,22 +1286,64 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     frame_buffer[4] = frame->dlc & 0x0F; // DLC: bits 3-0
 
     // Copy data bytes into the frame buffer
-    for (uint8_t i = 0; i < frame->dlc && i < ARTIE_CAN_FRAME_MAX_DATA_LENGTH; i++)
+    for (uint8_t i = 0; (i < frame->dlc) && (i < ARTIE_CAN_FRAME_MAX_DATA_LENGTH); i++)
     {
         frame_buffer[5 + i] = frame->data[i];
     }
 
     // Check the error flags on the device first to ensure we can actually send right now
+    uint8_t error_flags;
+    err = _read_instruction(context, MCP2515_REG_EFLG, &error_flags, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+    else if (error_flags & (uint8_t)(MCP2515_EFLG_TXBO | MCP2515_EFLG_TXEP))
+    {
+        return ARTIE_CAN_ERR_SEND_FAIL;
+    }
 
     // Choose which TXBnCTRL register based on the frame protocol. We allocate TXB2 for
     // RTACP frames (if this node is configured for RTACP). The other buffers are used
     // for the other protocols.
+    uint8_t buffer_index = -1;
+    if ((frame->id & ARTIE_CAN_FRAME_ID_PROTOCOL_MASK == ARTIE_CAN_RTACP_PROTOCOL_ID) || ((context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP) == 0))
+    {
+        // This is an RTACP frame OR we aren't configured to send RTACP (and therefore don't need to reserve TXB2), so we use TXB2
+        // Check if TXB2 is free by reading the TXB2CTRL register and checking the TXREQ bit
+        // If it's not free, opt for the next one in line, etc. Return busy error if all buffers are full.
+        err = _find_next_available_tx_buffer(context, 2, &buffer_index);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
+    }
+    else
+    {
+        // This is not an RTACP frame, so we can use either TXB0 or TXB1. We'll use TXB0 if it's free and TXB1 otherwise.
+        // Check if TXB0 is free by reading the TXB0CTRL register and checking the TXREQ bit
+        // If it's free, use TXB0. If it's not free, check if TXB1 is free by reading the TXB1CTRL register and checking the TXREQ bit
+        // If TXB1 is free, use TXB1. If neither buffer is free, return an error.
+        err = _find_next_available_tx_buffer(context, 1, &buffer_index);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
+    }
 
-    // Check TXBnCTRL register
-
-    // If data is present, load TXBnDm
+    // Load the frame buffer into the appropriate TX buffer's registers using the LOAD TX BUFFER instruction
+    err = _load_tx_buffer_instruction(context, buffer_index, frame_buffer, ARRAY_LENGTH(frame_buffer));
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     // Send RTS instruction for the appropriate buffer
+    err = _rts_instruction(context, buffer_index);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
     return ARTIE_CAN_ERR_NONE;
 }
