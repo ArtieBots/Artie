@@ -12,7 +12,7 @@
 /** Maximum bytes in a single frame's data field */
 #define ARTIE_CAN_FRAME_MAX_DATA_LENGTH 8U
 
-/** Length of the CAN ID in bits */
+/** Length of the CAN ID in bits; we use the least significant 29 bits of a uint32_t */
 #define ARTIE_CAN_FRAME_ID_LENGTH (29U)
 
 /** Location of the protocol bits in the CAN ID */

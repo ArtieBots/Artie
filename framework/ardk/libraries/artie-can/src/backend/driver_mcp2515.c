@@ -5,6 +5,22 @@
 #include "driver_mcp2515.h"
 #include "context.h"
 #include "err.h"
+#include "psacp.h"
+#include "rpcacp.h"
+#include "bwacp.h"
+#include "rtacp.h"
+
+/** Bits from the CANINTF register. */
+typedef enum {
+    MCP2515_CANINTF_RX0IF = (1 << 0),
+    MCP2515_CANINTF_RX1IF = (1 << 1),
+    MCP2515_CANINTF_TX0IF = (1 << 2),
+    MCP2515_CANINTF_TX1IF = (1 << 3),
+    MCP2515_CANINTF_TX2IF = (1 << 4),
+    MCP2515_CANINTF_ERRIF = (1 << 5),
+    MCP2515_CANINTF_WAKIF = (1 << 6),
+    MCP2515_CANINTF_MERRF = (1 << 7)
+} mcp2515_canintf_flags_t;
 
 /** Bits from the EFLG register. */
 typedef enum {
@@ -85,15 +101,6 @@ typedef struct {
     uint8_t tx_buffer0_request_flag;   //< TXREQ (TXB0CNTRL[3])
 } mcp2515_status_t;
 
-/** Modes the MCP2515 can be in. */
-typedef enum {
-    MCP2515_MODE_NORMAL = 0,
-    MCP2515_MODE_SLEEP = 1,
-    MCP2515_MODE_LOOPBACK = 2,
-    MCP2515_MODE_LISTEN_ONLY = 3,
-    MCP2515_MODE_CONFIGURATION = 4,
-} mcp2515_mode_t;
-
 /** The available SPI instructions. Instructions are one byte each. See Table 12.1 in the datasheet. */
 typedef enum {
     MCP2515_INSTRUCTION_RESET = 0xC0,
@@ -115,23 +122,23 @@ static artie_can_error_t _reset_instruction(artie_can_context_t *context)
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the RESET instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_RESET);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_RESET);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -148,18 +155,18 @@ static artie_can_error_t _read_instruction(artie_can_context_t *context, uint8_t
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the READ instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_READ);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_READ);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
@@ -167,21 +174,21 @@ static artie_can_error_t _read_instruction(artie_can_context_t *context, uint8_t
     for (size_t i = 0; i < nbytes; i++)
     {
         // Send a dummy byte to clock the SPI bus
-        err = mcp2515_ctx->write_byte(0x00);
+        err = mcp2515_ctx->write_byte(context, 0x00);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             // Pull CS high to deselect the device before returning
-            mcp2515_ctx->write_cs_pin(true);
+            mcp2515_ctx->write_cs_pin(context, true);
             return err;
         }
 
         // The byte read from SPI should have been inserted into the context pointer
         // by the write_byte function, so we can just read it from there and put it in the output buffer.
-        bytes_to_read[i] = *(mcp2515_ctx->read_byte);
+        bytes_to_read[i] = mcp2515_ctx->read_byte;
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -190,27 +197,27 @@ static artie_can_error_t _read_instruction(artie_can_context_t *context, uint8_t
     return ARTIE_CAN_ERR_NONE;
 }
 
-/** buffer index is either 0 or 1. start_at_id true means start reading from the SIDH portion, otherwise start reading at D0. After this instruction, the RXnIF is cleared. */
-static artie_can_error_t _read_rx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, bool start_at_id, uint8_t *bytes_to_read, size_t nbytes)
+/** buffer index is either 0 or 1. After this instruction, the RXnIF is cleared. */
+static artie_can_error_t _read_rx_buffer_instruction(artie_can_context_t *context, uint8_t buffer_index, uint8_t *bytes_to_read, size_t nbytes)
 {
     // Cast context
     artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
-    // Send the READ RX BUFFER instruction byte over SPI
-    uint8_t instruction_byte = MCP2515_INSTRUCTION_READ_RX_BUFFER | (buffer_index << 2) | ((uint8_t)start_at_id << 1);
-    err = mcp2515_ctx->write_byte(instruction_byte);
+    // Send the READ RX BUFFER instruction byte over SPI; start at SIDH
+    uint8_t instruction_byte = MCP2515_INSTRUCTION_READ_RX_BUFFER | (buffer_index << 2) | (1 << 1);
+    err = mcp2515_ctx->write_byte(context, instruction_byte);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
@@ -218,21 +225,21 @@ static artie_can_error_t _read_rx_buffer_instruction(artie_can_context_t *contex
     for (size_t i = 0; i < nbytes; i++)
     {
         // Send a dummy byte to clock the SPI bus
-        err = mcp2515_ctx->write_byte(0x00);
+        err = mcp2515_ctx->write_byte(context, 0x00);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             // Pull CS high to deselect the device before returning
-            mcp2515_ctx->write_cs_pin(true);
+            mcp2515_ctx->write_cs_pin(context, true);
             return err;
         }
 
         // The byte read from SPI should have been inserted into the context pointer
         // by the write_byte function, so we can just read it from there and put it in the output buffer.
-        bytes_to_read[i] = *(mcp2515_ctx->read_byte);
+        bytes_to_read[i] = mcp2515_ctx->read_byte;
     }
 
     // Pull CS high to deselect the device (this also clears the RXnIF flag in the device)
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -248,45 +255,45 @@ static artie_can_error_t _write_instruction(artie_can_context_t *context, uint8_
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the WRITE instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_WRITE);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_WRITE);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send the starting address byte over SPI
-    err = mcp2515_ctx->write_byte(start_addr);
+    err = mcp2515_ctx->write_byte(context, start_addr);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // For each byte we want to write, write the byte to SPI
     for (size_t i = 0; i < nbytes; i++)
     {
-        err = mcp2515_ctx->write_byte(bytes_to_write[i]);
+        err = mcp2515_ctx->write_byte(context, bytes_to_write[i]);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             // Pull CS high to deselect the device before returning
             // All bytes except this one will likely have been written.
-            mcp2515_ctx->write_cs_pin(true);
+            mcp2515_ctx->write_cs_pin(context,true);
             return err;
         }
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -303,7 +310,7 @@ static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *contex
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -311,29 +318,29 @@ static artie_can_error_t _load_tx_buffer_instruction(artie_can_context_t *contex
 
     // Send the LOAD TX BUFFER instruction byte over SPI; start at SIDH
     uint8_t instruction_byte = MCP2515_INSTRUCTION_LOAD_TX_BUFFER | (buffer_index << 2) | ((uint8_t)1 << 1);
-    err = mcp2515_ctx->write_byte(instruction_byte);
+    err = mcp2515_ctx->write_byte(context, instruction_byte);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // For each byte we want to write, write the byte to SPI
     for (size_t i = 0; i < nbytes; i++)
     {
-        err = mcp2515_ctx->write_byte(bytes_to_write[i]);
+        err = mcp2515_ctx->write_byte(context, bytes_to_write[i]);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             // Pull CS high to deselect the device before returning
             // All bytes except this one will likely have been written.
-            mcp2515_ctx->write_cs_pin(true);
+            mcp2515_ctx->write_cs_pin(context, true);
             return err;
         }
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -350,7 +357,7 @@ static artie_can_error_t _rts_instruction(artie_can_context_t *context, uint8_t 
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -358,16 +365,16 @@ static artie_can_error_t _rts_instruction(artie_can_context_t *context, uint8_t 
 
     // Send the RTS instruction byte over SPI
     uint8_t instruction_byte = MCP2515_INSTRUCTION_RTS | (buffer_mask & 0x07);
-    err = mcp2515_ctx->write_byte(instruction_byte);
+    err = mcp2515_ctx->write_byte(context, instruction_byte);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -377,40 +384,40 @@ static artie_can_error_t _rts_instruction(artie_can_context_t *context, uint8_t 
 }
 
 /** Read the status byte. See Section 12.8 of the datasheet. */
-static artie_can_error_t _read_status_instruction(artie_can_context_t *context, mctp_2515_status_t *status)
+static artie_can_error_t _read_status_instruction(artie_can_context_t *context, mcp2515_status_t *status)
 {
     // Cast context
     artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the READ STATUS instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_READ_STATUS);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_READ_STATUS);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send a dummy byte to clock the SPI bus and read the status byte
-    err = mcp2515_ctx->write_byte(0x00);
+    err = mcp2515_ctx->write_byte(context, 0x00);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // The byte read from SPI should have been inserted into the context pointer
     // by the write_byte function, so we can just read it from there and put it in the output struct.
-    uint8_t read_byte = *(mcp2515_ctx->read_byte);
+    uint8_t read_byte = mcp2515_ctx->read_byte;
     status->rx_buffer0_interrupt_flag = (read_byte >> 0) & 0x01;
     status->rx_buffer1_interrupt_flag = (read_byte >> 1) & 0x01;
     status->tx_buffer0_request_flag = (read_byte >> 2) & 0x01;
@@ -421,7 +428,7 @@ static artie_can_error_t _read_status_instruction(artie_can_context_t *context, 
     status->tx_buffer2_interrupt_flag= (read_byte >> 7) & 0x01;
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -438,39 +445,39 @@ static artie_can_error_t _rx_status_instruction(artie_can_context_t *context, mc
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the RX STATUS instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_RX_STATUS);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_RX_STATUS);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send a dummy byte to clock the SPI bus and read the status byte
-    err = mcp2515_ctx->write_byte(0x00);
+    err = mcp2515_ctx->write_byte(context, 0x00);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // The byte read from SPI should have been inserted into the context pointer
     // by the write_byte function, so we can just read it from there and put it in the output buffer.
-    uint8_t read_byte = *(mcp2515_ctx->read_byte);
+    uint8_t read_byte = mcp2515_ctx->read_byte;
     status->filter_match = (mcp2515_filter_match_t)(read_byte & 0x07);
     status->message_type_received = (mcp2515_message_type_t)((read_byte & 0x18) >> 3);
     status->rx_buffer = (mcp2515_rx_buffer_t)((read_byte & 0xC0) >> 6);
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -487,50 +494,50 @@ static artie_can_error_t _bit_modify_instruction(artie_can_context_t *context, u
 
     // Pull CS low to select the device
     artie_can_error_t err;
-    err = mcp2515_ctx->write_cs_pin(false);
+    err = mcp2515_ctx->write_cs_pin(context, false);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
     // Send the BIT MODIFY instruction byte over SPI
-    err = mcp2515_ctx->write_byte(MCP2515_INSTRUCTION_BIT_MODIFY);
+    err = mcp2515_ctx->write_byte(context, MCP2515_INSTRUCTION_BIT_MODIFY);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send the address byte over SPI
-    err = mcp2515_ctx->write_byte(addr);
+    err = mcp2515_ctx->write_byte(context, addr);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send the mask byte over SPI
-    err = mcp2515_ctx->write_byte(mask);
+    err = mcp2515_ctx->write_byte(context, mask);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Send the data byte over SPI
-    err = mcp2515_ctx->write_byte(data);
+    err = mcp2515_ctx->write_byte(context, data);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         // Pull CS high to deselect the device before returning
-        mcp2515_ctx->write_cs_pin(true);
+        mcp2515_ctx->write_cs_pin(context, true);
         return err;
     }
 
     // Pull CS high to deselect the device
-    err = mcp2515_ctx->write_cs_pin(true);
+    err = mcp2515_ctx->write_cs_pin(context, true);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -758,7 +765,6 @@ static artie_can_error_t _configure_interrupts(artie_can_context_t *context, dri
     // - RX buffer 0 full interrupt (RX0IE in CANINTE[0])
     // - RX buffer 1 full interrupt (RX1IE in CANINTE[1])
     // - Error interrupt flag (ERRIE in CANINTE[5])
-    // TODO: Decide if we want the TX interrupts
     uint8_t caninte_value = 0x00;
     caninte_value |= (1 << 0); // Enable RX buffer 0 full interrupt
     caninte_value |= (1 << 1); // Enable RX buffer 1 full interrupt
@@ -851,7 +857,7 @@ static void _get_two_highest_priority_filters(artie_can_context_t *context, uint
     // Additionally, we set the EIDE bit and address bits in the filters.
 
     // First set the address bits and EIDE bit.
-    filters_out[0] = ((node_address << 8) & 0x0001F800) | (1 << 19);
+    filters_out[0] = ((context->node_address << 8) & 0x0001F800) | (1 << 19);
 
     // How many protocols are enabled?
     size_t num_protocols_enabled = 0;
@@ -1162,14 +1168,90 @@ static artie_can_error_t _set_mode(artie_can_context_t *context, mcp2515_mode_t 
 /** Find the next available TX buffer to use, starting at start_buffer_index and decrementing until we find one that is not full. */
 static artie_can_error_t _find_next_available_tx_buffer(artie_can_context_t *context, uint8_t start_buffer_index, uint8_t *buffer_index_out)
 {
+    artie_can_error_t err;
 
+    // Check each buffer's control register to see if it's available (TXREQ bit is 0)
+    for (int i = (int)start_buffer_index; i >= 0; i--)
+    {
+        uint8_t txbctrl_reg;
+        switch (i)
+        {
+            case 0:
+                txbctrl_reg = MCP2515_REG_TXB0CTRL;
+                break;
+            case 1:
+                txbctrl_reg = MCP2515_REG_TXB1CTRL;
+                break;
+            case 2:
+                txbctrl_reg = MCP2515_REG_TXB2CTRL;
+                break;
+            default:
+                return ARTIE_CAN_ERR_INTERNAL;
+        }
+
+        uint8_t txbctrl_value;
+        err = _read_instruction(context, txbctrl_reg, &txbctrl_value, 1);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
+
+        // If the TXREQ bit is 0, the buffer is available
+        if ((txbctrl_value & (1 << 3)) == 0)
+        {
+            *buffer_index_out = (uint8_t)i;
+            return ARTIE_CAN_ERR_NONE;
+        }
+    }
+
+    // If we get here, all buffers are full
+    return ARTIE_CAN_ERR_SEND_BUSY;
+}
+
+/** Handle a received frame from an ISR context. The frame should be in the backend receive buffer. */
+static void _handle_received_frame_from_isr(artie_can_context_t *context)
+{
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
+    // Create a frame on the stack, pulling the bits into the right places
+    artie_can_frame_t received_frame = {
+        .id = ((uint32_t)mcp2515_ctx->rx_buffer[0] << 21) |             // SIDH
+              (((uint32_t)mcp2515_ctx->rx_buffer[1] & 0xE0) << 13) |    // SIDL[7:5]
+              (((uint32_t)mcp2515_ctx->rx_buffer[1] & 0x03) << 16) |    // SIDL[1:0]
+              ((uint32_t)mcp2515_ctx->rx_buffer[2] << 8) |              // EID8
+              ((uint32_t)mcp2515_ctx->rx_buffer[3]),                    // EID0
+        .dlc = mcp2515_ctx->rx_buffer[4] & 0x0F,
+        .data = {0},
+     };
+
+    // Copy all data bytes into the frame's data array, regardless of dlc. We always read all 13 registers.
+    // If we don't need that data, we just won't use it. This can be helpful for debugging.
+    for (uint8_t i = 0; i < ARTIE_CAN_FRAME_MAX_DATA_LENGTH; i++)
+    {
+        received_frame.data[i] = mcp2515_ctx->rx_buffer[5 + i];
+    }
+
+    // Check the frame's protocol against the context's protocol flags to see if we should
+    // feed it back up the stack to its appropriate state machine.
+    uint16_t protocol = (received_frame.id & ARTIE_CAN_FRAME_ID_PROTOCOL_MASK) >> ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
+    switch (protocol)
+    {
+        case ARTIE_CAN_RTACP_PROTOCOL_ID:
+            rtacp_receive_in_isr(context, &received_frame);
+            break;
+
+        // TODO: handle the other cases
+
+        default:
+            // Unknown protocol, so ignore the frame
+            break;
+    }
 }
 
 artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
 {
     artie_can_error_t err;
-
-    // TODO
 
     // Reset the device to ensure it's in a known state
     err = _reset_instruction(context);
@@ -1181,15 +1263,13 @@ artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp2515_config_t *config)
+artie_can_error_t driver_mcp2515_config(artie_can_context_t *context)
 {
     artie_can_error_t err;
 
     // Cast context
     artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
-
-    // Save the configuration to the context
-    // TODO
+    driver_mcp2515_config_t *config = &(mcp2515_ctx->mcp2515_config);
 
     // Set device to configuration mode
     err = _set_mode(context, MCP2515_MODE_CONFIGURATION);
@@ -1266,7 +1346,7 @@ artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp
 
 artie_can_error_t driver_mcp2515_deinit(artie_can_context_t *context)
 {
-    // TODO
+    // TODO: Put the device into sleep mode?
 
     return ARTIE_CAN_ERR_NONE;
 }
@@ -1276,7 +1356,7 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     artie_can_error_t err;
 
     // Transfer the frame into an array of bytes in the format expected by the MCP2515 (SIDH, SIDL, EID8, EID0, DLC, data bytes)
-    uint8_t frame_buffer[13] = {0}; // 4 bytes for ID, 1 byte for DLC, and 8 bytes for data
+    uint8_t frame_buffer[BYTES_IN_MCP1515_CAN_FRAME] = {0}; // 4 bytes for ID, 1 byte for DLC, and 8 bytes for data
     frame_buffer[0] = (uint8_t)(frame->id >> 21); // SIDH: bits 28-21
     frame_buffer[1] = (uint8_t)(((frame->id >> 18) & 0x07) << 5) | // SIDL: bits 20-18 (SID2-0)
                       (1 << 3) | // EXIDE bit (must be 1 for extended IDs)
@@ -1339,7 +1419,8 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     }
 
     // Send RTS instruction for the appropriate buffer
-    err = _rts_instruction(context, buffer_index);
+    uint8_t send_mask = (1 << buffer_index);
+    err = _rts_instruction(context, send_mask);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -1350,21 +1431,83 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
 
 artie_can_error_t driver_mcp2515_isr(artie_can_context_t *context)
 {
-    // TODO
-
     // Read the CANINTF register to determine which interrupt(s) occurred
+    uint8_t canintf_value;
+    artie_can_error_t err = _read_instruction(context, MCP2515_REG_CANINTF, &canintf_value, 1);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
 
-    // If it was a RX buffer full interrupt, read the frame from the appropriate RX buffer and call the receive callback with the frame data
+    // Cast context
+    artie_can_mcp2515_context_t *backend_context = (artie_can_mcp2515_context_t *)context->backend_context;
 
-    // If it was an error interrupt, read the error flags from EFLG and return an appropriate error code
+    if (canintf_value == 0)
+    {
+        // If we read 0, that means there are no interrupts to service.
+        return ARTIE_CAN_ERR_NONE;
+    }
 
-    return ARTIE_CAN_ERR_NONE;
-}
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_RX0IF)
+    {
+        // Receive from buffer 0; after this instruction the interrupt flag is cleared
+        artie_can_error_t e = _read_rx_buffer_instruction(context, 0, backend_context->rx_buffer, BYTES_IN_MCP1515_CAN_FRAME);
+        if (e == ARTIE_CAN_ERR_NONE)
+        {
+            _handle_received_frame_from_isr(context); // Call the appropriate protocol handler
+        }
+        err |= e;
+    }
 
-artie_can_error_t driver_mcp2515_receive(artie_can_context_t *context, artie_can_frame_t *frame)
-{
-    // TODO
-    return ARTIE_CAN_ERR_NONE;
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_RX1IF)
+    {
+        // Receive from buffer 1; after this instruction the interrupt flag is cleared
+        artie_can_error_t e = _read_rx_buffer_instruction(context, 1, backend_context->rx_buffer, BYTES_IN_MCP1515_CAN_FRAME);
+        if (e == ARTIE_CAN_ERR_NONE)
+        {
+            _handle_received_frame_from_isr(context); // Call the appropriate protocol handler
+        }
+        err |= e;
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_TX0IF)
+    {
+        // We currently do not use the TX interrupts
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_TX1IF)
+    {
+        // We currently do not use the TX interrupts
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_TX2IF)
+    {
+        // We currently do not use the TX interrupts
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_ERRIF)
+    {
+        // There is an error. Read the error flags register and handle the error accordingly.
+        uint8_t eflg_value;
+        artie_can_error_t e = _read_instruction(context, MCP2515_REG_EFLG, &eflg_value, 1);
+        if (e == ARTIE_CAN_ERR_NONE)
+        {
+            err |= _handle_error_interrupt(context, eflg_value);
+        }
+        err |= e;
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_WAKIF)
+    {
+        // We currently do not use the wakeup-flag because we do not currently use sleep mode
+    }
+
+    if (canintf_value & (uint8_t)MCP2515_CANINTF_MERRF)
+    {
+        // We currently do not use the message error interrupt
+    }
+
+    return err;
 }
 
 artie_can_error_t driver_mcp2515_reset(artie_can_context_t *context)
@@ -1378,8 +1521,11 @@ artie_can_error_t driver_mcp2515_reset(artie_can_context_t *context)
         return err;
     }
 
+    // Cast context
+    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+
     // Reconfigure device according to context
-    err = driver_mcp2515_config(context, todo);
+    err = driver_mcp2515_config(context, &(mcp2515_ctx->mcp2515_config));
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
