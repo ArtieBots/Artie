@@ -21,14 +21,24 @@ typedef enum {
     RTACP_STATE_SENDING        ///< The node is in the process of sending a frame (not an ACK).
 } rtacp_state_t;
 
+typedef enum {
+    RTACP_ISR_FLAG_NONE = 0,                ///< No special conditions for this ISR call
+    RTACP_ISR_FLAG_PENDING_ACK_RX = 1 << 0, ///< We received an ACK in the ISR that we need to process from the main thread context
+    RTACP_ISR_FLAG_PENDING_ACK_TX = 1 << 1, ///< We have an ACK that we need to send from the main thread context
+} rtacp_isr_flags_t;
+
 /**
  * @brief Context for RTACP protocol handling within the Artie CAN library.
  *
  */
 typedef struct {
+    // Written to by main thread
     uint8_t node_address;               ///< The RTACP address of this node on the CAN bus
     uint64_t ack_start_time_ms;         ///< The time in milliseconds when we started waiting for an ACK for a sent frame. Used to check for ACK timeouts.
     artie_can_frame_t in_flight_frame;  ///< The frame that is currently in flight and waiting for an ACK
     rtacp_state_t state;                ///< The current state of the RTACP protocol for this node
+
+    // Written to by ISR
     artie_can_frame_t ack_frame;        ///< The ACK frame that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
+    rtacp_isr_flags_t isr_flags;        ///< Flags to indicate special conditions found during ISR; cleared by main thread
 } rtacp_context_t;
