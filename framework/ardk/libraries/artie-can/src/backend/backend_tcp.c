@@ -24,6 +24,7 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
     switch (protocol)
     {
         case ARTIE_CAN_RTACP_PROTOCOL_ID:
+            // TODO: Suspend the other thread while we call the ISR callbacks to simulate a real environment
             rtacp_receive_in_isr(context, frame);
             break;
 

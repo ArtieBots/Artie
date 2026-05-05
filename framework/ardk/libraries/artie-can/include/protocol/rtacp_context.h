@@ -18,6 +18,7 @@ typedef enum {
     RTACP_STATE_IDLE,          ///< The node is idle and not currently processing any frames.
     RTACP_STATE_WAITING_ACK,   ///< The node has sent a frame and is waiting for an ACK.
     RTACP_STATE_SENDING_ACK,   ///< The node has received a frame that it should ACK, but has not yet sent that ACK.
+    RTACP_STATE_SENDING        ///< The node is in the process of sending a frame (not an ACK).
 } rtacp_state_t;
 
 /**
