@@ -94,8 +94,16 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
  * the Artie CAN Library depends on how often this function is called, so it should be called as frequently as possible
  * for best performance.
  *
- * In an environment running an OS, you can use the convenience function artie_can_start_event_loop() to start
- * a dedicated thread that runs this event loop for you.
+ * All functions in the Artie Can Library are labeled as _from_isr if they are meant to be called
+ * from an ISR context. All other functions MUST be called from the main thread. In a baremetal system,
+ * that would be the main loop. In an RTOS, that would be whichever task is responsible for this library
+ * (don't split responsibilities for this library across tasks in an RTOS). And in an OS, you should have
+ * a dedicated thread for handling this library - again, don't split responsibilities for this library
+ * across threads.
+ *
+ * E.g., in an OS or RTOS, a reasonable paradigm is to have a thread/task that waits for messages
+ * to come in from other threads/tasks and handles all requests to send Artie CAN frames through that
+ * interface.
  *
  * @param handle Pointer to the artie_can_backend_t struct representing the backend to run the event loop for.
  * @return Error code indicating the result of the operation. If the event loop ran successfully,
@@ -112,22 +120,3 @@ artie_can_error_t artie_can_tick(artie_can_backend_t *handle);
  * returns ARTIE_CAN_ERR_NONE. If there was an error, returns an appropriate error code.
  */
 artie_can_error_t artie_can_tick_isr(artie_can_backend_t *handle);
-
-/**
- * @brief Start the event loop for the specified backend in a separate thread.
- * This function creates a new thread to run the event loop, allowing the backend to process
- * events concurrently with the main program. The event loop will continue running until
- * artie_can_close() is called on the backend.
- *
- * Important! This function is not supported in an embedded context. It is only intended for use
- * in a full-blown OS environment. In an embedded context, you should call artie_can_tick() periodically
- * from your main loop, a timer interrupt, or an RTOS thread to allow the backend to process events.
- *
- * @param handle Pointer to the artie_can_backend_t struct representing the backend to start the event loop for.
- * @param tick_interval_us The interval in microseconds at which to call artie_can_tick() in the event loop thread.
- * This determines how often the backend processes events, so a lower value will result in lower latency but
- * higher CPU usage. A reasonable default might be 100 (0.1 ms). Must be greater than 0.
- * @return Error code indicating the result of the operation. If the event loop was successfully started,
- * returns ARTIE_CAN_ERR_NONE. If there was an error, returns an appropriate error code.
- */
-artie_can_error_t artie_can_start_event_loop(artie_can_backend_t *handle, uint32_t tick_interval_us);

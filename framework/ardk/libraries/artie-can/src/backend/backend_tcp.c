@@ -23,6 +23,11 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
     uint16_t protocol = (frame->id & ARTIE_CAN_FRAME_ID_PROTOCOL_MASK) >> ARTIE_CAN_FRAME_ID_PROTOCOL_LOCATION;
     switch (protocol)
     {
+        // Ideally we would suspend the other threads that might be running at this point
+        // to simulate the fact that we are in an ISR context, but instead, we just need to
+        // ensure that the protocol handling code is re-entrant where it matters (which is what
+        // we should do anyway since we could be preempted at any point in a real ISR).
+
         case ARTIE_CAN_RTACP_PROTOCOL_ID:
             rtacp_receive_in_isr(context, frame);
             break;

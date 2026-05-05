@@ -59,6 +59,10 @@ typedef enum {
     #define SLEEP_US(us) usleep(us)
 #endif
 
+// Platform-specific atomic type definitions
+// We use volatile uint32_t for atomic operations on all platforms
+typedef volatile uint32_t atomic_uint32_t;
+
 /**
  * @brief Platform-independent thread function signature.
  * @param arg Pointer to thread parameters.
@@ -86,6 +90,24 @@ bool create_thread(thread_handle_t *handle, thread_func_t func, void *arg);
  * @return true if the thread completed, false on timeout or error.
  */
 bool join_thread(thread_handle_t handle, uint32_t timeout_ms);
+
+/**
+ * @brief Atomically perform bitwise OR operation.
+ * Performs *ptr |= value atomically and returns the previous value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to OR with the current value.
+ * @return The previous value before the operation.
+ */
+uint32_t atomic_fetch_or(atomic_uint32_t *ptr, uint32_t value);
+
+/**
+ * @brief Atomically perform bitwise AND operation.
+ * Performs *ptr &= value atomically and returns the previous value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to AND with the current value.
+ * @return The previous value before the operation.
+ */
+uint32_t atomic_fetch_and(atomic_uint32_t *ptr, uint32_t value);
 
 /**
  * @brief Initialize the socket subsystem (required on Windows, no-op on POSIX).

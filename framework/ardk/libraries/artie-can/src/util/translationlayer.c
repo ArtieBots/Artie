@@ -39,6 +39,90 @@ bool join_thread(thread_handle_t handle, uint32_t timeout_ms)
 #endif
 }
 
+static uint32_t _critical_section_enter(void)
+{
+#ifdef _WIN32
+    // On Windows with native atomics, critical sections are not needed
+    return 0;
+#elif defined(__GNUC__) || defined(__clang__)
+    // On POSIX with native atomics, critical sections are not needed
+    return 0;
+#elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
+    // ARM Cortex-M: Disable interrupts using CPSID i (Change Processor State, Interrupt Disable)
+    uint32_t primask;
+    __asm__ volatile ("mrs %0, primask" : "=r" (primask));
+    __asm__ volatile ("cpsid i" : : : "memory");
+    return primask;
+#elif defined(__ARM_ARCH)
+    // Generic ARM: Use CPSR (Current Program Status Register)
+    uint32_t cpsr;
+    __asm__ volatile ("mrs %0, cpsr" : "=r" (cpsr));
+    __asm__ volatile ("cpsid i" : : : "memory");
+    return cpsr;
+#else
+    // Unknown bare metal platform: Provide a weak implementation
+    // Users should override this for their specific platform
+    return 0;
+#endif
+}
+
+static void _critical_section_exit(uint32_t state)
+{
+#ifdef _WIN32
+    // On Windows with native atomics, critical sections are not needed
+    (void)state;
+#elif defined(__GNUC__) || defined(__clang__)
+    // On POSIX with native atomics, critical sections are not needed
+    (void)state;
+#elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
+    // ARM Cortex-M: Restore interrupt state using PRIMASK
+    __asm__ volatile ("msr primask, %0" : : "r" (state) : "memory");
+#elif defined(__ARM_ARCH)
+    // Generic ARM: Restore CPSR
+    __asm__ volatile ("msr cpsr_c, %0" : : "r" (state) : "memory");
+#else
+    // Unknown bare metal platform: Provide a weak implementation
+    (void)state;
+#endif
+}
+
+uint32_t atomic_fetch_or(atomic_uint32_t *ptr, uint32_t value)
+{
+#ifdef _WIN32
+    // Windows: Use InterlockedOr which returns the original value
+    // Note: InterlockedOr takes LONG* which is 32-bit on both x86 and x64
+    return (uint32_t)InterlockedOr((volatile LONG *)ptr, (LONG)value);
+#elif defined(__GNUC__) || defined(__clang__)
+    // GCC/Clang: Use atomic built-ins with sequential consistency
+    return __atomic_fetch_or(ptr, value, __ATOMIC_SEQ_CST);
+#else
+    // Bare metal or unsupported platform: Use critical section
+    uint32_t state = critical_section_enter();
+    uint32_t old_value = *ptr;
+    *ptr = old_value | value;
+    critical_section_exit(state);
+    return old_value;
+#endif
+}
+
+uint32_t atomic_fetch_and(atomic_uint32_t *ptr, uint32_t value)
+{
+#ifdef _WIN32
+    // Windows: Use InterlockedAnd which returns the original value
+    return (uint32_t)InterlockedAnd((volatile LONG *)ptr, (LONG)value);
+#elif defined(__GNUC__) || defined(__clang__)
+    // GCC/Clang: Use atomic built-ins with sequential consistency
+    return __atomic_fetch_and(ptr, value, __ATOMIC_SEQ_CST);
+#else
+    // Bare metal or unsupported platform: Use critical section
+    uint32_t state = critical_section_enter();
+    uint32_t old_value = *ptr;
+    *ptr = old_value & value;
+    critical_section_exit(state);
+    return old_value;
+#endif
+}
+
 bool socket_subsystem_init(void)
 {
 #ifdef _WIN32
