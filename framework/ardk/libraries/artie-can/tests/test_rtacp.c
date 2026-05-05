@@ -473,6 +473,14 @@ void test_echo_message(void)
     assert_rtacp_frames_equal(&frame2to1, &_frame_received_in_callback1);
 }
 
+/**
+ * @brief Test sending a whole bunch of messages in a row and echoing them all back, to test the robustness of the system under load.
+ *
+ */
+void test_send_lots_of_messages(void)
+{
+    // TODO
+}
 
 /**
  * @brief Main function - runs all tests.
@@ -490,6 +498,7 @@ int main(void)
     RUN_TEST(test_send_to_specific_address_only_received_by_target);
     RUN_TEST(test_send_multiple_messages);
     RUN_TEST(test_echo_message);
+    RUN_TEST(test_send_lots_of_messages);
 
     // Finish and return results
     return UNITY_END();
