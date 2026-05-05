@@ -25,10 +25,9 @@ artie_can_error_t driver_mcp2515_init(artie_can_context_t *context);
  * @brief Configure the MCP2515 device with the provided parameters.
  *
  * @param context The Artie CAN context struct that is being used with this driver.
- * @param config The configuration parameters for the MCP2515 device.
  * @return artie_can_error_t An error code indicating the result of the configuration attempt.
  */
-artie_can_error_t driver_mcp2515_config(artie_can_context_t *context, driver_mcp2515_config_t *config);
+artie_can_error_t driver_mcp2515_config(artie_can_context_t *context);
 
 /**
  * @brief Deinitialize the MCP2515 driver and free any resources it is using.

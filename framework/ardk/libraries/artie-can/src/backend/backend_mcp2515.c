@@ -25,7 +25,7 @@ static artie_can_error_t _init_mcp2515(artie_can_context_t *context)
     }
 
     // Initialize the device itself
-    err = driver_mcp2515_config(context, &((artie_can_mcp2515_context_t *)(context->backend_context))->mcp2515_config);
+    err = driver_mcp2515_config(context);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -46,11 +46,10 @@ static artie_can_error_t _send_mcp2515(void *ctx, const artie_can_frame_t *frame
     }
 
     // Cast context
-    artie_can_context_t *context = (artie_can_context_t *)context;
-    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
+    artie_can_context_t *context = (artie_can_context_t *)ctx;
 
     // Send the frame using the MCP2515 driver
-    return driver_mcp2515_send_frame(context, frame);
+    return driver_mcp2515_send(context, frame);
 }
 
 static artie_can_error_t _close_mcp2515(artie_can_context_t *context)

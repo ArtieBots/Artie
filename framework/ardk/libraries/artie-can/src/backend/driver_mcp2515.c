@@ -10,6 +10,9 @@
 #include "bwacp.h"
 #include "rtacp.h"
 
+/** Good ol' array length macro. */
+#define ARRAY_LENGTH(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 /** Bits from the CANINTF register. */
 typedef enum {
     MCP2515_CANINTF_RX0IF = (1 << 0),
@@ -551,7 +554,7 @@ static artie_can_error_t _write_byte_and_verify(artie_can_context_t *context, ui
     artie_can_error_t err;
 
     // Write the data to the device
-    err = _write_instruction(context, addr, data, 1);
+    err = _write_instruction(context, addr, &data, 1);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -914,28 +917,28 @@ static artie_can_error_t _write_filter_or_mask(artie_can_context_t *context, uin
 {
     artie_can_error_t err;
 
-    uint8_t sidh_value = (filter_or_mask & 0xFF000000) >> 24;
+    uint8_t sidh_value = (uint8_t)((filter_or_mask & 0xFF000000) >> 24);
     err = _write_byte_and_verify(context, start_addr + 0, sidh_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
-    uint8_t sidl_value = (filter_or_mask & 0x00FF0000) >> 16;
+    uint8_t sidl_value = (uint8_t)((filter_or_mask & 0x00FF0000) >> 16);
     err = _write_byte_and_verify(context, start_addr + 1, sidl_value, 0xEB);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
-    uint8_t eid8_value = (filter_or_mask & 0x0000FF00) >> 8;
+    uint8_t eid8_value = (uint8_t)((filter_or_mask & 0x0000FF00) >> 8);
     err = _write_byte_and_verify(context, start_addr + 2, eid8_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
     }
 
-    uint8_t eid0_value = (filter_or_mask & 0x000000FF) >> 0;
+    uint8_t eid0_value = (uint8_t)((filter_or_mask & 0x000000FF) >> 0);
     err = _write_byte_and_verify(context, start_addr + 3, eid0_value, 0xFF);
     if (err != ARTIE_CAN_ERR_NONE)
     {
@@ -1249,6 +1252,66 @@ static void _handle_received_frame_from_isr(artie_can_context_t *context)
     }
 }
 
+artie_can_error_t _handle_error_interrupt(artie_can_context_t *context, uint8_t error_flags)
+{
+    // In this function, we have to end by clearing the error interrupt flag,
+    // so we do not return early. Instead, we OR the errors we find and return the result.
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    // Read the EFLG register
+    uint8_t eflg_value = 0;
+    err |= _read_instruction(context, MCP2515_REG_EFLG, &eflg_value, 1);
+
+    // Note: The EWARN flag means either RXWARN and/or TXWARN is set. We ignore it
+    // because we handle each individual warning flag separately, and the EWARN flag doesn't give us any additional information.
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_RXWAR))
+    {
+        // TODO: RXWARN flag means the REC has reached the warning threshold of 96.
+        // This means the receiver is having some serious difficulty.
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_TXWAR))
+    {
+        // TODO: TXWARN flag means the TEC has reached the warning threshold of 96.
+        // This means the transmitter is having some serious difficulty.
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_RXEP))
+    {
+        // TODO: RXEP flag means the REC has reached the error-passive threshold of 127 and the device is now in error-passive state.
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_TXEP))
+    {
+        // TODO: TXEP flag means the TEC has reached the error-passive threshold of 127 and the device is now in error-passive state.
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_TXBO))
+    {
+        // TODO: TXBO flag means the TEC has reached the bus-off threshold of 255 and the device is now in the bus-off state.
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_RX0OVR))
+    {
+        // TODO: RX0OVR flag means the MAB has assembled a valid frame, but RX buffer 0 was not empty and therefore the frame was lost.
+        // The RXnOVR bit in EFLG is set and must be cleared by MCU.
+        err |= _bit_modify_instruction(context, MCP2515_REG_EFLG, (uint8_t)(MCP2515_EFLG_RX0OVR), 0x00);
+    }
+
+    if (eflg_value & (uint8_t)(MCP2515_EFLG_RX1OVR))
+    {
+        // TODO: RX1OVR flag means the MAB has assembled a valid frame, but RX buffer 1 was not empty and therefore the frame was lost.
+        // The RXnOVR bit in EFLG is set and must be cleared by MCU.
+        err |= _bit_modify_instruction(context, MCP2515_REG_EFLG, (uint8_t)(MCP2515_EFLG_RX1OVR), 0x00);
+    }
+
+    // Reset the interrupt flag by writing a 0 to the appropriate bit in the CANINTF register
+    err |= _bit_modify_instruction(context, MCP2515_REG_CANINTF, (1 << 5), 0x00);
+
+    return err;
+}
+
 artie_can_error_t driver_mcp2515_init(artie_can_context_t *context)
 {
     artie_can_error_t err;
@@ -1386,8 +1449,8 @@ artie_can_error_t driver_mcp2515_send(artie_can_context_t *context, const artie_
     // Choose which TXBnCTRL register based on the frame protocol. We allocate TXB2 for
     // RTACP frames (if this node is configured for RTACP). The other buffers are used
     // for the other protocols.
-    uint8_t buffer_index = -1;
-    if ((frame->id & ARTIE_CAN_FRAME_ID_PROTOCOL_MASK == ARTIE_CAN_RTACP_PROTOCOL_ID) || ((context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP) == 0))
+    uint8_t buffer_index = 0xFF;
+    if (((frame->id & ARTIE_CAN_FRAME_ID_PROTOCOL_MASK) == ARTIE_CAN_RTACP_PROTOCOL_ID) || ((context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP) == 0))
     {
         // This is an RTACP frame OR we aren't configured to send RTACP (and therefore don't need to reserve TXB2), so we use TXB2
         // Check if TXB2 is free by reading the TXB2CTRL register and checking the TXREQ bit
