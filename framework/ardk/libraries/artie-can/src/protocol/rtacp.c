@@ -15,7 +15,7 @@ static artie_can_error_t _check_ack_timeout(artie_can_backend_t *handle)
     if ((current_time_ms - handle->context->rtacp_context.ack_start_time_ms) >= (uint64_t)ARTIE_CAN_RTACP_ACK_TIMEOUT_MS)
     {
         // Timeout occurred, reset to idle and return an error
-        ARTIE_CAN_LOG(handle->context, "ACK timeout occurred, resetting state to idle.\n");
+        ARTIE_CAN_LOG(handle->context, "RTACP: ACK timeout occurred, resetting state to idle.\n");
         handle->context->rtacp_context.state = RTACP_STATE_IDLE;
         handle->context->rtacp_context.ack_start_time_ms = 0;
         memset(&handle->context->rtacp_context.in_flight_frame, 0, sizeof(artie_can_frame_t));
@@ -26,38 +26,64 @@ static artie_can_error_t _check_ack_timeout(artie_can_backend_t *handle)
 }
 
 /** Send the pending ACK and call back once we are sure it happened. */
-static artie_can_error_t _send_pending_ack(artie_can_backend_t *handle)
+static artie_can_error_t _send_pending_ack(artie_can_backend_t *handle, size_t ack_buffer_index)
 {
-    ARTIE_CAN_LOG(handle->context, "Attempting to send pending ACK frame.\n");
+    ARTIE_CAN_LOG(handle->context, "RTACP: Attempting to send pending ACK frame from buffer index %zu.\n", ack_buffer_index);
 
     artie_can_error_t err;
-    err = handle->send(handle->context, &handle->context->rtacp_context.ack_frame);
+    artie_can_frame_t *ack_frame = (ack_buffer_index == 0) ? &handle->context->rtacp_context.ack_frame0 : &handle->context->rtacp_context.ack_frame1;
+
+    err = handle->send(handle->context, ack_frame);
     if (err != ARTIE_CAN_ERR_NONE)
     {
-        ARTIE_CAN_LOG(handle->context, "Failed to send ACK frame, error code %d.\n", err);
+        ARTIE_CAN_LOG(handle->context, "RTACP: Failed to send ACK frame, error code %d.\n", err);
         return err;
     }
     else
     {
-        // Reconstruct the original frame that we ACKed from the ACK frame buffer so that we can pass it to the callback function.
-        artie_can_frame_t acked_frame;
-        memcpy(&acked_frame, &handle->context->rtacp_context.ack_frame, sizeof(artie_can_frame_t));
-        acked_frame.id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK; // Clear the ACK bit to get the original frame ID
-        acked_frame.id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK; // Clear the sender address bits
-        acked_frame.id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK; // Clear the target address bits
-        acked_frame.id |= ((uint32_t)ARTIE_CAN_FRAME_TYPE_RTACP_DATA << (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION);
-        acked_frame.id |= ((((uint32_t)handle->context->rtacp_context.ack_frame.id & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) << ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION);
-        acked_frame.id |= ((((uint32_t)handle->context->rtacp_context.ack_frame.id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) << ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
-
-        // Now call the callback to let the user know that we received a frame that we ACKed.
-        ARTIE_CAN_LOG(handle->context, "Successfully sent ACK frame, calling callback with original frame.\n");
-        handle->context->rx_callback(&acked_frame);
-
-        // After sending the ACK, we are done with it, so we can clear the ACK frame buffer and reset to idle.
-        memset(&handle->context->rtacp_context.ack_frame, 0, sizeof(artie_can_frame_t));
-        handle->context->rtacp_context.state = RTACP_STATE_IDLE;
+        // After sending the ACK, we are done with it, so we can clear the ACK frame buffer.
+        // Even though the ISR owns the ack frame buffer, it is locked out of it by the interrupt flag
+        // in the context struct until we clear that flag, which we don't do until we return from this function.
+        ARTIE_CAN_LOG(handle->context, "RTACP: Clearing ACK frame buffer and resetting state to idle.\n");
+        memset(ack_frame, 0, sizeof(artie_can_frame_t));
         return ARTIE_CAN_ERR_NONE;
     }
+}
+
+static void _process_received_ack(artie_can_backend_t *handle)
+{
+    // Check if we are waiting for an ACK
+    if (handle->context->rtacp_context.state != RTACP_STATE_WAITING_ACK)
+    {
+        ARTIE_CAN_LOG(handle->context, "RTACP: Received ACK frame but we are not waiting for an ACK, ignoring.\n");
+        return;
+    }
+
+    // Check if the ACK is for the frame we are waiting for:
+    // Sender is destination of in-flight frame?
+    uint8_t dest_addr = ((handle->context->rtacp_context.in_flight_frame.id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION);
+    if (((handle->context->rtacp_context.received_ack.id & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) != dest_addr)
+    {
+        ARTIE_CAN_LOG(handle->context, "RTACP: Received ACK frame but sender address does not match destination address of in-flight message, ignoring.\n");
+        return;
+    }
+
+    // Data matches what we are waiting on?
+    if ((handle->context->rtacp_context.received_ack.dlc != handle->context->rtacp_context.in_flight_frame.dlc) || (memcmp(handle->context->rtacp_context.received_ack.data, handle->context->rtacp_context.in_flight_frame.data, sizeof(handle->context->rtacp_context.in_flight_frame.dlc)) != 0))
+    {
+        ARTIE_CAN_LOG(handle->context, "RTACP: Received ACK frame but data does not match in-flight message, ignoring.\n");
+        return;
+    }
+
+    // Valid and expected ACK frame
+    ARTIE_CAN_LOG(handle->context, "RTACP: Received valid ACK frame, resetting state and calling callback.\n");
+    memset(&handle->context->rtacp_context.in_flight_frame, 0, sizeof(artie_can_frame_t));
+    handle->context->rtacp_context.ack_start_time_ms = 0;
+    handle->context->rtacp_context.state = RTACP_STATE_IDLE;
+
+    // Memset the received ACK buffer. Normally the ISR owns this buffer, but we have locked them out
+    // by means of the interrupt flag until we clear that flag when we return from this function.
+    memset(&handle->context->rtacp_context.received_ack, 0, sizeof(artie_can_frame_t));
 }
 
 artie_can_error_t artie_can_init_context_rtacp(artie_can_context_t *context, uint8_t node_address)
@@ -168,27 +194,19 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
     {
         // We are already waiting for an ACK for a previously sent frame,
         // we can't send another frame until we get the ACK back or timeout
+        ARTIE_CAN_LOG(handle->context, "RTACP: Cannot send frame, already waiting for ACK.\n");
         return ARTIE_CAN_ERR_SEND_BUSY;
     }
 
     artie_can_error_t err;
 
-    // If we are waiting to send an ACK, we need to send that first before we can send the new frame.
-    if (handle->context->rtacp_context.state == RTACP_STATE_SENDING_ACK)
-    {
-        err = _send_pending_ack(handle);
-        if (err != ARTIE_CAN_ERR_NONE)
-        {
-            return err;
-        }
-    }
-
     // Now send the requested frame
-    ARTIE_CAN_LOG(handle->context, "Attempting to send frame with dest addr %u and priority %u\n", ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION), ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_LOCATION));
+    ARTIE_CAN_LOG(handle->context, "RTACP: Attempting to send frame with dest addr %u and priority %u; setting state to sending\n", ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION), ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_LOCATION));
+    memcpy(&handle->context->rtacp_context.in_flight_frame, frame, sizeof(artie_can_frame_t)); // Set this before we send, in case we get the ACK before we are ready for it
     err = handle->send(handle->context, frame);
     if (err != ARTIE_CAN_ERR_NONE)
     {
-        ARTIE_CAN_LOG(handle->context, "Failed to send frame, error code %d.\n", err);
+        ARTIE_CAN_LOG(handle->context, "RTACP: Failed to send frame, error code %d.\n", err);
         return err;
     }
     else if (((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) == (uint32_t)ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST)
@@ -198,14 +216,16 @@ artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_
     }
     else
     {
-        // Otherwise, we wait for the ACK.
-        memcpy(&handle->context->rtacp_context.in_flight_frame, frame, sizeof(artie_can_frame_t));
-        handle->context->rtacp_context.ack_start_time_ms = handle->get_ms();
+        ARTIE_CAN_LOG(handle->context, "RTACP: Sent frame, now waiting for ACK.\n");
         handle->context->rtacp_context.state = RTACP_STATE_WAITING_ACK;
+        handle->context->rtacp_context.ack_start_time_ms = handle->get_ms();
         return ARTIE_CAN_ERR_NONE;
     }
 }
 
+// !! Make sure all code in this function interacts with the rest of the code in a re-entrant manner !!
+// In general we do this by only writing to items in the context that are meant to be owned by the ISR.
+// Also, don't read anything from the context that might be changed on the main thread at any moment, such as the state machine state.
 void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
     // We assume that the backend only calls this function for frames that match the RTACP protocol ID in their frame ID.
@@ -214,7 +234,7 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
     if ((context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RTACP) == 0)
     {
         // This node is not configured to use the RTACP protocol, ignore the frame.
-        ARTIE_CAN_LOG(context, "Received RTACP frame but this node is not configured for RTACP, ignoring.\n");
+        ARTIE_CAN_LOG(context, "RTACP: Received RTACP frame but this node is not configured for RTACP, ignoring.\n");
         return;
     }
 
@@ -224,41 +244,29 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
     // If this is an ACK, do one thing; if it is a MSG, do another
     if ((frame_type == ARTIE_CAN_FRAME_TYPE_RTACP_ACK))
     {
-        // Are we waiting for an ACK?
-        if (context->rtacp_context.state != RTACP_STATE_WAITING_ACK)
-        {
-            ARTIE_CAN_LOG(context, "Received ACK frame but we are not waiting for an ACK, ignoring.\n");
-            return;
-        }
-
         // Check if we are the destination of the ACK.
         if (((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) != context->rtacp_context.node_address)
         {
-            ARTIE_CAN_LOG(context, "Received ACK frame but it is not addressed to us, ignoring.\n");
+            ARTIE_CAN_LOG(context, "RTACP: Received ACK frame but it is not addressed to us, ignoring.\n");
             return;
         }
-
-        // Check if sender address is the destination address of the message we are waiting on.
-        uint8_t dest_addr = ((context->rtacp_context.in_flight_frame.id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION);
-        if (((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) != dest_addr)
+        else if ((context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_RX) != 0)
         {
-            ARTIE_CAN_LOG(context, "Received ACK frame but sender address does not match destination address of in-flight message, ignoring.\n");
+            // We already have a pending ACK that we received and haven't processed yet,
+            // so we shouldn't overwrite it with a new one until we process the first one.
+            // Also, this generally means that one of the ACKs is wrongly addressed to us.
+            ARTIE_CAN_LOG(context, "RTACP: Received ACK frame but we already have a pending ACK to process, ignoring.\n");
             return;
         }
-
-        // Check if the data matches the data we are waiting on.
-        if ((frame->dlc != context->rtacp_context.in_flight_frame.dlc) || (memcmp(frame->data, context->rtacp_context.in_flight_frame.data, sizeof(context->rtacp_context.in_flight_frame.dlc)) != 0))
+        else
         {
-            ARTIE_CAN_LOG(context, "Received ACK frame but data does not match in-flight message, ignoring.\n");
+            // Got an ACK that is addressed to us. Handle from the main thread.
+            memcpy(&context->rtacp_context.received_ack, frame, sizeof(artie_can_frame_t));
+
+            // Atomically set the pending ACK RX flag
+            atomic_fetch_or(&context->rtacp_context.isr_flags, (uint32_t)RTACP_ISR_FLAG_PENDING_ACK_RX);
             return;
         }
-
-        // If we have made it through the gauntlet, we can reset our state, because the ACK checks out.
-        ARTIE_CAN_LOG(context, "Received valid ACK frame, resetting state and calling callback.\n");
-        memset(&context->rtacp_context.in_flight_frame, 0, sizeof(artie_can_frame_t));
-        context->rtacp_context.ack_start_time_ms = 0;
-        context->rtacp_context.state = RTACP_STATE_IDLE;
-        return;
     }
     else
     {
@@ -266,27 +274,54 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
         if (address == ARTIE_CAN_RTACP_TARGET_ADDRESS_BROADCAST)
         {
             // No need for ACK. Call the call-back function from ISR context with the frame.
-            ARTIE_CAN_LOG(context, "Received broadcast frame, calling callback from ISR context.\n");
+            ARTIE_CAN_LOG(context, "RTACP: Received broadcast frame, calling callback from ISR context.\n");
             context->rx_callback(frame);
             return;
         }
         else if (address == context->rtacp_context.node_address)
         {
-            ARTIE_CAN_LOG(context, "Received frame addressed to us, preparing ACK to be sent at next tick.\n");
-            // This frame is addressed to a specific node and that node is us. We need to ACK it.
-            // Do so by copying the frame into the ACK frame buffer in our context,
-            // setting the appropriate fields, and then setting our state machine to send the ACK from the main thread context.
-            memcpy(&context->rtacp_context.ack_frame, frame, sizeof(artie_can_frame_t));
-            // Swap the sender and the target in the frame ID for the ACK
-            uint8_t sender_addr = (uint8_t)((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
-            context->rtacp_context.ack_frame.id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK;
-            context->rtacp_context.ack_frame.id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK;
-            context->rtacp_context.ack_frame.id |= (((uint32_t)context->rtacp_context.node_address << (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK);
-            context->rtacp_context.ack_frame.id |= (((uint32_t)sender_addr << (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK);
-            // Set the ACK bit in the frame ID
-            context->rtacp_context.ack_frame.id |= ((uint32_t)ARTIE_CAN_FRAME_TYPE_RTACP_ACK << (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION);
-            context->rtacp_context.state = RTACP_STATE_SENDING_ACK;
-            return;
+            // Only receive this message into the ack frame buffer if we don't already have a message we are pending on.
+            artie_can_frame_t *ack_buffer = NULL;
+            rtacp_isr_flags_t flag = 0;
+            if ((context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX0) && (context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX1))
+            {
+                ARTIE_CAN_LOG(context, "RTACP: Received frame addressed to us but we already have two pending ACKs to send, ignoring.\n");
+                return;
+            }
+            else if ((context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX0) == 0)
+            {
+                ARTIE_CAN_LOG(context, "RTACP: Received frame addressed to us. Assembling an ACK in buffer 0.\n");
+                ack_buffer = &context->rtacp_context.ack_frame0;
+                flag = RTACP_ISR_FLAG_PENDING_ACK_TX0;
+            }
+            else if ((context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX1) == 0)
+            {
+                ARTIE_CAN_LOG(context, "RTACP: Received frame addressed to us. Assembling an ACK in buffer 1.\n");
+                ack_buffer = &context->rtacp_context.ack_frame1;
+                flag = RTACP_ISR_FLAG_PENDING_ACK_TX1;
+            }
+
+            if (ack_buffer != NULL)
+            {
+                // This frame is addressed to a specific node and that node is us. We need to ACK it.
+                // Do so by copying the frame into the ACK frame buffer in our context,
+                // setting the appropriate fields, and then setting our state machine to send the ACK from the main thread context.
+                memcpy(ack_buffer, frame, sizeof(artie_can_frame_t));
+                uint8_t sender_addr = (uint8_t)((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
+                ack_buffer->id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK;
+                ack_buffer->id &= ~(uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK;
+                ack_buffer->id |= (((uint32_t)context->rtacp_context.node_address << (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) & (uint32_t)ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK);
+                ack_buffer->id |= (((uint32_t)sender_addr << (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK);
+                ack_buffer->id |= ((uint32_t)ARTIE_CAN_FRAME_TYPE_RTACP_ACK << (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION);
+
+                // Atomically set the pending ACK TX flag
+                atomic_fetch_or(&context->rtacp_context.isr_flags, (uint32_t)flag);
+
+                // Call the callback from ISR
+                ARTIE_CAN_LOG(context, "RTACP: Calling callback from ISR context with received frame.\n");
+                context->rx_callback(frame);
+                return;
+            }
         }
     }
 }
@@ -302,21 +337,67 @@ artie_can_error_t rtacp_tick(artie_can_backend_t *handle)
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    // Check the ISR flags
+    if ((handle->context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_RX) != 0)
+    {
+        // We received an ACK in the ISR that we need to process from the main thread context.
+        // Clear the flag and process the ACK.
+        ARTIE_CAN_LOG(handle->context, "RTACP: Processing received ACK from main thread context.\n");
+        _process_received_ack(handle);
+
+        // Atomically clear the pending ACK RX flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_RX);
+    }
+
+    if ((handle->context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX0) != 0)
+    {
+        // We have an ACK in buffer 0 that we need to send from the main thread context.
+        // We clear the flag only once we have sent the ACK
+        ARTIE_CAN_LOG(handle->context, "RTACP: Sending pending ACK from buffer 0 from main thread context.\n");
+        err = _send_pending_ack(handle, 0);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
+
+        // Atomically clear the pending ACK TX0 flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_TX0);
+    }
+
+    if ((handle->context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX1) != 0)
+    {
+        // We have an ACK in buffer 1 that we need to send from the main thread context.
+        // We clear the flag only once we have sent the ACK
+        ARTIE_CAN_LOG(handle->context, "RTACP: Sending pending ACK from buffer 1 from main thread context.\n");
+        err = _send_pending_ack(handle, 1);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
+
+        // Atomically clear the pending ACK TX1 flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_TX1);
+    }
+
     // Act according to state machine state
     switch (handle->context->rtacp_context.state)
     {
         case RTACP_STATE_IDLE:
             // Nothing to do in the idle state
-            return ARTIE_CAN_ERR_NONE;
+            err = ARTIE_CAN_ERR_NONE;
+            break;
         case RTACP_STATE_WAITING_ACK:
             // Check if we've timed out waiting for the ACK. If so, reset to idle and return an error.
-            return _check_ack_timeout(handle);
-        case RTACP_STATE_SENDING_ACK:
-            // We need to send the ACK frame that we prepared in the ISR context. Do so and then reset to idle.
-            return _send_pending_ack(handle);
+            err = _check_ack_timeout(handle);
+            break;
         default:
-            // Invalid state, reset to idle. Return an error.
+            // Invalid state
             handle->context->rtacp_context.state = RTACP_STATE_IDLE;
-            return ARTIE_CAN_ERR_INTERNAL;
+            err = ARTIE_CAN_ERR_INTERNAL;
+            break;
     }
+
+    return err;
 }

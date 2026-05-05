@@ -1584,11 +1584,8 @@ artie_can_error_t driver_mcp2515_reset(artie_can_context_t *context)
         return err;
     }
 
-    // Cast context
-    artie_can_mcp2515_context_t *mcp2515_ctx = (artie_can_mcp2515_context_t *)(context->backend_context);
-
     // Reconfigure device according to context
-    err = driver_mcp2515_config(context, &(mcp2515_ctx->mcp2515_config));
+    err = driver_mcp2515_config(context);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;

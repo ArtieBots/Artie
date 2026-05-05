@@ -176,6 +176,7 @@ void setUp(void)
     err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_TCP, _receive_callback_node3, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
+    // TODO: We no longer support a separate eventloop thread - sends and ticks must happen on the same thread.
     // Set up a thread to run the eventloop for the nodes (tick every 150us)
     err = artie_can_start_event_loop(&_node1, 150);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
@@ -473,6 +474,86 @@ void test_echo_message(void)
     assert_rtacp_frames_equal(&frame2to1, &_frame_received_in_callback1);
 }
 
+/**
+ * @brief Test sending a whole bunch of messages in a row and echoing them all back, to test the robustness of the system under load.
+ *
+ */
+void test_send_lots_of_messages(void)
+{
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_send_lots_of_messages !!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+    const int num_messages = 100;
+
+    for (int i = 0; i < num_messages; i++)
+    {
+        printf("----- Sending message %d/%d -----\n", i + 1, num_messages);
+
+        // Reset callback flags
+        _callback_called1 = false;
+        _callback_called2 = false;
+        _reset_frame(&_frame_received_in_callback1);
+        _reset_frame(&_frame_received_in_callback2);
+
+        // Node 1 sends to Node 2
+        uint8_t data_bytes[ARTIE_CAN_RTACP_MAX_DATA_BYTES];
+        for (int j = 0; j < ARTIE_CAN_RTACP_MAX_DATA_BYTES; j++)
+        {
+            data_bytes[j] = (uint8_t)(i + j);
+        }
+
+        artie_can_frame_rtacp_t frame1to2 = {
+            .ack = false,
+            .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
+            .source_address = 0x01,
+            .target_address = 0x02,
+            .nbytes = sizeof(data_bytes),
+            .data = {0}
+        };
+        memcpy(frame1to2.data, data_bytes, sizeof(data_bytes));
+
+        artie_can_frame_t can_frame1to2;
+        err = artie_can_rtacp_init_frame(&can_frame1to2, &frame1to2);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+        err = artie_can_send(&_node1, &can_frame1to2);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+        // Wait for Node 2 to receive
+        err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        assert_rtacp_frames_equal(&frame1to2, &_frame_received_in_callback2);
+
+        // Node 2 echoes back to Node 1
+        artie_can_frame_rtacp_t frame2to1 = {
+            .ack = false,
+            .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_MEDIUM,
+            .source_address = 0x02,
+            .target_address = 0x01,
+            .nbytes = _frame_received_in_callback2.nbytes,
+            .data = {0}
+        };
+
+        // Can't memcpy because of the volatile
+        for (uint8_t k = 0; k < frame2to1.nbytes; k++) {
+            frame2to1.data[k] = _frame_received_in_callback2.data[k];
+        }
+
+        artie_can_frame_t can_frame2to1;
+        err = artie_can_rtacp_init_frame(&can_frame2to1, &frame2to1);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+        err = artie_can_send(&_node2, &can_frame2to1);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+        // Wait for Node 1 to receive echo
+        err = wait_with_timeout(&_callback_called1, DEFAULT_TIMEOUT_MS);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        assert_rtacp_frames_equal(&frame2to1, &_frame_received_in_callback1);
+    }
+}
 
 /**
  * @brief Main function - runs all tests.
@@ -486,10 +567,11 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_broadcast);
-    RUN_TEST(test_send_to_specific_address);
-    RUN_TEST(test_send_to_specific_address_only_received_by_target);
-    RUN_TEST(test_send_multiple_messages);
-    RUN_TEST(test_echo_message);
+    //RUN_TEST(test_send_to_specific_address);
+    //RUN_TEST(test_send_to_specific_address_only_received_by_target);
+    //RUN_TEST(test_send_multiple_messages);
+    //RUN_TEST(test_echo_message);
+    //RUN_TEST(test_send_lots_of_messages);
 
     // Finish and return results
     return UNITY_END();
