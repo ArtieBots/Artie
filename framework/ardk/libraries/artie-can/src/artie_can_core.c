@@ -9,6 +9,7 @@
 #include <string.h>
 #include "artie_can.h"
 #include "backend.h"
+#include "bwacp.h"
 #include "err.h"
 #include "rtacp.h"
 #include "translationlayer.h"
@@ -123,33 +124,6 @@ artie_can_error_t artie_can_close(artie_can_backend_t *handle)
     return err;
 }
 
-artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_frame_t *frame)
-{
-    if (handle == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-    else if (frame == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-    else if (handle->send == NULL)
-    {
-        return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-
-    // Depending on the type of frame, we route to different send functions.
-    switch ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION)
-    {
-        case ARTIE_CAN_RTACP_PROTOCOL_ID:
-            return rtacp_send(handle, frame);
-            break;
-        default:
-            // Invalid frame ID type
-            return ARTIE_CAN_ERR_INVALID_ARG;
-    }
-}
-
 artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
 {
     if (handle == NULL)
@@ -187,7 +161,7 @@ artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
 
     if (handle->context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_BWACP)
     {
-        // TODO
+        err |= bwacp_tick(handle);
     }
 
     return err;

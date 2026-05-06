@@ -110,6 +110,24 @@ uint32_t atomic_fetch_or(atomic_uint32_t *ptr, uint32_t value);
 uint32_t atomic_fetch_and(atomic_uint32_t *ptr, uint32_t value);
 
 /**
+ * @brief Atomically perform addition operation.
+ * Performs *ptr += value atomically and returns the previous value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to add to the current value.
+ * @return The previous value before the operation.
+ */
+uint32_t atomic_fetch_add(atomic_uint32_t *ptr, uint32_t value);
+
+/**
+ * @brief Atomically perform subtraction operation.
+ * Performs *ptr -= value atomically and returns the previous value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to subtract from the current value.
+ * @return The previous value before the operation.
+ */
+uint32_t atomic_fetch_sub(atomic_uint32_t *ptr, uint32_t value);
+
+/**
  * @brief Initialize the socket subsystem (required on Windows, no-op on POSIX).
  * @return true on success, false on failure.
  */

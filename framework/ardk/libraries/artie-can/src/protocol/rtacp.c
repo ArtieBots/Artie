@@ -176,7 +176,7 @@ artie_can_error_t artie_can_rtacp_parse_frame(const artie_can_frame_t *in, artie
     return ARTIE_CAN_ERR_NONE;
 }
 
-artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame)
+artie_can_error_t artie_can_rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame)
 {
     if (handle == NULL)
     {

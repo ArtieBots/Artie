@@ -12,6 +12,7 @@
 #include "backend.h"
 #include "backend_mcp2515.h"
 #include "backend_tcp.h"
+#include "bwacp.h"
 #include "context.h"
 #include "err.h"
 #include "frame.h"
@@ -72,21 +73,6 @@ artie_can_error_t artie_can_init_custom(artie_can_context_t *context, artie_can_
  * reused or freed by the caller. If the backend was already closed, returns ARTIE_CAN_ERR_CLOSED.
  */
 artie_can_error_t artie_can_close(artie_can_backend_t *handle);
-
-/**
- * @brief Send the given CAN frame using the specified backend.
- *
- * This function assumes you already have a prepared frame. To prepare the frame for your backend
- * and protocol, use the appropriate frame initialization function for your protocol.
- * For example, if you are using RTACP, you can use artie_can_rtacp_init_frame()
- * to prepare your frame before sending it with this function.
- *
- * @param handle Pointer to the artie_can_backend_t struct representing the backend to use for sending the frame.
- * @param frame Pointer to the artie_can_frame_t struct representing the frame to send.
- * @return Error code indicating the result of the operation. If the frame was successfully sent,
- * returns ARTIE_CAN_ERR_NONE. If there was an error sending the frame, returns an appropriate error code.
- */
-artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);
 
 /**
  * @brief Run the event loop for the specified backend. This should be called periodically to allow the backend to process

@@ -1244,6 +1244,10 @@ static void _handle_received_frame_from_isr(artie_can_context_t *context)
             rtacp_receive_in_isr(context, &received_frame);
             break;
 
+        case ARTIE_CAN_BWACP_PROTOCOL_ID:
+            bwacp_receive_in_isr(context, &received_frame);
+            break;
+
         // TODO: handle the other cases
 
         default:
