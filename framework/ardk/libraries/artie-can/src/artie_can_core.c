@@ -138,6 +138,13 @@ artie_can_error_t artie_can_send(artie_can_backend_t *handle, const artie_can_fr
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
+    // First run one tick of the eventloop to make sure we are as caught up as we can be
+    artie_can_error_t err = artie_can_tick(handle);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        return err;
+    }
+
     // Depending on the type of frame, we route to different send functions.
     switch ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION)
     {

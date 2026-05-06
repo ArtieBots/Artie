@@ -123,6 +123,14 @@ static void _reset_frame(volatile artie_can_frame_rtacp_t *frame)
     }
 }
 
+static void _run_event_loops(void)
+{
+    // Run one tick of the event loop for each node
+    artie_can_tick(&_node1);
+    artie_can_tick(&_node2);
+    artie_can_tick(&_node3);
+}
+
 /**
  * @brief Setup function called before each test.
  *
@@ -174,17 +182,6 @@ void setUp(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_TCP, _receive_callback_node3, get_current_time_ms);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    // TODO: We no longer support a separate eventloop thread - sends and ticks must happen on the same thread.
-    // Set up a thread to run the eventloop for the nodes (tick every 150us)
-    err = artie_can_start_event_loop(&_node1, 150);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    err = artie_can_start_event_loop(&_node2, 150);
-    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-
-    err = artie_can_start_event_loop(&_node3, 150);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 
@@ -250,16 +247,17 @@ void test_broadcast(void)
     // Send the frame from node 1
     err = artie_can_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    _run_event_loops();
 
     // Blocking receive on node 2 to get the frame
-    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Check that the received frame matches the sent frame
     assert_rtacp_frames_equal(&rtacp_frame, &_frame_received_in_callback2);
 
     // Blocking receive on node 3 to get the frame
-    err = wait_with_timeout(&_callback_called3, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called3, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Check that the received frame matches the sent frame
@@ -298,9 +296,10 @@ void test_send_to_specific_address(void)
     // Send the frame from node 1
     err = artie_can_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    _run_event_loops();
 
     // Blocking receive on node 2 to get the frame
-    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Check that the received frame matches the sent frame
@@ -339,9 +338,10 @@ void test_send_to_specific_address_only_received_by_target(void)
     // Send the frame from node 1
     err = artie_can_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    _run_event_loops();
 
     // Blocking receive on node 2 to get the frame
-    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Check that the received frame matches the sent frame
@@ -391,19 +391,35 @@ void test_send_multiple_messages(void)
         err = artie_can_rtacp_init_frame(&frame_to_send, &rtacp_frame);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        // Send the frame
-        err = artie_can_send(&_node1, &frame_to_send);
-        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        // Send the frame (trying again if busy up to 5 times)
+        for (unsigned int i = 0; i < 5; i++)
+        {
+            _run_event_loops();
+            err = artie_can_send(&_node1, &frame_to_send);
+            if (err == ARTIE_CAN_ERR_SEND_BUSY)
+            {
+                continue;
+            }
+            else if (err == ARTIE_CAN_ERR_NONE)
+            {
+                _run_event_loops();
+                break;
+            }
+            else
+            {
+                // Fail
+                TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+            }
+        }
 
         // Ensure node 2 receives the frame
-        err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+        err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
         // Ensure the received frame matches the sent frame
         assert_rtacp_frames_equal(&rtacp_frame, &_frame_received_in_callback2);
     }
 }
-
 
 /**
  * @brief Test sending a message to a node and then having that node echo back the message.
@@ -438,9 +454,10 @@ void test_echo_message(void)
     // Send from 1 to 2
     err = artie_can_send(&_node1, &can_frame1to2);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    _run_event_loops();
 
     // Wait for Node 2 to receive
-    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     assert_rtacp_frames_equal(&frame1to2, &_frame_received_in_callback2);
 
@@ -467,9 +484,10 @@ void test_echo_message(void)
     // Send from 2 to 1
     err = artie_can_send(&_node2, &can_frame2to1);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    _run_event_loops();
 
     // Wait for Node 1 to receive echo
-    err = wait_with_timeout(&_callback_called1, DEFAULT_TIMEOUT_MS);
+    err = wait_with_timeout(&_callback_called1, DEFAULT_TIMEOUT_MS, _run_event_loops);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     assert_rtacp_frames_equal(&frame2to1, &_frame_received_in_callback1);
 }
@@ -520,9 +538,10 @@ void test_send_lots_of_messages(void)
 
         err = artie_can_send(&_node1, &can_frame1to2);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        _run_event_loops();
 
         // Wait for Node 2 to receive
-        err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS);
+        err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         assert_rtacp_frames_equal(&frame1to2, &_frame_received_in_callback2);
 
@@ -547,9 +566,10 @@ void test_send_lots_of_messages(void)
 
         err = artie_can_send(&_node2, &can_frame2to1);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        _run_event_loops();
 
         // Wait for Node 1 to receive echo
-        err = wait_with_timeout(&_callback_called1, DEFAULT_TIMEOUT_MS);
+        err = wait_with_timeout(&_callback_called1, DEFAULT_TIMEOUT_MS, _run_event_loops);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         assert_rtacp_frames_equal(&frame2to1, &_frame_received_in_callback1);
     }
@@ -567,11 +587,11 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_broadcast);
-    //RUN_TEST(test_send_to_specific_address);
-    //RUN_TEST(test_send_to_specific_address_only_received_by_target);
-    //RUN_TEST(test_send_multiple_messages);
-    //RUN_TEST(test_echo_message);
-    //RUN_TEST(test_send_lots_of_messages);
+    RUN_TEST(test_send_to_specific_address);
+    RUN_TEST(test_send_to_specific_address_only_received_by_target);
+    RUN_TEST(test_send_multiple_messages);
+    RUN_TEST(test_echo_message);
+    RUN_TEST(test_send_lots_of_messages);
 
     // Finish and return results
     return UNITY_END();

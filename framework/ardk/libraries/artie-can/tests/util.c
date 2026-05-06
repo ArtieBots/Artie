@@ -45,7 +45,7 @@ uint64_t get_current_time_ms(void)
 #endif
 }
 
-artie_can_error_t wait_with_timeout(volatile bool *condition, uint32_t timeout_ms)
+artie_can_error_t wait_with_timeout(volatile bool *condition, uint32_t timeout_ms, void (*tick_callback)(void))
 {
     uint64_t start_time_ms = get_current_time_ms();
     while (!(*condition))
@@ -54,7 +54,14 @@ artie_can_error_t wait_with_timeout(volatile bool *condition, uint32_t timeout_m
         {
             return ARTIE_CAN_ERR_TIMEOUT;
         }
-        SLEEP_MS(10);
+
+        // Call the tick callback if provided (for event loop processing)
+        if (tick_callback != NULL)
+        {
+            tick_callback();
+        }
+
+        SLEEP_MS(1);  // Sleep for 1ms to allow event loops to process
     }
     return ARTIE_CAN_ERR_NONE;
 }
