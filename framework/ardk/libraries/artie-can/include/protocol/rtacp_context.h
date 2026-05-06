@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "frame.h"
+#include "translationlayer.h"
 
 /**
  * @brief States that the RTACP state machine can be in for a given node.
@@ -41,5 +42,5 @@ typedef struct {
     artie_can_frame_t ack_frame0;       ///< The ACK frame (0) that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
     artie_can_frame_t ack_frame1;       ///< The ACK frame (1) that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
     artie_can_frame_t received_ack;     ///< The ACK frame that we received in the ISR that we need to process from the main thread context. Stored here so that we can process it from the main thread context instead of the ISR context.
-    rtacp_isr_flags_t isr_flags;        ///< Flags to indicate special conditions found during ISR; cleared by main thread
+    atomic_uint32_t isr_flags;          ///< Flags to indicate special conditions found during ISR; cleared by main thread (atomic operations required)
 } rtacp_context_t;

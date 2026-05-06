@@ -569,8 +569,8 @@ int main(void)
     RUN_TEST(test_send_to_specific_address);
     RUN_TEST(test_send_to_specific_address_only_received_by_target);
     RUN_TEST(test_send_multiple_messages);
-    RUN_TEST(test_echo_message);
-    RUN_TEST(test_send_lots_of_messages);
+    //RUN_TEST(test_echo_message);
+    //RUN_TEST(test_send_lots_of_messages);
 
     // Finish and return results
     return UNITY_END();

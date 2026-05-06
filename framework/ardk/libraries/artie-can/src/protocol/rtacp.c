@@ -263,8 +263,8 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
             // Got an ACK that is addressed to us. Handle from the main thread.
             memcpy(&context->rtacp_context.received_ack, frame, sizeof(artie_can_frame_t));
 
-            // TODO atomic write this bit
-            context->rtacp_context.isr_flags |= RTACP_ISR_FLAG_PENDING_ACK_RX;
+            // Atomically set the pending ACK RX flag
+            atomic_fetch_or(&context->rtacp_context.isr_flags, (uint32_t)RTACP_ISR_FLAG_PENDING_ACK_RX);
             return;
         }
     }
@@ -314,8 +314,8 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
                 ack_buffer->id |= (((uint32_t)sender_addr << (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK);
                 ack_buffer->id |= ((uint32_t)ARTIE_CAN_FRAME_TYPE_RTACP_ACK << (uint32_t)ARTIE_CAN_FRAME_ID_FRAME_TYPE_LOCATION);
 
-                // TODO atomic write this bit
-                context->rtacp_context.isr_flags |= flag;
+                // Atomically set the pending ACK TX flag
+                atomic_fetch_or(&context->rtacp_context.isr_flags, (uint32_t)flag);
 
                 // Call the callback from ISR
                 ARTIE_CAN_LOG(context, "RTACP: Calling callback from ISR context with received frame.\n");
@@ -347,8 +347,8 @@ artie_can_error_t rtacp_tick(artie_can_backend_t *handle)
         ARTIE_CAN_LOG(handle->context, "RTACP: Processing received ACK from main thread context.\n");
         _process_received_ack(handle);
 
-        // TODO: Atomically clear this bit
-        handle->context->rtacp_context.isr_flags &= ~RTACP_ISR_FLAG_PENDING_ACK_RX;
+        // Atomically clear the pending ACK RX flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_RX);
     }
 
     if ((handle->context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX0) != 0)
@@ -362,8 +362,8 @@ artie_can_error_t rtacp_tick(artie_can_backend_t *handle)
             return err;
         }
 
-        // TODO: Atomically clear this bit
-        handle->context->rtacp_context.isr_flags &= ~RTACP_ISR_FLAG_PENDING_ACK_TX0;
+        // Atomically clear the pending ACK TX0 flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_TX0);
     }
 
     if ((handle->context->rtacp_context.isr_flags & RTACP_ISR_FLAG_PENDING_ACK_TX1) != 0)
@@ -377,8 +377,8 @@ artie_can_error_t rtacp_tick(artie_can_backend_t *handle)
             return err;
         }
 
-        // TODO: Atomically clear this bit
-        handle->context->rtacp_context.isr_flags &= ~RTACP_ISR_FLAG_PENDING_ACK_TX1;
+        // Atomically clear the pending ACK TX1 flag
+        atomic_fetch_and(&handle->context->rtacp_context.isr_flags, (uint32_t)~RTACP_ISR_FLAG_PENDING_ACK_TX1);
     }
 
     // Act according to state machine state
