@@ -17,14 +17,13 @@
 typedef enum {
     RTACP_STATE_IDLE,          ///< The node is idle and not currently processing any frames.
     RTACP_STATE_WAITING_ACK,   ///< The node has sent a frame and is waiting for an ACK.
-    RTACP_STATE_SENDING_ACK,   ///< The node has received a frame that it should ACK, but has not yet sent that ACK.
-    RTACP_STATE_SENDING        ///< The node is in the process of sending a frame (not an ACK).
 } rtacp_state_t;
 
 typedef enum {
-    RTACP_ISR_FLAG_NONE = 0,                ///< No special conditions for this ISR call
-    RTACP_ISR_FLAG_PENDING_ACK_RX = 1 << 0, ///< We received an ACK in the ISR that we need to process from the main thread context
-    RTACP_ISR_FLAG_PENDING_ACK_TX = 1 << 1, ///< We have an ACK that we need to send from the main thread context
+    RTACP_ISR_FLAG_NONE = 0,                 ///< No special conditions for this ISR call
+    RTACP_ISR_FLAG_PENDING_ACK_RX = 1 << 0,  ///< We received an ACK in the ISR that we need to process from the main thread context
+    RTACP_ISR_FLAG_PENDING_ACK_TX0 = 1 << 1, ///< We have an ACK that we need to send from the main thread context (buffer 0)
+    RTACP_ISR_FLAG_PENDING_ACK_TX1 = 1 << 2, ///< We have an ACK that we need to send from the main thread context (buffer 1)
 } rtacp_isr_flags_t;
 
 /**
@@ -39,6 +38,8 @@ typedef struct {
     rtacp_state_t state;                ///< The current state of the RTACP protocol for this node
 
     // Written to by ISR
-    artie_can_frame_t ack_frame;        ///< The ACK frame that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
+    artie_can_frame_t ack_frame0;       ///< The ACK frame (0) that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
+    artie_can_frame_t ack_frame1;       ///< The ACK frame (1) that we need to send when we receive a frame that we need to ACK. Stored here so that we can send it from the main thread context instead of the ISR context.
+    artie_can_frame_t received_ack;     ///< The ACK frame that we received in the ISR that we need to process from the main thread context. Stored here so that we can process it from the main thread context instead of the ISR context.
     rtacp_isr_flags_t isr_flags;        ///< Flags to indicate special conditions found during ISR; cleared by main thread
 } rtacp_context_t;
