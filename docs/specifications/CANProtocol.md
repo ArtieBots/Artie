@@ -361,9 +361,8 @@ The ID field looks like this:
 [1 bit] - if DATA, parity bit to indicate relative ordering of frames, otherwise should be 1.
 ```
 
-* *REPEAT frame 0xx1=0001*: This frame is sent at any time during a data transfer from any remote node
-  to indicate that the last frame should be repeated. If this is sent after a COMPLETE frame,
-  it indicates that the entire data write should be sent again.
+* *REPEAT frame 0xx1=0001*: This frame is sent after a COMPLETE frame to indicate that data was
+  not received properly and the entire transfer should start again.
 * *READY frame 0xx1=0011*: This frame is sent from a writing node to a single device (tttttt != 0x3F)
   or to a class of devices (tttttt = 0x3F, cccccc = Bit mask, see below) to initiate a data transfer.
   If this is sent with its interrupt bit set, it means all target nodes should discard the current block

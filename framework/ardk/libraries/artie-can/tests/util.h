@@ -41,6 +41,7 @@ uint64_t get_current_time_ms(void);
  *
  * @param condition Pointer to a volatile boolean that represents the condition we are waiting for.
  * @param timeout_ms The timeout in milliseconds to wait for the condition to become true.
+ * @param tick_callback Optional callback function to call periodically (~1ms intervals) while waiting. Can be NULL.
  * @return artie_can_error_t Error code indicating whether the condition became true or if we timed out.
  */
-artie_can_error_t wait_with_timeout(volatile bool *condition, uint32_t timeout_ms);
+artie_can_error_t wait_with_timeout(volatile bool *condition, uint32_t timeout_ms, void (*tick_callback)(void));
