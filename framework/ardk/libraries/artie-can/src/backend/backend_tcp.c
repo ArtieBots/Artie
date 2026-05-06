@@ -5,6 +5,7 @@
 #include <string.h>
 #include "backend.h"
 #include "backend_tcp.h"
+#include "bwacp.h"
 #include "circular_buffer.h"
 #include "context.h"
 #include "err.h"
@@ -30,6 +31,10 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 
         case ARTIE_CAN_RTACP_PROTOCOL_ID:
             rtacp_receive_in_isr(context, frame);
+            break;
+
+        case ARTIE_CAN_BWACP_PROTOCOL_ID:
+            bwacp_receive_in_isr(context, frame);
             break;
 
         default:

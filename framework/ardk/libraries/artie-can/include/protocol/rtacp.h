@@ -99,7 +99,7 @@ artie_can_error_t artie_can_rtacp_parse_frame(const artie_can_frame_t *in, artie
  * @param frame Pointer to the artie_can_frame_t struct representing the frame to send.
  * @return Error code indicating the result of the operation.
  */
-artie_can_error_t rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);
+artie_can_error_t artie_can_rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);
 
 /**
  * @brief Handle a received RTACP frame within an ISR context.

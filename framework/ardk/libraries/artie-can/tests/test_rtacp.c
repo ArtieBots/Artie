@@ -245,7 +245,7 @@ void test_broadcast(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_send(&_node1, &frame_to_send);
+    err = artie_can_rtacp_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -294,7 +294,7 @@ void test_send_to_specific_address(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_send(&_node1, &frame_to_send);
+    err = artie_can_rtacp_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -336,7 +336,7 @@ void test_send_to_specific_address_only_received_by_target(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_send(&_node1, &frame_to_send);
+    err = artie_can_rtacp_send(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -395,7 +395,7 @@ void test_send_multiple_messages(void)
         for (unsigned int i = 0; i < 5; i++)
         {
             _run_event_loops();
-            err = artie_can_send(&_node1, &frame_to_send);
+            err = artie_can_rtacp_send(&_node1, &frame_to_send);
             if (err == ARTIE_CAN_ERR_SEND_BUSY)
             {
                 continue;
@@ -452,7 +452,7 @@ void test_echo_message(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send from 1 to 2
-    err = artie_can_send(&_node1, &can_frame1to2);
+    err = artie_can_rtacp_send(&_node1, &can_frame1to2);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -482,7 +482,7 @@ void test_echo_message(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send from 2 to 1
-    err = artie_can_send(&_node2, &can_frame2to1);
+    err = artie_can_rtacp_send(&_node2, &can_frame2to1);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -536,7 +536,7 @@ void test_send_lots_of_messages(void)
         err = artie_can_rtacp_init_frame(&can_frame1to2, &frame1to2);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        err = artie_can_send(&_node1, &can_frame1to2);
+        err = artie_can_rtacp_send(&_node1, &can_frame1to2);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         _run_event_loops();
 
@@ -564,7 +564,7 @@ void test_send_lots_of_messages(void)
         err = artie_can_rtacp_init_frame(&can_frame2to1, &frame2to1);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        err = artie_can_send(&_node2, &can_frame2to1);
+        err = artie_can_rtacp_send(&_node2, &can_frame2to1);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         _run_event_loops();
 
