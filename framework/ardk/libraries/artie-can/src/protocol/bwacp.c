@@ -217,9 +217,10 @@ static void _process_ready_frame_from_isr(artie_can_context_t *context, const ar
         return;
     }
 
-    if (frame->dlc < 7)
+    // If we are already receiving a bulk transfer from another source,
+    // ignore this READY frame (BWACP does not support concurrent transfers to the same node)
+    if (ctx->state == BWACP_STATE_RECEIVING)
     {
-        ARTIE_CAN_LOG(context, "BWACP: READY frame too short\n");
         return;
     }
 
@@ -229,13 +230,6 @@ static void _process_ready_frame_from_isr(artie_can_context_t *context, const ar
 
     // Check if we should accept this frame
     if (!_should_accept_frame(ctx, target_address, target_class))
-    {
-        return;
-    }
-
-    // If we are already receiving a bulk transfer from another source,
-    // ignore this READY frame (BWACP does not support concurrent transfers to the same node)
-    if (ctx->state == BWACP_STATE_RECEIVING)
     {
         return;
     }
@@ -260,12 +254,6 @@ static void _process_data_frame_from_isr(artie_can_context_t *context, const art
         return;
     }
 
-    // Only process if we're in receiving state
-    if (ctx->state != BWACP_STATE_RECEIVING)
-    {
-        return;
-    }
-
     // Check target address
     uint8_t target_address = (frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION;
     uint8_t target_class = (frame->id & BWACP_FRAME_ID_CLASS_MASK) >> BWACP_FRAME_ID_CLASS_LOCATION;
@@ -286,8 +274,22 @@ static void _process_data_frame_from_isr(artie_can_context_t *context, const art
         return;
     }
 
-    // Copy frame to context for main thread processing
-    memcpy(&ctx->received_frame, frame, sizeof(artie_can_frame_t));
+    // Check if circular buffer has space
+    uint32_t pending = ctx->data_frames_pending;
+    if (pending >= ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE)
+    {
+        ARTIE_CAN_LOG(context, "BWACP: DATA frame buffer full\n");
+        return;
+    }
+
+    // Copy frame to circular buffer
+    memcpy(&ctx->data_frame_buffer[ctx->data_frame_write_index], frame, sizeof(artie_can_frame_t));
+
+    // Update write index (wrap around)
+    ctx->data_frame_write_index = (ctx->data_frame_write_index + 1) % ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE;
+
+    // Atomically increment pending count (this makes the frame visible to main thread)
+    atomic_fetch_add(&ctx->data_frames_pending, 1);
 
     // Set flag
     atomic_fetch_or(&ctx->isr_flags, BWACP_ISR_FLAG_DATA_RECEIVED);
@@ -385,6 +387,156 @@ static artie_can_error_t _send_next_chunk(artie_can_backend_t *handle)
 
         return ARTIE_CAN_ERR_NONE;
     }
+}
+
+/**
+ * @brief Process READY frame received in ISR (main thread handler).
+ */
+static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+
+    // If we are already receiving a bulk transfer from another source,
+    // ignore this READY frame (BWACP does not support concurrent transfers to the same node)
+    if (ctx->state == BWACP_STATE_RECEIVING)
+    {
+        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
+        return ARTIE_CAN_ERR_NONE;
+    }
+
+    // Extract data from received frame
+    artie_can_frame_t *frame = &ctx->received_frame;
+
+    // Extract sender address
+    ctx->receive_sender_address = (frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION;
+
+    // Extract CRC24
+    ctx->receive_crc24 = ((uint32_t)frame->data[0] << 16) | ((uint32_t)frame->data[1] << 8) | frame->data[2];
+
+    // Extract address
+    ctx->receive_address = ((uint32_t)frame->data[3] << 24) | ((uint32_t)frame->data[4] << 16) | ((uint32_t)frame->data[5] << 8) | frame->data[6];
+
+    // Check interrupt bit
+    ctx->receive_ready_interrupt = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
+
+    // Reset receive state
+    ctx->receive_bytes_written = 0;
+    ctx->receive_expected_parity = false;
+    ctx->state = BWACP_STATE_RECEIVING;
+
+    ARTIE_CAN_LOG(handle->context, "BWACP: READY frame received (addr=0x%08X, CRC=0x%06X)\n", ctx->receive_address, ctx->receive_crc24);
+
+    atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
+    return ARTIE_CAN_ERR_NONE;
+}
+
+/**
+ * @brief Process DATA frame received in ISR (main thread handler).
+ */
+static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+
+    // Only process if we're in receiving state
+    if (ctx->state != BWACP_STATE_RECEIVING)
+    {
+        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_DATA_RECEIVED);
+        return ARTIE_CAN_ERR_NONE;
+    }
+
+    // Process all pending DATA frames from circular buffer
+    while (ctx->data_frames_pending > 0)
+    {
+        // Read frame from circular buffer
+        artie_can_frame_t *frame = &ctx->data_frame_buffer[ctx->data_frame_read_index];
+
+        // Check if this is a repeat frame
+        bool is_repeat = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
+
+        // Check buffer space
+        if (ctx->receive_bytes_written + frame->dlc <= ctx->receive_buffer_size)
+        {
+            // Copy data to receive buffer
+            if (ctx->receive_buffer != NULL && !is_repeat)
+            {
+                memcpy(&ctx->receive_buffer[ctx->receive_bytes_written], frame->data, frame->dlc);
+                ctx->receive_bytes_written += frame->dlc;
+
+                // Toggle expected parity for next frame
+                ctx->receive_expected_parity = !ctx->receive_expected_parity;
+            }
+        }
+        else
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: Receive buffer overflow\n");
+        }
+
+        // Update read index (wrap around)
+        ctx->data_frame_read_index = (ctx->data_frame_read_index + 1) % ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE;
+
+        // Atomically decrement pending count
+        atomic_fetch_sub(&ctx->data_frames_pending, 1);
+    }
+
+    atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_DATA_RECEIVED);
+    return ARTIE_CAN_ERR_NONE;
+}
+
+/**
+ * @brief Process REPEAT frame received in ISR (main thread handler).
+ */
+static artie_can_error_t _process_repeat_received(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+
+    // Extract data from received frame
+    artie_can_frame_t *frame = &ctx->received_frame;
+
+    bool repeat_all = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) == 0;
+
+    if (repeat_all)
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested\n");
+        // Reset to beginning
+        ctx->send_payload_offset = 0;
+        ctx->send_parity = false;
+        ctx->state = BWACP_STATE_SENDING;
+    }
+    else
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT last frame requested\n");
+        // Don't increment offset or toggle parity - resend last frame
+    }
+
+    atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_REPEAT_RECEIVED);
+    return ARTIE_CAN_ERR_NONE;
+}
+
+/**
+ * @brief Process COMPLETE frame received in ISR (main thread handler).
+ */
+static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    // Verify CRC
+    if (ctx->receive_buffer != NULL && ctx->receive_bytes_written > 0)
+    {
+        uint32_t calculated_crc = _calculate_crc24(ctx->receive_buffer, ctx->receive_bytes_written);
+        if (calculated_crc != ctx->receive_crc24)
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting repeat\n");
+            err = _send_repeat(handle, true);
+        }
+        else
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified\n");
+            ctx->state = BWACP_STATE_IDLE;
+        }
+    }
+    atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_COMPLETE_RECEIVED);
+    return err;
 }
 
 artie_can_error_t artie_can_init_context_bwacp(artie_can_context_t *context, uint8_t node_address, uint8_t node_class)
@@ -526,110 +678,22 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
 
     if ((ctx->isr_flags & BWACP_ISR_FLAG_READY_RECEIVED) != 0)
     {
-        // If we are already receiving a bulk transfer from another source,
-        // ignore this READY frame (BWACP does not support concurrent transfers to the same node)
-        if (ctx->state == BWACP_STATE_RECEIVING)
-        {
-            atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
-            return;
-        }
-
-        // Extract data from received frame
-        artie_can_frame_t *frame = &ctx->received_frame;
-
-        // Extract sender address
-        ctx->receive_sender_address = (frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION;
-
-        // Extract CRC24
-        ctx->receive_crc24 = ((uint32_t)frame->data[0] << 16) | ((uint32_t)frame->data[1] << 8) | frame->data[2];
-
-        // Extract address
-        ctx->receive_address = ((uint32_t)frame->data[3] << 24) | ((uint32_t)frame->data[4] << 16) | ((uint32_t)frame->data[5] << 8) | frame->data[6];
-
-        // Check interrupt bit
-        ctx->receive_ready_interrupt = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
-
-        // Reset receive state
-        ctx->receive_bytes_written = 0;
-        ctx->receive_expected_parity = false;
-        ctx->state = BWACP_STATE_RECEIVING;
-
-        ARTIE_CAN_LOG(handle->context, "BWACP: READY frame received (addr=0x%08X, CRC=0x%06X)\n", ctx->receive_address, ctx->receive_crc24);
-
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
+        err |= _process_ready_received(handle);
     }
 
     if ((ctx->isr_flags & BWACP_ISR_FLAG_DATA_RECEIVED) != 0)
     {
-        // Extract data from received frame
-        artie_can_frame_t *frame = &ctx->received_frame;
-
-        // Check if this is a repeat frame
-        bool is_repeat = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
-
-        // Check buffer space
-        if (ctx->receive_bytes_written + frame->dlc <= ctx->receive_buffer_size)
-        {
-            // Copy data to receive buffer
-            if (ctx->receive_buffer != NULL && !is_repeat)
-            {
-                memcpy(&ctx->receive_buffer[ctx->receive_bytes_written], frame->data, frame->dlc);
-                ctx->receive_bytes_written += frame->dlc;
-
-                // Toggle expected parity for next frame
-                ctx->receive_expected_parity = !ctx->receive_expected_parity;
-            }
-        }
-        else
-        {
-            ARTIE_CAN_LOG(handle->context, "BWACP: Receive buffer overflow\n");
-        }
-
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_DATA_RECEIVED);
+        err |= _process_data_received(handle);
     }
 
     if ((ctx->isr_flags & BWACP_ISR_FLAG_REPEAT_RECEIVED) != 0)
     {
-        // Extract data from received frame
-        artie_can_frame_t *frame = &ctx->received_frame;
-
-        bool repeat_all = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) == 0;
-
-        if (repeat_all)
-        {
-            ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested\n");
-            // Reset to beginning
-            ctx->send_payload_offset = 0;
-            ctx->send_parity = false;
-            ctx->state = BWACP_STATE_SENDING;
-        }
-        else
-        {
-            ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT last frame requested\n");
-            // Don't increment offset or toggle parity - resend last frame
-        }
-
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_REPEAT_RECEIVED);
+        err |= _process_repeat_received(handle);
     }
 
     if ((ctx->isr_flags & BWACP_ISR_FLAG_COMPLETE_RECEIVED) != 0)
     {
-        // Verify CRC
-        if (ctx->receive_buffer != NULL && ctx->receive_bytes_written > 0)
-        {
-            uint32_t calculated_crc = _calculate_crc24(ctx->receive_buffer, ctx->receive_bytes_written);
-            if (calculated_crc != ctx->receive_crc24)
-            {
-                ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting repeat\n");
-                _send_repeat(handle, true);
-            }
-            else
-            {
-                ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified\n");
-                ctx->state = BWACP_STATE_IDLE;
-            }
-        }
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_COMPLETE_RECEIVED);
+        err |= _process_complete_received(handle);
     }
 
     // State machine
@@ -637,7 +701,7 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
     {
         case BWACP_STATE_SENDING:
             // Continue sending DATA frames
-            err = _send_next_chunk(handle);
+            err |= _send_next_chunk(handle);
             break;
 
         case BWACP_STATE_WAITING_COMPLETE:

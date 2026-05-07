@@ -115,10 +115,46 @@ uint32_t atomic_fetch_and(atomic_uint32_t *ptr, uint32_t value)
     return __atomic_fetch_and(ptr, value, __ATOMIC_SEQ_CST);
 #else
     // Bare metal or unsupported platform: Use critical section
-    uint32_t state = critical_section_enter();
+    uint32_t state = _critical_section_enter();
     uint32_t old_value = *ptr;
     *ptr = old_value & value;
-    critical_section_exit(state);
+    _critical_section_exit(state);
+    return old_value;
+#endif
+}
+
+uint32_t atomic_fetch_add(atomic_uint32_t *ptr, uint32_t value)
+{
+#ifdef _WIN32
+    // Windows: Use InterlockedExchangeAdd which returns the original value
+    return (uint32_t)InterlockedExchangeAdd((volatile LONG *)ptr, (LONG)value);
+#elif defined(__GNUC__) || defined(__clang__)
+    // GCC/Clang: Use atomic built-ins with sequential consistency
+    return __atomic_fetch_add(ptr, value, __ATOMIC_SEQ_CST);
+#else
+    // Bare metal or unsupported platform: Use critical section
+    uint32_t state = _critical_section_enter();
+    uint32_t old_value = *ptr;
+    *ptr = old_value + value;
+    _critical_section_exit(state);
+    return old_value;
+#endif
+}
+
+uint32_t atomic_fetch_sub(atomic_uint32_t *ptr, uint32_t value)
+{
+#ifdef _WIN32
+    // Windows: Use InterlockedExchangeAdd with negative value
+    return (uint32_t)InterlockedExchangeAdd((volatile LONG *)ptr, -(LONG)value);
+#elif defined(__GNUC__) || defined(__clang__)
+    // GCC/Clang: Use atomic built-ins with sequential consistency
+    return __atomic_fetch_sub(ptr, value, __ATOMIC_SEQ_CST);
+#else
+    // Bare metal or unsupported platform: Use critical section
+    uint32_t state = _critical_section_enter();
+    uint32_t old_value = *ptr;
+    *ptr = old_value - value;
+    _critical_section_exit(state);
     return old_value;
 #endif
 }

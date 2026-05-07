@@ -14,6 +14,9 @@
 /** Maximum payload size for BWACP (64 KB) */
 #define ARTIE_CAN_BWACP_MAX_PAYLOAD_SIZE (65536U)
 
+/** Size of the circular buffer for DATA frames */
+#define ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE (16U)
+
 /**
  * @brief States that the BWACP state machine can be in for a given node.
  *
@@ -67,6 +70,12 @@ typedef struct {
     bool receive_expected_parity;           ///< Expected parity bit for next DATA frame
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
     bool receive_ready_interrupt;           ///< Whether the READY frame had the interrupt bit set
+
+    // Circular buffer for DATA frames (written by ISR, read by main thread)
+    artie_can_frame_t data_frame_buffer[ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE]; ///< Circular buffer for received DATA frames
+    uint32_t data_frame_read_index;         ///< Read index for circular buffer (modified only by main thread)
+    uint32_t data_frame_write_index;        ///< Write index for circular buffer (modified only by ISR)
+    atomic_uint32_t data_frames_pending;    ///< Number of DATA frames pending processing (atomic: incremented by ISR, decremented by main thread)
 
     // Written to by ISR
     artie_can_frame_t received_frame;       ///< Most recently received frame (for processing in main thread)
