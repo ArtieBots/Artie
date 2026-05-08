@@ -26,6 +26,7 @@ typedef enum {
     BWACP_STATE_SENDING,           ///< The node is sending a block write.
     BWACP_STATE_RECEIVING,         ///< The node is receiving a block write.
     BWACP_STATE_WAITING_COMPLETE,  ///< The node has finished sending and is waiting for receivers to acknowledge completion or request repeat.
+    BWACP_STATE_RECEIVE_COOLDOWN   ///< The node has finished receiving and is in a cooldown period before it can receive another block write from the same sender to the same target address (to allow for REPEAT requests to be received after COMPLETE).
 } bwacp_state_t;
 
 /**
@@ -33,11 +34,10 @@ typedef enum {
  */
 typedef enum {
     BWACP_ISR_FLAG_NONE = 0,                 ///< No special conditions for this ISR call
-    BWACP_ISR_FLAG_PENDING_REPEAT = 1 << 0,  ///< A REPEAT frame needs to be sent from main thread
-    BWACP_ISR_FLAG_READY_RECEIVED = 1 << 1,  ///< A READY frame was received in the ISR
-    BWACP_ISR_FLAG_DATA_RECEIVED = 1 << 2,   ///< A DATA frame was received in the ISR
-    BWACP_ISR_FLAG_COMPLETE_RECEIVED = 1 << 3, ///< A COMPLETE frame was received in the ISR
-    BWACP_ISR_FLAG_REPEAT_RECEIVED = 1 << 4,  ///< A REPEAT frame was received in the ISR
+    BWACP_ISR_FLAG_READY_RECEIVED = 1 << 0,  ///< A READY frame was received in the ISR
+    BWACP_ISR_FLAG_DATA_RECEIVED = 1 << 1,   ///< A DATA frame was received in the ISR
+    BWACP_ISR_FLAG_COMPLETE_RECEIVED = 1 << 2, ///< A COMPLETE frame was received in the ISR
+    BWACP_ISR_FLAG_REPEAT_RECEIVED = 1 << 3,  ///< A REPEAT frame was received in the ISR
 } bwacp_isr_flags_t;
 
 /**
@@ -49,7 +49,7 @@ typedef struct {
     uint8_t node_address;                   ///< The BWACP address of this node on the CAN bus
     uint8_t node_class;                     ///< The class bitmask of this node (bit 0=SBC, bit 1=MCU, bit 2=Sensor, bit 3=Motor, bits 4-5=Reserved)
     bwacp_state_t state;                    ///< The current state of the BWACP protocol for this node
-    uint64_t transfer_start_time_ms;        ///< The time in milliseconds when the transfer started
+    uint64_t last_packet_ms;                ///< The time in milliseconds when the latest packet has been received
 
     // Sending state
     const uint8_t *send_payload;            ///< Pointer to the payload being sent (owned by caller)
@@ -70,6 +70,7 @@ typedef struct {
     bool receive_expected_parity;           ///< Expected parity bit for next DATA frame
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
     bool receive_ready_interrupt;           ///< Whether the READY frame had the interrupt bit set
+    uint8_t sending_node_address;           ///< The address of the node we are receiving from
 
     // Circular buffer for DATA frames (written by ISR, read by main thread)
     artie_can_frame_t data_frame_buffer[ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE]; ///< Circular buffer for received DATA frames

@@ -15,17 +15,17 @@
 #include "frame.h"
 #include "log.h"
 
-// Location of class bits in ID field (lower 6 bits of remaining space)
-#define BWACP_FRAME_ID_CLASS_LOCATION 7U
-#define BWACP_FRAME_ID_CLASS_MASK (0x3F << BWACP_FRAME_ID_CLASS_LOCATION)
-
-// Location of repeat/interrupt bit
-#define BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION 1U
-#define BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK (0x01 << BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION)
-
-// Location of parity bit
-#define BWACP_FRAME_ID_PARITY_LOCATION 0U
-#define BWACP_FRAME_ID_PARITY_MASK (0x01 << BWACP_FRAME_ID_PARITY_LOCATION)
+// CRC24 algorithm constants
+/** Initial value for CRC24 calculation */
+#define BWACP_CRC24_INIT 0x000000U
+/** CRC24 polynomial */
+#define BWACP_CRC24_POLYNOMIAL 0x864CFBU
+/** Bit shift for XOR operation in CRC24 */
+#define BWACP_CRC24_XOR_SHIFT 16U
+/** MSB bit position for CRC24 */
+#define BWACP_CRC24_MSB_BIT 0x800000U
+/** Mask to keep only 24 bits */
+#define BWACP_CRC24_MASK 0xFFFFFFU
 
 /**
  * @brief Calculate CRC24 over a buffer (simplified implementation).
@@ -33,16 +33,16 @@
  */
 static uint32_t _calculate_crc24(const uint8_t *data, uint32_t length)
 {
-    uint32_t crc = 0x000000;
+    uint32_t crc = BWACP_CRC24_INIT;
 
     for (uint32_t i = 0; i < length; i++)
     {
-        crc ^= ((uint32_t)data[i] << 16);
+        crc ^= ((uint32_t)data[i] << BWACP_CRC24_XOR_SHIFT);
         for (int j = 0; j < 8; j++)
         {
-            if (crc & 0x800000)
+            if (crc & BWACP_CRC24_MSB_BIT)
             {
-                crc = (crc << 1) ^ 0x864CFB; // CRC24 polynomial
+                crc = (crc << 1) ^ BWACP_CRC24_POLYNOMIAL;
             }
             else
             {
@@ -51,7 +51,7 @@ static uint32_t _calculate_crc24(const uint8_t *data, uint32_t length)
         }
     }
 
-    return crc & 0xFFFFFF;
+    return crc & BWACP_CRC24_MASK;
 }
 
 /**
@@ -78,9 +78,9 @@ static bool _should_accept_frame(bwacp_context_t *ctx, uint8_t target_address, u
 }
 
 /**
- * @brief Send a REPEAT frame.
+ * @brief Send a REPEAT frame to request full retransmission.
  */
-static artie_can_error_t _send_repeat(artie_can_backend_t *handle, bool repeat_all)
+static artie_can_error_t _send_repeat(artie_can_backend_t *handle)
 {
     artie_can_frame_t frame = {0};
     bwacp_context_t *ctx = &handle->context->bwacp_context;
@@ -92,15 +92,9 @@ static artie_can_error_t _send_repeat(artie_can_backend_t *handle, bool repeat_a
                ((uint32_t)ctx->node_address << ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION) |
                ((uint32_t)ctx->receive_sender_address << ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION);
 
-    // Set repeat bit (1 = repeat last frame, 0 = repeat whole sequence)
-    if (!repeat_all)
-    {
-        frame.id |= (1U << BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION);
-    }
-
     frame.dlc = 0; // REPEAT frames have no data
 
-    ARTIE_CAN_LOG(handle->context, "BWACP: Sending REPEAT frame (repeat_all=%d)\n", repeat_all);
+    ARTIE_CAN_LOG(handle->context, "BWACP: Sending REPEAT frame (full retransmission)\n");
     return handle->send(handle->context, &frame);
 }
 
@@ -132,14 +126,14 @@ static artie_can_error_t _send_ready(artie_can_backend_t *handle, const uint8_t 
     }
 
     // Data: [3 bytes CRC24][4 bytes address][1 byte first stuffing byte]
-    frame.data[0] = (crc24 >> 16) & 0xFF;
-    frame.data[1] = (crc24 >> 8) & 0xFF;
-    frame.data[2] = crc24 & 0xFF;
-    frame.data[3] = (address >> 24) & 0xFF;
-    frame.data[4] = (address >> 16) & 0xFF;
-    frame.data[5] = (address >> 8) & 0xFF;
-    frame.data[6] = address & 0xFF;
-    frame.data[7] = 0x00; // First stuffing byte (simplified - not implementing full byte stuffing)
+    frame.data[BWACP_READY_DATA_CRC24_BYTE0] = (crc24 >> BWACP_CRC24_SHIFT_BYTE0) & 0xFF;
+    frame.data[BWACP_READY_DATA_CRC24_BYTE1] = (crc24 >> BWACP_CRC24_SHIFT_BYTE1) & 0xFF;
+    frame.data[BWACP_READY_DATA_CRC24_BYTE2] = (crc24 >> BWACP_CRC24_SHIFT_BYTE2) & 0xFF;
+    frame.data[BWACP_READY_DATA_ADDRESS_BYTE0] = (address >> BWACP_SHIFT_BYTE0) & 0xFF;
+    frame.data[BWACP_READY_DATA_ADDRESS_BYTE1] = (address >> BWACP_SHIFT_BYTE1) & 0xFF;
+    frame.data[BWACP_READY_DATA_ADDRESS_BYTE2] = (address >> BWACP_SHIFT_BYTE2) & 0xFF;
+    frame.data[BWACP_READY_DATA_ADDRESS_BYTE3] = (address >> BWACP_SHIFT_BYTE3) & 0xFF;
+    frame.data[BWACP_READY_DATA_STUFFING] = 0x00; // First stuffing byte (simplified - not implementing full byte stuffing)
     frame.dlc = 8;
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending READY frame (addr=0x%08X, size=%u)\n", address, payload_size);
@@ -237,6 +231,9 @@ static void _process_ready_frame_from_isr(artie_can_context_t *context, const ar
     // Copy frame to context for main thread processing
     memcpy(&ctx->received_ready_frame, frame, sizeof(artie_can_frame_t));
 
+    // Set the address of the node we are receiving from
+    ctx->sending_node_address = (uint8_t)((frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
+
     // Set flag for main thread
     atomic_fetch_or(&ctx->isr_flags, BWACP_ISR_FLAG_READY_RECEIVED);
 }
@@ -263,14 +260,21 @@ static void _process_data_frame_from_isr(artie_can_context_t *context, const art
         return;
     }
 
+    // Check that we are supposed to be receiving from this node
+    uint8_t sending_node_address = (uint8_t)((frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
+    if (sending_node_address != ctx->sending_node_address)
+    {
+        return;
+    }
+
     // Extract parity
     bool parity = (frame->id & BWACP_FRAME_ID_PARITY_MASK) != 0;
 
-    // Check parity
+    // Check parity - if mismatch, drop the frame and continue
+    // The CRC check at the end will catch the error and request full retransmission
     if (parity != ctx->receive_expected_parity)
     {
-        ARTIE_CAN_LOG(context, "BWACP: Parity mismatch, requesting REPEAT\n");
-        atomic_fetch_or(&ctx->isr_flags, BWACP_ISR_FLAG_PENDING_REPEAT);
+        ARTIE_CAN_LOG(context, "BWACP: Parity mismatch, dropping frame (will be caught by CRC check)\n");
         return;
     }
 
@@ -316,6 +320,13 @@ static void _process_complete_frame_from_isr(artie_can_context_t *context, const
     uint8_t target_class = (frame->id & BWACP_FRAME_ID_CLASS_MASK) >> BWACP_FRAME_ID_CLASS_LOCATION;
 
     if (!_should_accept_frame(ctx, target_address, target_class))
+    {
+        return;
+    }
+
+    // Check that we are supposed to be receiving from this node
+    uint8_t sending_node_address = (uint8_t)((frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
+    if (sending_node_address != ctx->sending_node_address)
     {
         return;
     }
@@ -390,14 +401,6 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
 
-    // If we are already receiving a bulk transfer from another source,
-    // ignore this READY frame (BWACP does not support concurrent transfers to the same node)
-    if (ctx->state == BWACP_STATE_RECEIVING)
-    {
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
-        return ARTIE_CAN_ERR_NONE;
-    }
-
     // Extract data from received READY frame
     artie_can_frame_t *frame = &ctx->received_ready_frame;
 
@@ -405,10 +408,15 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
     ctx->receive_sender_address = (frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION;
 
     // Extract CRC24
-    ctx->receive_crc24 = ((uint32_t)frame->data[0] << 16) | ((uint32_t)frame->data[1] << 8) | frame->data[2];
+    ctx->receive_crc24 = ((uint32_t)frame->data[BWACP_READY_DATA_CRC24_BYTE0] << BWACP_CRC24_SHIFT_BYTE0) |
+                         ((uint32_t)frame->data[BWACP_READY_DATA_CRC24_BYTE1] << BWACP_CRC24_SHIFT_BYTE1) |
+                         ((uint32_t)frame->data[BWACP_READY_DATA_CRC24_BYTE2] << BWACP_CRC24_SHIFT_BYTE2);
 
     // Extract address
-    ctx->receive_address = ((uint32_t)frame->data[3] << 24) | ((uint32_t)frame->data[4] << 16) | ((uint32_t)frame->data[5] << 8) | frame->data[6];
+    ctx->receive_address = ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE0] << BWACP_SHIFT_BYTE0) |
+                           ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE1] << BWACP_SHIFT_BYTE1) |
+                           ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE2] << BWACP_SHIFT_BYTE2) |
+                           ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE3] << BWACP_SHIFT_BYTE3);
 
     // Check interrupt bit
     ctx->receive_ready_interrupt = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
@@ -417,6 +425,7 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
     ctx->receive_bytes_written = 0;
     ctx->receive_expected_parity = false;
     ctx->state = BWACP_STATE_RECEIVING;
+    ctx->last_packet_ms = handle->get_ms();
 
     ARTIE_CAN_LOG(handle->context, "BWACP: READY frame received (addr=0x%08X, CRC=0x%06X)\n", ctx->receive_address, ctx->receive_crc24);
 
@@ -469,6 +478,9 @@ static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
         atomic_fetch_sub(&ctx->data_frames_pending, 1);
     }
 
+    // Update timeout counter
+    ctx->last_packet_ms = handle->get_ms();
+
     atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_DATA_RECEIVED);
     return ARTIE_CAN_ERR_NONE;
 }
@@ -480,24 +492,12 @@ static artie_can_error_t _process_repeat_received(artie_can_backend_t *handle)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
 
-    // Extract data from received REPEAT frame
-    artie_can_frame_t *frame = &ctx->received_repeat_frame;
+    ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested\n");
 
-    bool repeat_all = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) == 0;
-
-    if (repeat_all)
-    {
-        ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested\n");
-        // Reset to beginning
-        ctx->send_payload_offset = 0;
-        ctx->send_parity = false;
-        ctx->state = BWACP_STATE_SENDING;
-    }
-    else
-    {
-        ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT last frame requested\n");
-        // Don't increment offset or toggle parity - resend last frame
-    }
+    // Reset to beginning for full retransmission
+    ctx->send_payload_offset = 0;
+    ctx->send_parity = false;
+    ctx->state = BWACP_STATE_SENDING;
 
     atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_REPEAT_RECEIVED);
     return ARTIE_CAN_ERR_NONE;
@@ -512,22 +512,72 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
     artie_can_error_t err = ARTIE_CAN_ERR_NONE;
 
     // Verify CRC
-    if (ctx->receive_buffer != NULL && ctx->receive_bytes_written > 0)
+    if ((ctx->receive_buffer != NULL) && (ctx->receive_bytes_written > 0))
     {
         uint32_t calculated_crc = _calculate_crc24(ctx->receive_buffer, ctx->receive_bytes_written);
         if (calculated_crc != ctx->receive_crc24)
         {
-            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting repeat\n");
-            err = _send_repeat(handle, true);
+            // Set up the receive state
+            ctx->receive_bytes_written = 0;
+            ctx->receive_crc24 = 0;
+            ctx->state = BWACP_STATE_RECEIVING;
+
+            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting full retransmission\n");
+            err = _send_repeat(handle);
         }
         else
         {
+            // Reset the receive state
+            ctx->sending_node_address = 0xFF;
+            ctx->state = BWACP_STATE_RECEIVE_COOLDOWN;
+
             ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified\n");
-            ctx->state = BWACP_STATE_IDLE;
         }
     }
     atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_COMPLETE_RECEIVED);
     return err;
+}
+
+static artie_can_error_t _check_timeout_receiving(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
+    if (elapsed >= ARTIE_CAN_BWACP_TIMEOUT_MS)
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: Transfer timeout\n");
+        ctx->sending_node_address = 0xFF;
+        ctx->state = BWACP_STATE_IDLE;
+        return ARTIE_CAN_ERR_TIMEOUT;
+    }
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _check_timeout_waiting_complete(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
+    if (elapsed >= ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: Finished waiting for REPEATs. Transfer is complete.\n");
+        ctx->state = BWACP_STATE_IDLE;
+
+        // No error here - the timeout is a normal part of operation
+    }
+    return ARTIE_CAN_ERR_NONE;
+}
+
+static artie_can_error_t _check_timeout_receive_cooldown(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
+    if (elapsed >= ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: Receive cooldown complete. Returning to idle state.\n");
+        ctx->state = BWACP_STATE_IDLE;
+
+        // No error here - the timeout is a normal part of operation
+    }
+    return ARTIE_CAN_ERR_NONE;
 }
 
 artie_can_error_t artie_can_init_context_bwacp(artie_can_context_t *context, uint8_t node_address, uint8_t node_class)
@@ -546,6 +596,7 @@ artie_can_error_t artie_can_init_context_bwacp(artie_can_context_t *context, uin
     context->bwacp_context.node_address = node_address;
     context->bwacp_context.node_class = node_class;
     context->bwacp_context.state = BWACP_STATE_IDLE;
+    context->bwacp_context.sending_node_address = 0xFF;
 
     // Enable BWACP protocol
     context->protocol_flags |= ARTIE_CAN_PROTOCOL_FLAG_BWACP;
@@ -591,7 +642,6 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     ctx->send_target_class = target_class;
     ctx->send_parity = false;
     ctx->state = BWACP_STATE_SENDING;
-    ctx->transfer_start_time_ms = handle->get_ms();
 
     // Send READY frame
     artie_can_error_t err = _send_ready(handle, payload, payload_size, address, target_address, target_class, priority, false);
@@ -640,7 +690,7 @@ void bwacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
 
 artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
 {
-    if (handle == NULL || handle->context == NULL)
+    if ((handle == NULL) || (handle->context == NULL))
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -648,25 +698,7 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
     bwacp_context_t *ctx = &handle->context->bwacp_context;
     artie_can_error_t err = ARTIE_CAN_ERR_NONE;
 
-    // Check for timeout
-    if (ctx->state != BWACP_STATE_IDLE)
-    {
-        uint64_t elapsed = handle->get_ms() - ctx->transfer_start_time_ms;
-        if (elapsed >= ARTIE_CAN_BWACP_TIMEOUT_MS)
-        {
-            ARTIE_CAN_LOG(handle->context, "BWACP: Transfer timeout\n");
-            ctx->state = BWACP_STATE_IDLE;
-            err |= ARTIE_CAN_ERR_TIMEOUT;
-        }
-    }
-
     // Process ISR flags
-    if ((ctx->isr_flags & BWACP_ISR_FLAG_PENDING_REPEAT) != 0)
-    {
-        err |= _send_repeat(handle, false);
-        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_PENDING_REPEAT);
-    }
-
     if ((ctx->isr_flags & BWACP_ISR_FLAG_READY_RECEIVED) != 0)
     {
         err |= _process_ready_received(handle);
@@ -694,10 +726,17 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
             // Continue sending DATA frames
             err |= _send_next_chunk(handle);
             break;
-
         case BWACP_STATE_WAITING_COMPLETE:
+            err |= _check_timeout_waiting_complete(handle);
+            break;
         case BWACP_STATE_RECEIVING:
+            err |= _check_timeout_receiving(handle);
+            break;
+        case BWACP_STATE_RECEIVE_COOLDOWN:
+            err |= _check_timeout_receive_cooldown(handle);
+            break;
         case BWACP_STATE_IDLE:
+            break;
         default:
             break;
     }

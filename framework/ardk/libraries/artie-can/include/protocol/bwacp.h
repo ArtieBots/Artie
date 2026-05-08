@@ -19,8 +19,63 @@
 /** Multicast address (target address = 0x3F) */
 #define ARTIE_CAN_BWACP_MULTICAST_ADDRESS 0x3FU
 
-/** Timeout in ms for BWACP operations */
+/** Timeout in ms for waiting for the next packet */
 #define ARTIE_CAN_BWACP_TIMEOUT_MS 5000U
+
+/** Timeout in ms for waiting for REPEAT frames after transfer completes */
+#define ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS 1000U
+
+// BWACP READY frame data layout offsets
+/** Offset of CRC24 byte 0 (MSB) in READY frame data */
+#define BWACP_READY_DATA_CRC24_BYTE0 0U
+/** Offset of CRC24 byte 1 in READY frame data */
+#define BWACP_READY_DATA_CRC24_BYTE1 1U
+/** Offset of CRC24 byte 2 (LSB) in READY frame data */
+#define BWACP_READY_DATA_CRC24_BYTE2 2U
+/** Offset of address byte 0 (MSB) in READY frame data */
+#define BWACP_READY_DATA_ADDRESS_BYTE0 3U
+/** Offset of address byte 1 in READY frame data */
+#define BWACP_READY_DATA_ADDRESS_BYTE1 4U
+/** Offset of address byte 2 in READY frame data */
+#define BWACP_READY_DATA_ADDRESS_BYTE2 5U
+/** Offset of address byte 3 (LSB) in READY frame data */
+#define BWACP_READY_DATA_ADDRESS_BYTE3 6U
+/** Offset of stuffing byte in READY frame data */
+#define BWACP_READY_DATA_STUFFING 7U
+
+// Bit shift amounts for multi-byte field extraction/packing
+/** Bit shift for most significant byte of 32-bit value */
+#define BWACP_SHIFT_BYTE0 24U
+/** Bit shift for second byte of 32-bit value */
+#define BWACP_SHIFT_BYTE1 16U
+/** Bit shift for third byte of 32-bit value */
+#define BWACP_SHIFT_BYTE2 8U
+/** Bit shift for least significant byte */
+#define BWACP_SHIFT_BYTE3 0U
+
+// CRC24 specific shifts
+/** Bit shift for CRC24 MSB (byte 0) */
+#define BWACP_CRC24_SHIFT_BYTE0 16U
+/** Bit shift for CRC24 middle byte (byte 1) */
+#define BWACP_CRC24_SHIFT_BYTE1 8U
+/** Bit shift for CRC24 LSB (byte 2) */
+#define BWACP_CRC24_SHIFT_BYTE2 0U
+
+// Location of BWACP-specific bits in ID field
+/** Location of class bits in ID field (6 bits for target class) */
+#define BWACP_FRAME_ID_CLASS_LOCATION 7U
+/** Mask for class bits in ID field */
+#define BWACP_FRAME_ID_CLASS_MASK (0x3FU << BWACP_FRAME_ID_CLASS_LOCATION)
+
+/** Location of repeat/interrupt bit in ID field */
+#define BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION 1U
+/** Mask for repeat/interrupt bit in ID field */
+#define BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK (0x01U << BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION)
+
+/** Location of parity bit in ID field */
+#define BWACP_FRAME_ID_PARITY_LOCATION 0U
+/** Mask for parity bit in ID field */
+#define BWACP_FRAME_ID_PARITY_MASK (0x01U << BWACP_FRAME_ID_PARITY_LOCATION)
 
 /**
  * @brief Enumeration for BWACP frame types.
