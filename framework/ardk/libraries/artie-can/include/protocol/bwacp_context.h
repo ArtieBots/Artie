@@ -26,7 +26,6 @@ typedef enum {
     BWACP_STATE_SENDING,           ///< The node is sending a block write.
     BWACP_STATE_RECEIVING,         ///< The node is receiving a block write.
     BWACP_STATE_WAITING_COMPLETE,  ///< The node has finished sending and is waiting for receivers to acknowledge completion or request repeat.
-    BWACP_STATE_RECEIVE_COOLDOWN   ///< The node has finished receiving and is in a cooldown period before it can receive another block write from the same sender to the same target address (to allow for REPEAT requests to be received after COMPLETE).
 } bwacp_state_t;
 
 /**
@@ -71,6 +70,11 @@ typedef struct {
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
     bool receive_ready_interrupt;           ///< Whether the READY frame had the interrupt bit set
     uint8_t sending_node_address;           ///< The address of the node we are receiving from
+
+    // Last completed transfer tracking (to prevent duplicate reception of same transfer during REPEAT cooldown)
+    uint8_t last_completed_sender_address;  ///< Sender address of last completed transfer
+    uint32_t last_completed_receive_address; ///< Receive address of last completed transfer
+    uint64_t last_completed_timestamp_ms;   ///< Timestamp when last transfer completed
 
     // Circular buffer for DATA frames (written by ISR, read by main thread)
     artie_can_frame_t data_frame_buffer[ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE]; ///< Circular buffer for received DATA frames

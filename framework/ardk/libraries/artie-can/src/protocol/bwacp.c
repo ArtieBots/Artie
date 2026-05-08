@@ -418,6 +418,18 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
                            ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE2] << BWACP_SHIFT_BYTE2) |
                            ((uint32_t)frame->data[BWACP_READY_DATA_ADDRESS_BYTE3] << BWACP_SHIFT_BYTE3);
 
+    // Check if this is the same transfer we just completed (within cooldown period)
+    // This prevents receiving duplicate transfers when a sibling node requests REPEAT
+    uint64_t time_since_last_complete = handle->get_ms() - ctx->last_completed_timestamp_ms;
+    bool same_sender = ctx->receive_sender_address == ctx->last_completed_sender_address;
+    bool same_address = ctx->receive_address == ctx->last_completed_receive_address;
+    if ((time_since_last_complete < ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS) && same_sender && same_address)
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: Ignoring duplicate transfer within cooldown (sender=0x%02X, addr=0x%08X)\n", ctx->receive_sender_address, ctx->receive_address);
+        atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_READY_RECEIVED);
+        return ARTIE_CAN_ERR_NONE;
+    }
+
     // Check interrupt bit
     ctx->receive_ready_interrupt = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
 
@@ -527,11 +539,16 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
         }
         else
         {
-            // Reset the receive state
-            ctx->sending_node_address = 0xFF;
-            ctx->state = BWACP_STATE_RECEIVE_COOLDOWN;
-
             ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified\n");
+
+            // Save this transfer info for cooldown period
+            ctx->last_completed_sender_address = ctx->receive_sender_address;
+            ctx->last_completed_receive_address = ctx->receive_address;
+            ctx->last_completed_timestamp_ms = handle->get_ms();
+
+            // Return to IDLE - we can receive new transfers immediately
+            ctx->sending_node_address = 0xFF;
+            ctx->state = BWACP_STATE_IDLE;
         }
     }
     atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_COMPLETE_RECEIVED);
@@ -559,20 +576,6 @@ static artie_can_error_t _check_timeout_waiting_complete(artie_can_backend_t *ha
     if (elapsed >= ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Finished waiting for REPEATs. Transfer is complete.\n");
-        ctx->state = BWACP_STATE_IDLE;
-
-        // No error here - the timeout is a normal part of operation
-    }
-    return ARTIE_CAN_ERR_NONE;
-}
-
-static artie_can_error_t _check_timeout_receive_cooldown(artie_can_backend_t *handle)
-{
-    bwacp_context_t *ctx = &handle->context->bwacp_context;
-    uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
-    if (elapsed >= ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)
-    {
-        ARTIE_CAN_LOG(handle->context, "BWACP: Receive cooldown complete. Returning to idle state.\n");
         ctx->state = BWACP_STATE_IDLE;
 
         // No error here - the timeout is a normal part of operation
@@ -731,9 +734,6 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
             break;
         case BWACP_STATE_RECEIVING:
             err |= _check_timeout_receiving(handle);
-            break;
-        case BWACP_STATE_RECEIVE_COOLDOWN:
-            err |= _check_timeout_receive_cooldown(handle);
             break;
         case BWACP_STATE_IDLE:
             break;
