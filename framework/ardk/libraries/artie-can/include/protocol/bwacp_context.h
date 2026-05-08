@@ -77,7 +77,9 @@ typedef struct {
     uint32_t data_frame_write_index;        ///< Write index for circular buffer (modified only by ISR)
     atomic_uint32_t data_frames_pending;    ///< Number of DATA frames pending processing (atomic: incremented by ISR, decremented by main thread)
 
-    // Written to by ISR
-    artie_can_frame_t received_frame;       ///< Most recently received frame (for processing in main thread)
+    // Written to by ISR (each ISR type has its own dedicated frame)
+    artie_can_frame_t received_ready_frame;     ///< Most recently received READY frame (for processing in main thread)
+    artie_can_frame_t received_complete_frame;  ///< Most recently received COMPLETE frame (for processing in main thread)
+    artie_can_frame_t received_repeat_frame;    ///< Most recently received REPEAT frame (for processing in main thread)
     atomic_uint32_t isr_flags;              ///< Flags to indicate special conditions found during ISR; cleared by main thread (atomic operations required)
 } bwacp_context_t;

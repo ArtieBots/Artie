@@ -150,6 +150,24 @@ void test_rtacp_while_bwacp(void)
 }
 
 /**
+ * @brief Test that two concurrent BWACP transfers do not mess
+ * each other up.
+ *
+ */
+void test_concurrent_bwacp(void)
+{
+    // Four nodes: A, B, C, and D
+    // Nodes C and D will be receiving bulk transfers and are
+    // both sensor nodes.
+    // Node A starts a bwacp transfer to node C by address.
+    // Node B starts a bwacp transfer to sensor class.
+    // Node D should receive all the bytes from node B,
+    // while node C should receive all the bytes from node A.
+    // Node C is busy receiving from A so even though it is a sensor
+    // node, it can't listen to the bwacp transfer from B.
+}
+
+/**
  * @brief Main function - runs all tests.
  *
  * This function sets up the Unity test runner and executes all tests.

@@ -235,7 +235,7 @@ static void _process_ready_frame_from_isr(artie_can_context_t *context, const ar
     }
 
     // Copy frame to context for main thread processing
-    memcpy(&ctx->received_frame, frame, sizeof(artie_can_frame_t));
+    memcpy(&ctx->received_ready_frame, frame, sizeof(artie_can_frame_t));
 
     // Set flag for main thread
     atomic_fetch_or(&ctx->isr_flags, BWACP_ISR_FLAG_READY_RECEIVED);
@@ -274,6 +274,9 @@ static void _process_data_frame_from_isr(artie_can_context_t *context, const art
         return;
     }
 
+    // Toggle expected parity for next frame
+    ctx->receive_expected_parity = !ctx->receive_expected_parity;
+
     // Check if circular buffer has space
     uint32_t pending = ctx->data_frames_pending;
     if (pending >= ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE)
@@ -308,12 +311,6 @@ static void _process_complete_frame_from_isr(artie_can_context_t *context, const
         return;
     }
 
-    // Only process if we're in receiving state
-    if (ctx->state != BWACP_STATE_RECEIVING)
-    {
-        return;
-    }
-
     // Check target address
     uint8_t target_address = (frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION;
     uint8_t target_class = (frame->id & BWACP_FRAME_ID_CLASS_MASK) >> BWACP_FRAME_ID_CLASS_LOCATION;
@@ -322,6 +319,9 @@ static void _process_complete_frame_from_isr(artie_can_context_t *context, const
     {
         return;
     }
+
+    // Copy frame to context for main thread processing
+    memcpy(&ctx->received_complete_frame, frame, sizeof(artie_can_frame_t));
 
     ARTIE_CAN_LOG(context, "BWACP: COMPLETE frame received\n");
 
@@ -342,12 +342,6 @@ static void _process_repeat_frame_from_isr(artie_can_context_t *context, const a
         return;
     }
 
-    // Only process if we're sending
-    if (ctx->state != BWACP_STATE_SENDING && ctx->state != BWACP_STATE_WAITING_COMPLETE)
-    {
-        return;
-    }
-
     // Check if addressed to us
     uint8_t target_address = (frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION;
     if (target_address != ctx->node_address)
@@ -356,7 +350,7 @@ static void _process_repeat_frame_from_isr(artie_can_context_t *context, const a
     }
 
     // Copy frame to context for main thread processing
-    memcpy(&ctx->received_frame, frame, sizeof(artie_can_frame_t));
+    memcpy(&ctx->received_repeat_frame, frame, sizeof(artie_can_frame_t));
 
     // Set flag for main thread
     atomic_fetch_or(&ctx->isr_flags, BWACP_ISR_FLAG_REPEAT_RECEIVED);
@@ -404,8 +398,8 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
         return ARTIE_CAN_ERR_NONE;
     }
 
-    // Extract data from received frame
-    artie_can_frame_t *frame = &ctx->received_frame;
+    // Extract data from received READY frame
+    artie_can_frame_t *frame = &ctx->received_ready_frame;
 
     // Extract sender address
     ctx->receive_sender_address = (frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION;
@@ -461,9 +455,6 @@ static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
             {
                 memcpy(&ctx->receive_buffer[ctx->receive_bytes_written], frame->data, frame->dlc);
                 ctx->receive_bytes_written += frame->dlc;
-
-                // Toggle expected parity for next frame
-                ctx->receive_expected_parity = !ctx->receive_expected_parity;
             }
         }
         else
@@ -489,8 +480,8 @@ static artie_can_error_t _process_repeat_received(artie_can_backend_t *handle)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
 
-    // Extract data from received frame
-    artie_can_frame_t *frame = &ctx->received_frame;
+    // Extract data from received REPEAT frame
+    artie_can_frame_t *frame = &ctx->received_repeat_frame;
 
     bool repeat_all = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) == 0;
 
@@ -665,14 +656,14 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
         {
             ARTIE_CAN_LOG(handle->context, "BWACP: Transfer timeout\n");
             ctx->state = BWACP_STATE_IDLE;
-            return ARTIE_CAN_ERR_TIMEOUT;
+            err |= ARTIE_CAN_ERR_TIMEOUT;
         }
     }
 
     // Process ISR flags
     if ((ctx->isr_flags & BWACP_ISR_FLAG_PENDING_REPEAT) != 0)
     {
-        err = _send_repeat(handle, false);
+        err |= _send_repeat(handle, false);
         atomic_fetch_and(&ctx->isr_flags, ~BWACP_ISR_FLAG_PENDING_REPEAT);
     }
 
