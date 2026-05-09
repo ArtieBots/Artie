@@ -467,13 +467,13 @@ static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
         // Check if this is a repeat frame
         bool is_repeat = (frame->id & BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK) != 0;
 
-        // Check buffer space
-        if (ctx->receive_bytes_written + frame->dlc <= ctx->receive_buffer_size)
+        // Check buffer space (address is the offset within the buffer where data should be written)
+        if (ctx->receive_address + ctx->receive_bytes_written + frame->dlc <= ctx->receive_buffer_size)
         {
-            // Copy data to receive buffer
+            // Copy data to receive buffer at the specified offset
             if (ctx->receive_buffer != NULL && !is_repeat)
             {
-                memcpy(&ctx->receive_buffer[ctx->receive_bytes_written], frame->data, frame->dlc);
+                memcpy(&ctx->receive_buffer[ctx->receive_address + ctx->receive_bytes_written], frame->data, frame->dlc);
                 ctx->receive_bytes_written += frame->dlc;
             }
         }

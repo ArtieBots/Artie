@@ -138,7 +138,7 @@ artie_can_error_t artie_can_bwacp_set_receive_buffer(artie_can_context_t *contex
  * @param handle Pointer to the artie_can_backend_t struct representing the backend.
  * @param payload Pointer to the payload data to send. Must remain valid until the block write completes.
  * @param payload_size Size of the payload in bytes.
- * @param address Application-specific address (4 bytes).
+ * @param address Buffer offset (0 to buffer_size - payload_size) where the receiving node(s) should write the data.
  * @param target_address Target node address (0-62), or ARTIE_CAN_BWACP_MULTICAST_ADDRESS for multicast.
  * @param target_class If multicast, the class bitmask to target. Otherwise, ignored.
  * @param priority Priority for the block write frames.

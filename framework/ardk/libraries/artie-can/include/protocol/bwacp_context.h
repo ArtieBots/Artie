@@ -54,7 +54,7 @@ typedef struct {
     const uint8_t *send_payload;            ///< Pointer to the payload being sent (owned by caller)
     uint32_t send_payload_size;             ///< Size of the payload being sent
     uint32_t send_payload_offset;           ///< Current offset in the send payload
-    uint32_t send_address;                  ///< Application-specific address for the write
+    uint32_t send_address;                  ///< Buffer offset where the receiving node(s) should write the data
     uint8_t send_target_address;            ///< Target node address (or 0x3F for multicast)
     uint8_t send_target_class;              ///< Target class bitmask (for multicast)
     bool send_parity;                       ///< Current parity bit for DATA frames
@@ -64,7 +64,7 @@ typedef struct {
     uint8_t *receive_buffer;                ///< Buffer for receiving data (owned by caller, must be provided before receiving)
     uint32_t receive_buffer_size;           ///< Size of the receive buffer
     uint32_t receive_bytes_written;         ///< Number of bytes written to the receive buffer so far
-    uint32_t receive_address;               ///< Application-specific address for the received write
+    uint32_t receive_address;               ///< Buffer offset where received data should be written
     uint8_t receive_sender_address;         ///< Address of the sender
     bool receive_expected_parity;           ///< Expected parity bit for next DATA frame
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
