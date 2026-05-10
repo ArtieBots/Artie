@@ -9,7 +9,7 @@ that implements the protocol.
 ## General Architecture
 
 This library is meant to run both on an OS and in a bare-metal embedded context, so it is
-entirely heapless (except for the TCP backend, which is used in testing). This means that
+entirely heapless (except for the UDP multicast backend, which is used in testing). This means that
 structs used by the library are managed by the caller and their lifetime must last the entire
 lifetime of the library (until deinitialization, if ever). This is called out in any API documentation
 as appropriate.
@@ -17,7 +17,7 @@ as appropriate.
 The general architecture of the library is this:
 
 * Lowest level: backend (transport layer) - the library is meant to work over CAN bus,
-  but for testing, using sockets with TCP is awfully convenient. Additionally, every device
+  but for testing, using UDP multicast is awfully convenient. Additionally, every device
   has a different way to interact with a CAN bus. Some microcontrollers have a CAN peripheral,
   while others make use of an external SPI to CAN translator (such as the ubiquitous MCP 2515).
   Therefore, we provide a couple of backends that we use in Artie reference implementations,

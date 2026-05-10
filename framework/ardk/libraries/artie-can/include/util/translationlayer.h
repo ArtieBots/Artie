@@ -34,6 +34,15 @@
     #define SOCKET_ERROR_VALUE -1
 #endif
 
+// Platform-independent socket type aliases
+typedef struct sockaddr_in sockaddr_in_t;
+typedef struct sockaddr sockaddr_t;
+typedef struct ip_mreq ip_mreq_t;
+typedef struct timeval timeval_t;
+#ifdef _WIN32
+    typedef int socklen_t;
+#endif
+
 // Platform-independent socket shutdown modes
 typedef enum {
     SHUTDOWN_RECEIVE = 0,  ///< Stop receiving data
@@ -90,6 +99,14 @@ bool create_thread(thread_handle_t *handle, thread_func_t func, void *arg);
  * @return true if the thread completed, false on timeout or error.
  */
 bool join_thread(thread_handle_t handle, uint32_t timeout_ms);
+
+
+/**
+ * @brief Atomically store a value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to store.
+ */
+void atomic_store(atomic_uint32_t *ptr, uint32_t value);
 
 /**
  * @brief Atomically perform bitwise OR operation.
@@ -152,3 +169,22 @@ int close_socket(socket_t sock);
  * @return 0 on success, -1 on error.
  */
 int shutdown_socket(socket_t sock, int how);
+
+/**
+ * @brief Get the last socket error code.
+ * @return Error code from the last socket operation.
+ */
+int get_socket_error(void);
+
+/**
+ * @brief Check if the last socket error was a timeout or interrupt (non-fatal).
+ * @return true if the error was a timeout or interrupt, false otherwise.
+ */
+bool is_socket_error_wouldblock(void);
+
+/**
+ * @brief Set SO_REUSEPORT option on a socket (Unix-specific, no-op on Windows).
+ * @param sock The socket to configure.
+ * @return 0 on success, -1 on error (non-fatal on systems without SO_REUSEPORT).
+ */
+int set_socket_reuse_port(socket_t sock);

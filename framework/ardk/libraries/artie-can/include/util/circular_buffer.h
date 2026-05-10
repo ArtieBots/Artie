@@ -10,7 +10,7 @@
 #include "frame.h"
 
 /** The size of the buffer in frames. */
-#define ARTIE_CAN_TCP_BUFFER_N_FRAMES 100U
+#define ARTIE_CAN_BUFFER_N_FRAMES 100U
 
 /**
  * @brief Get the current number of frames in the buffer.

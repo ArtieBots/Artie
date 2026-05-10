@@ -8,7 +8,7 @@
 #include <string.h>
 
 /** Static buffer storage for frames */
-static artie_can_frame_t _buffer[ARTIE_CAN_TCP_BUFFER_N_FRAMES];
+static artie_can_frame_t _buffer[ARTIE_CAN_BUFFER_N_FRAMES];
 
 /** Read index (head of the buffer) */
 static uint32_t _read_index = 0;
@@ -41,7 +41,7 @@ artie_can_error_t cb_read(artie_can_frame_t *out)
     memcpy(out, &_buffer[_read_index], sizeof(artie_can_frame_t));
 
     // Update read index (wrap around if necessary)
-    _read_index = (_read_index + 1) % ARTIE_CAN_TCP_BUFFER_N_FRAMES;
+    _read_index = (_read_index + 1) % ARTIE_CAN_BUFFER_N_FRAMES;
 
     // Decrement count
     _count--;
@@ -57,7 +57,7 @@ artie_can_error_t cb_write(const artie_can_frame_t *in)
     }
 
     // Check if buffer is full
-    if (_count >= ARTIE_CAN_TCP_BUFFER_N_FRAMES)
+    if (_count >= ARTIE_CAN_BUFFER_N_FRAMES)
     {
         return ARTIE_CAN_ERR_NO_SPACE;
     }
@@ -66,7 +66,7 @@ artie_can_error_t cb_write(const artie_can_frame_t *in)
     memcpy(&_buffer[_write_index], in, sizeof(artie_can_frame_t));
 
     // Update write index (wrap around if necessary)
-    _write_index = (_write_index + 1) % ARTIE_CAN_TCP_BUFFER_N_FRAMES;
+    _write_index = (_write_index + 1) % ARTIE_CAN_BUFFER_N_FRAMES;
 
     // Increment count
     _count++;
