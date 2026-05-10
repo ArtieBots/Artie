@@ -202,6 +202,51 @@ void test_send_one_byte(void)
  */
 void test_send_four_bytes(void)
 {
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_send_four_bytes !!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a 4-byte payload
+    uint8_t send_data[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    // Address specifies the offset within the receive buffer where data should be written
+    uint32_t buffer_offset = 0x2000;
+
+    // Send from node 1 to multicast address targeting SENSOR class (nodes 2 and 3 are sensors)
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset, ARTIE_CAN_BWACP_MULTICAST_ADDRESS, ARTIE_CAN_BWACP_CLASS_SENSOR, ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops and wait for node 1 to finish sending
+    // Node 1 should transition to WAITING_COMPLETE, then back to IDLE after timeout
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!node1_complete && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending");
+
+    // Check that node 2 received the bytes at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0xDE, _node2_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0xAD, _node2_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0xBE, _node2_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0xEF, _node2_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
+
+    // Check that node 3 received the bytes at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0xDE, _node3_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0xAD, _node3_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0xBE, _node3_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0xEF, _node3_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node3_context.bwacp_context.receive_address);
+
+    printf("!!!!!!!!!!!! test_send_four_bytes PASSED !!!!!!!!!!!\n");
 }
 
 /**
@@ -210,6 +255,59 @@ void test_send_four_bytes(void)
  */
 void test_send_eight_bytes(void)
 {
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_send_eight_bytes !!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create an 8-byte payload
+    uint8_t send_data[] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF};
+    // Address specifies the offset within the receive buffer where data should be written
+    uint32_t buffer_offset = 0x3000;
+
+    // Send from node 1 to multicast address targeting SENSOR class (nodes 2 and 3 are sensors)
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset, ARTIE_CAN_BWACP_MULTICAST_ADDRESS, ARTIE_CAN_BWACP_CLASS_SENSOR, ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops and wait for node 1 to finish sending
+    // Node 1 should transition to WAITING_COMPLETE, then back to IDLE after timeout
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!node1_complete && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending");
+
+    // Check that node 2 received the bytes at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0x01, _node2_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0x23, _node2_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x45, _node2_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0x67, _node2_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT8(0x89, _node2_receive_buffer[buffer_offset + 4]);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, _node2_receive_buffer[buffer_offset + 5]);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, _node2_receive_buffer[buffer_offset + 6]);
+    TEST_ASSERT_EQUAL_UINT8(0xEF, _node2_receive_buffer[buffer_offset + 7]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
+
+    // Check that node 3 received the bytes at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0x01, _node3_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0x23, _node3_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x45, _node3_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0x67, _node3_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT8(0x89, _node3_receive_buffer[buffer_offset + 4]);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, _node3_receive_buffer[buffer_offset + 5]);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, _node3_receive_buffer[buffer_offset + 6]);
+    TEST_ASSERT_EQUAL_UINT8(0xEF, _node3_receive_buffer[buffer_offset + 7]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node3_context.bwacp_context.receive_address);
+
+    printf("!!!!!!!!!!!! test_send_eight_bytes PASSED !!!!!!!!!!!\n");
 }
 
 /**
@@ -218,6 +316,55 @@ void test_send_eight_bytes(void)
  */
 void test_send_254_bytes(void)
 {
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_send_254_bytes !!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a 254-byte payload with incrementing pattern
+    uint8_t send_data[254];
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        send_data[i] = (uint8_t)i;
+    }
+    // Address specifies the offset within the receive buffer where data should be written
+    uint32_t buffer_offset = 0x4000;
+
+    // Send from node 1 to multicast address targeting SENSOR class (nodes 2 and 3 are sensors)
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset, ARTIE_CAN_BWACP_MULTICAST_ADDRESS, ARTIE_CAN_BWACP_CLASS_SENSOR, ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops and wait for node 1 to finish sending
+    // Node 1 should transition to WAITING_COMPLETE, then back to IDLE after timeout
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!node1_complete && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending");
+
+    // Check that node 2 received the bytes at the correct buffer offset
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)i, _node2_receive_buffer[buffer_offset + i]);
+    }
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
+
+    // Check that node 3 received the bytes at the correct buffer offset
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)i, _node3_receive_buffer[buffer_offset + i]);
+    }
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node3_context.bwacp_context.receive_address);
+
+    printf("!!!!!!!!!!!! test_send_254_bytes PASSED !!!!!!!!!!!\n");
 }
 
 /**
@@ -327,6 +474,9 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_send_one_byte);
+    RUN_TEST(test_send_four_bytes);
+    RUN_TEST(test_send_eight_bytes);
+    RUN_TEST(test_send_254_bytes);
     // ...
 
     // Finish and return results
