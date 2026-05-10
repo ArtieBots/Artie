@@ -28,4 +28,9 @@ typedef enum {
     ARTIE_CAN_ERR_NO_SPACE = (1 << 9),      /**< Cannot write to a buffer because there is no more space in it */
     ARTIE_CAN_ERR_INTERNAL = (1 << 10),     /**< An internal error occurred. This is a catch-all for errors that don't fit into the other categories, and typically indicates a bug in the library. */
     ARTIE_CAN_ERR_DRIVER = (1 << 11),       /**< An error occurred in the backend driver. This indicates an error in the communication with underlying hardware. */
+    ARTIE_CAN_ERR_NO_RESPONSE = (1 << 12),  /**< No response received when one was expected (e.g. no ACK received for a sent frame that requires ACKs) */
 } artie_can_error_t;
+
+#define ARTIE_CAN_ERR_RETRIABLE_MASK (ARTIE_CAN_ERR_TIMEOUT | ARTIE_CAN_ERR_SEND_BUSY | ARTIE_CAN_ERR_NO_SPACE | ARTIE_CAN_ERR_NO_RESPONSE)
+#define ARTIE_CAN_ERR_AT_LEAST_ONE_RETRIABLE(err) ((err) & ARTIE_CAN_ERR_RETRIABLE_MASK)
+#define ARTIE_CAN_ERR_ONLY_RETRIABLE(err) ((err) && !((err) & ~ARTIE_CAN_ERR_RETRIABLE_MASK))

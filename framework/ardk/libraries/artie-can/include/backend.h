@@ -57,5 +57,5 @@ typedef struct {
  */
 typedef enum {
     ARTIE_CAN_BACKEND_MCP2515,
-    ARTIE_CAN_BACKEND_TCP,
+    ARTIE_CAN_BACKEND_UDP_MCAST,
 } artie_can_backend_type_t;

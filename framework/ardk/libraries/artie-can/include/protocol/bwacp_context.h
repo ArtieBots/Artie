@@ -14,18 +14,19 @@
 /** Maximum payload size for BWACP (64 KB) */
 #define ARTIE_CAN_BWACP_MAX_PAYLOAD_SIZE (65536U)
 
-/** Size of the circular buffer for DATA frames */
-#define ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE (16U)
-
 /**
  * @brief States that the BWACP state machine can be in for a given node.
  *
  */
 typedef enum {
     BWACP_STATE_IDLE,              ///< The node is idle and not currently processing any block write.
-    BWACP_STATE_SENDING,           ///< The node is sending a block write.
+    BWACP_STATE_SENDING_READY,     ///< The node has sent a READY frame and is waiting for ACKs.
+    BWACP_STATE_SENDING_DATA,      ///< The node is sending DATA frames.
+    BWACP_STATE_WAITING_ACK_DATA,  ///< The node has sent a DATA frame and is waiting for ACKs.
+    BWACP_STATE_SENDING_COMPLETE,  ///< The node has sent a COMPLETE frame and is waiting for ACKs.
     BWACP_STATE_RECEIVING,         ///< The node is receiving a block write.
-    BWACP_STATE_WAITING_COMPLETE,  ///< The node has finished sending and is waiting for receivers to acknowledge completion or request repeat.
+    BWACP_STATE_EXPECT_REPEAT,     ///< The node has sent a NACK and is expecting a repeat of the last DATA frame.
+    BWACP_STATE_RECEIVE_IN_ERROR,  ///< The node is receiving a block write but has detected a parity error and is waiting for the transfer to end to request retransmission.
 } bwacp_state_t;
 
 /**
@@ -36,7 +37,6 @@ typedef enum {
     BWACP_ISR_FLAG_READY_RECEIVED = 1 << 0,  ///< A READY frame was received in the ISR
     BWACP_ISR_FLAG_DATA_RECEIVED = 1 << 1,   ///< A DATA frame was received in the ISR
     BWACP_ISR_FLAG_COMPLETE_RECEIVED = 1 << 2, ///< A COMPLETE frame was received in the ISR
-    BWACP_ISR_FLAG_REPEAT_RECEIVED = 1 << 3,  ///< A REPEAT frame was received in the ISR
 } bwacp_isr_flags_t;
 
 /**
@@ -48,7 +48,7 @@ typedef struct {
     uint8_t node_address;                   ///< The BWACP address of this node on the CAN bus
     uint8_t node_class;                     ///< The class bitmask of this node (bit 0=SBC, bit 1=MCU, bit 2=Sensor, bit 3=Motor, bits 4-5=Reserved)
     bwacp_state_t state;                    ///< The current state of the BWACP protocol for this node
-    uint64_t last_packet_ms;                ///< The time in milliseconds when the latest packet has been received
+    uint64_t last_packet_ms;                ///< The time in milliseconds when the latest packet has been received or sent
 
     // Sending state
     const uint8_t *send_payload;            ///< Pointer to the payload being sent (owned by caller)
@@ -59,6 +59,10 @@ typedef struct {
     uint8_t send_target_class;              ///< Target class bitmask (for multicast)
     bool send_parity;                       ///< Current parity bit for DATA frames
     uint32_t send_crc24;                    ///< CRC24 over the payload
+    uint32_t expected_ack_count;            ///< Number of ACKs expected after READY, DATA, or COMPLETE frames
+    uint32_t received_ack_count;            ///< Number of ACKs received so far
+    uint32_t received_nack_count;           ///< Number of NACKs received so far
+    bool need_repeat_data_frame;            ///< Whether the last DATA frame needs to be repeated due to NACK
 
     // Receiving state
     uint8_t *receive_buffer;                ///< Buffer for receiving data (owned by caller, must be provided before receiving)
@@ -70,21 +74,17 @@ typedef struct {
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
     bool receive_ready_interrupt;           ///< Whether the READY frame had the interrupt bit set
     uint8_t sending_node_address;           ///< The address of the node we are receiving from
+    bool transfer_invalidated;              ///< Whether the current transfer has been invalidated due to a parity error (used to determine whether to request retransmission at the end)
 
     // Last completed transfer tracking (to prevent duplicate reception of same transfer during REPEAT cooldown)
     uint8_t last_completed_sender_address;  ///< Sender address of last completed transfer
     uint32_t last_completed_receive_address; ///< Receive address of last completed transfer
     uint64_t last_completed_timestamp_ms;   ///< Timestamp when last transfer completed
 
-    // Circular buffer for DATA frames (written by ISR, read by main thread)
-    artie_can_frame_t data_frame_buffer[ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE]; ///< Circular buffer for received DATA frames
-    uint32_t data_frame_read_index;         ///< Read index for circular buffer (modified only by main thread)
-    uint32_t data_frame_write_index;        ///< Write index for circular buffer (modified only by ISR)
-    atomic_uint32_t data_frames_pending;    ///< Number of DATA frames pending processing (atomic: incremented by ISR, decremented by main thread)
-
     // Written to by ISR (each ISR type has its own dedicated frame)
     artie_can_frame_t received_ready_frame;     ///< Most recently received READY frame (for processing in main thread)
+    artie_can_frame_t received_data_frame;      ///< Most recently received DATA frame (for processing in main thread)
     artie_can_frame_t received_complete_frame;  ///< Most recently received COMPLETE frame (for processing in main thread)
-    artie_can_frame_t received_repeat_frame;    ///< Most recently received REPEAT frame (for processing in main thread)
+    artie_can_frame_t received_ack_nack_frame;  ///< Most recently received ACK/NACK frame (for processing in main thread)
     atomic_uint32_t isr_flags;              ///< Flags to indicate special conditions found during ISR; cleared by main thread (atomic operations required)
 } bwacp_context_t;

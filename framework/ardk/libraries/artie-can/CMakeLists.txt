@@ -22,20 +22,21 @@ include_directories(
 set(ARTIE_CAN_SOURCES
     src/backend/backend_mcp2515.c
     src/backend/driver_mcp2515.c
-    src/backend/backend_tcp.c
+    src/backend/backend_udp_mcast.c
     src/protocol/rtacp.c
     src/protocol/bwacp.c
     src/protocol/rpcacp.c
     src/protocol/psacp.c
     src/util/circular_buffer.c
     src/util/translationlayer.c
+    src/util/util.c
     src/artie_can_core.c
 )
 
 # Header files
 set(ARTIE_CAN_HEADERS
     include/backend/backend_mcp2515.h
-    include/backend/backend_tcp.h
+    include/backend/backend_udp_mcast.h
     include/backend/driver_mcp2515.h
     include/protocol/rtacp_context.h
     include/protocol/rtacp.h
@@ -47,6 +48,7 @@ set(ARTIE_CAN_HEADERS
     include/protocol/psacp.h
     include/util/circular_buffer.h
     include/util/log.h
+    include/util/util.h
     include/util/translationlayer.h
     include/artie_can.h
     include/backend.h

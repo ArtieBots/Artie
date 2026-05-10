@@ -9,6 +9,7 @@
 #include <string.h>
 #include "artie_can.h"
 #include "backend.h"
+#include "backend_udp_mcast.h"
 #include "bwacp.h"
 #include "err.h"
 #include "rtacp.h"
@@ -33,11 +34,11 @@ static artie_can_error_t _init_mcp2515(artie_can_context_t *context, artie_can_b
     }
 }
 
-static artie_can_error_t _init_tcp(artie_can_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
+static artie_can_error_t _init_udp_mcast(artie_can_context_t *context, artie_can_backend_t *handle, artie_can_rx_callback_t rx_callback, artie_can_get_ms_t get_ms_fn)
 {
     artie_can_error_t err;
 
-    err = tcp_init(context, handle, rx_callback, get_ms_fn);
+    err = udp_mcast_init(context, handle, rx_callback, get_ms_fn);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         return err;
@@ -79,8 +80,8 @@ artie_can_error_t artie_can_init(artie_can_context_t *context, artie_can_backend
     {
         case ARTIE_CAN_BACKEND_MCP2515:
             return _init_mcp2515(context, handle, rx_callback, get_ms_fn);
-        case ARTIE_CAN_BACKEND_TCP:
-            return _init_tcp(context, handle, rx_callback, get_ms_fn);
+        case ARTIE_CAN_BACKEND_UDP_MCAST:
+            return _init_udp_mcast(context, handle, rx_callback, get_ms_fn);
         default:
             return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -180,6 +181,11 @@ artie_can_error_t artie_can_tick_isr(artie_can_backend_t *handle)
     else if (handle->context->protocol_flags == 0)
     {
         // No valid protocol configured
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
+    else if (handle->context->isr_handler == NULL)
+    {
+        // No ISR handler configured
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
