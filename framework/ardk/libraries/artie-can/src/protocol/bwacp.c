@@ -369,10 +369,12 @@ static void _process_repeat_frame_from_isr(artie_can_context_t *context, const a
 static artie_can_error_t _send_next_chunk(artie_can_backend_t *handle)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
+    ARTIE_CAN_LOG(handle->context, "BWACP: Sending next chunk (offset=%u)\n", ctx->send_payload_offset);
 
     if (ctx->send_payload_offset >= ctx->send_payload_size)
     {
         // All data sent, send COMPLETE frame
+        ARTIE_CAN_LOG(handle->context, "BWACP: All data sent, setting state to WAITING_COMPLETE\n");
         ctx->state = BWACP_STATE_WAITING_COMPLETE;
         return _send_complete(handle);
     }
@@ -438,7 +440,7 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
     ctx->state = BWACP_STATE_RECEIVING;
     ctx->last_packet_ms = handle->get_ms();
 
-    ARTIE_CAN_LOG(handle->context, "BWACP: READY frame received (addr=0x%08X, CRC=0x%06X)\n", ctx->receive_address, ctx->receive_crc24);
+    ARTIE_CAN_LOG(handle->context, "BWACP: READY frame received (addr=0x%08X, CRC=0x%06X); state set to BWACP_STATE_RECEIVING\n", ctx->receive_address, ctx->receive_crc24);
 
     atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_READY_RECEIVED));
     return ARTIE_CAN_ERR_NONE;
@@ -503,7 +505,7 @@ static artie_can_error_t _process_repeat_received(artie_can_backend_t *handle)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
 
-    ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested\n");
+    ARTIE_CAN_LOG(handle->context, "BWACP: REPEAT all requested; state set to BWACP_STATE_SENDING\n");
 
     // Reset to beginning for full retransmission
     ctx->send_payload_offset = 0;
@@ -533,12 +535,12 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
             ctx->receive_crc24 = 0;
             ctx->state = BWACP_STATE_RECEIVING;
 
-            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting full retransmission\n");
+            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch, requesting full retransmission; setting state to BWACP_STATE_RECEIVING\n");
             err = _send_repeat(handle);
         }
         else
         {
-            ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified\n");
+            ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified; setting state to BWACP_STATE_IDLE\n");
 
             // Save this transfer info for cooldown period
             ctx->last_completed_sender_address = ctx->receive_sender_address;
@@ -560,7 +562,7 @@ static artie_can_error_t _check_timeout_receiving(artie_can_backend_t *handle)
     uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
     if (elapsed >= ARTIE_CAN_BWACP_TIMEOUT_MS)
     {
-        ARTIE_CAN_LOG(handle->context, "BWACP: Transfer timeout\n");
+        ARTIE_CAN_LOG(handle->context, "BWACP: Transfer timeout; setting state to BWACP_STATE_IDLE\n");
         ctx->sending_node_address = 0xFF;
         ctx->state = BWACP_STATE_IDLE;
         return ARTIE_CAN_ERR_TIMEOUT;
@@ -574,7 +576,7 @@ static artie_can_error_t _check_timeout_waiting_complete(artie_can_backend_t *ha
     uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
     if (elapsed >= ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)
     {
-        ARTIE_CAN_LOG(handle->context, "BWACP: Finished waiting for REPEATs. Transfer is complete.\n");
+        ARTIE_CAN_LOG(handle->context, "BWACP: Finished waiting for REPEATs. Transfer is complete; setting state to BWACP_STATE_IDLE\n");
         ctx->state = BWACP_STATE_IDLE;
 
         // No error here - the timeout is a normal part of operation
@@ -636,6 +638,7 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     }
 
     // Initialize send state
+    ARTIE_CAN_LOG(handle->context, "BWACP: Initiating send (addr=0x%08X, size=%u); setting state to BWACP_STATE_SENDING\n", address, payload_size);
     ctx->send_payload = payload;
     ctx->send_payload_size = payload_size;
     ctx->send_payload_offset = 0;
@@ -725,7 +728,6 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
     switch (ctx->state)
     {
         case BWACP_STATE_SENDING:
-            // Continue sending DATA frames
             err |= _send_next_chunk(handle);
             break;
         case BWACP_STATE_WAITING_COMPLETE:

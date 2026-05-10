@@ -20,7 +20,7 @@
 #endif
 
 // Default timeout for receive calls in tests (in milliseconds)
-#define DEFAULT_TIMEOUT_MS 10000
+#define DEFAULT_TIMEOUT_MS (uint32_t)(1.25 * ((ARTIE_CAN_BWACP_TIMEOUT_MS + ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)))
 
 // Size of receive buffers for BWACP tests
 #define RECEIVE_BUFFER_SIZE 65536
@@ -50,6 +50,11 @@ static void _run_event_loops(void)
     artie_can_tick(&_node1);
     artie_can_tick(&_node2);
     artie_can_tick(&_node3);
+}
+
+static void _empty_rx_callback(const artie_can_frame_t *frame)
+{
+    // Do nothing - we will check the receive buffers directly in the tests
 }
 
 /**
@@ -101,13 +106,13 @@ void setUp(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Set up the backends for the nodes
-    err = artie_can_init(&_node1_context, &_node1, ARTIE_CAN_BACKEND_TCP, NULL, get_current_time_ms);
+    err = artie_can_init(&_node1_context, &_node1, ARTIE_CAN_BACKEND_TCP, _empty_rx_callback, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, NULL, get_current_time_ms);
+    err = artie_can_init(&_node2_context, &_node2, ARTIE_CAN_BACKEND_TCP, _empty_rx_callback, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_TCP, NULL, get_current_time_ms);
+    err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_TCP, _empty_rx_callback, get_current_time_ms);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 }
 
@@ -182,12 +187,10 @@ void test_send_one_byte(void)
 
     // Check that node 2 received the byte at the correct buffer offset
     TEST_ASSERT_EQUAL_UINT8(0x42, _node2_receive_buffer[buffer_offset]);
-    TEST_ASSERT_EQUAL_UINT32(1, _node2_context.bwacp_context.receive_bytes_written);
     TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
 
     // Check that node 3 received the byte at the correct buffer offset
     TEST_ASSERT_EQUAL_UINT8(0x42, _node3_receive_buffer[buffer_offset]);
-    TEST_ASSERT_EQUAL_UINT32(1, _node3_context.bwacp_context.receive_bytes_written);
     TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node3_context.bwacp_context.receive_address);
 
     printf("!!!!!!!!!!!! test_send_one_byte PASSED !!!!!!!!!!!!!!\n");

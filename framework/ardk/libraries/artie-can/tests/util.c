@@ -28,14 +28,12 @@ uint64_t get_current_time_ms(void)
 #if defined(_WIN32) || defined(_WIN64)
     // Windows implementation using GetSystemTimeAsFileTime
     FILETIME ft;
-    uint64_t ts;
     GetSystemTimeAsFileTime(&ft);
 
-    ts = 0;
-    ts |= ft.dwHighDateTime;
-    ts <<= 32;
-    ts |= ft.dwLowDateTime;
-    return ts;
+    // Convert FILETIME (100-ns intervals since Jan 1, 1601) to milliseconds since Unix epoch
+    uint64_t time = ((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime; // Time in 100-ns intervals
+    time -= 116444736000000000ULL; // Convert from Windows epoch (1601) to Unix epoch (1970)
+    return time / 10000; // Convert from 100-ns intervals to milliseconds
 #else
     // Here is a simple implementation using gettimeofday for POSIX systems:
     // (AI generated, untested code)
