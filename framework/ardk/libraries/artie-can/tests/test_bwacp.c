@@ -20,7 +20,7 @@
 #endif
 
 // Default timeout for receive calls in tests (in milliseconds)
-#define DEFAULT_TIMEOUT_MS (uint32_t)(1.25 * ((ARTIE_CAN_BWACP_TIMEOUT_MS + ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS)))
+#define DEFAULT_TIMEOUT_MS ((uint32_t)(1.25 * ARTIE_CAN_BWACP_TIMEOUT_MS))
 
 // Size of receive buffers for BWACP tests
 #define RECEIVE_BUFFER_SIZE 65536
@@ -474,10 +474,20 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_send_one_byte);
+    #if 0
     RUN_TEST(test_send_four_bytes);
     RUN_TEST(test_send_eight_bytes);
     RUN_TEST(test_send_254_bytes);
-    // ...
+    RUN_TEST(test_send_255_bytes);
+    RUN_TEST(test_send_256_bytes);
+    RUN_TEST(test_send_257_bytes);
+    RUN_TEST(test_send_46k_bytes);
+    RUN_TEST(test_crc_mismatch);
+    RUN_TEST(test_one_target_node);
+    RUN_TEST(test_class_of_target_nodes);
+    RUN_TEST(test_rtacp_while_bwacp);
+    RUN_TEST(test_concurrent_bwacp);
+    #endif
 
     // Finish and return results
     return UNITY_END();

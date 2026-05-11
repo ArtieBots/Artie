@@ -22,9 +22,6 @@
 /** Timeout in ms for waiting for the next packet */
 #define ARTIE_CAN_BWACP_TIMEOUT_MS 5000U
 
-/** Timeout in ms for waiting for REPEAT frames after transfer completes */
-#define ARTIE_CAN_BWACP_REPEAT_REQUEST_TIMEOUT_MS 1000U
-
 // BWACP READY frame data layout offsets
 /** Offset of CRC24 byte 0 (MSB) in READY frame data */
 #define BWACP_READY_DATA_CRC24_BYTE0 0U
@@ -67,10 +64,10 @@
 /** Mask for class bits in ID field */
 #define BWACP_FRAME_ID_CLASS_MASK (0x3FU << BWACP_FRAME_ID_CLASS_LOCATION)
 
-/** Location of repeat/interrupt bit in ID field */
-#define BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION 1U
-/** Mask for repeat/interrupt bit in ID field */
-#define BWACP_FRAME_ID_REPEAT_INTERRUPT_MASK (0x01U << BWACP_FRAME_ID_REPEAT_INTERRUPT_LOCATION)
+/** Location of ACK/repeat bit in ID field (1=ACK/repeat, 0=NACK/fresh) */
+#define BWACP_FRAME_ID_ACK_REPEAT_LOCATION 1U
+/** Mask for ACK/repeat bit in ID field */
+#define BWACP_FRAME_ID_ACK_REPEAT_MASK (0x01U << BWACP_FRAME_ID_ACK_REPEAT_LOCATION)
 
 /** Location of parity bit in ID field */
 #define BWACP_FRAME_ID_PARITY_LOCATION 0U
@@ -82,7 +79,7 @@
  *
  */
 typedef enum {
-    ARTIE_CAN_FRAME_TYPE_BWACP_REPEAT = 0x01,    ///< REPEAT frame (0001)
+    ARTIE_CAN_FRAME_TYPE_BWACP_ACK_NACK = 0x01,  ///< ACK/NACK frame (0001)
     ARTIE_CAN_FRAME_TYPE_BWACP_READY = 0x03,     ///< READY frame (0011)
     ARTIE_CAN_FRAME_TYPE_BWACP_COMPLETE = 0x05,  ///< COMPLETE frame (0101)
     ARTIE_CAN_FRAME_TYPE_BWACP_DATA = 0x07,      ///< DATA frame (0111)

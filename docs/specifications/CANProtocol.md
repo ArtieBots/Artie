@@ -349,36 +349,46 @@ The ID field looks like this:
 
 ```
 [101] - specifies BWACP.
-[0xx1] - 0001: REPEAT, 0011: READY, 0111: DATA, 0101: COMPLETE
+[0xx1] - 0001: ACK/NACK, 0011: READY, 0111: DATA, 0101: COMPLETE
 [pp] - 2 bits of user-assigned priority: LOW (11), MED-LOW (10), MED-HIGH (01), HIGH (00)
 [ssssss] - 6 bits of sender address, which must be unique among all nodes on the CAN bus
 [tttttt] - 6 bits of target address
-[cccccc] - if DATA or READY: 6 bits of target class; if REPEAT: all 0s
-[1 bit] - if DATA, 0 means I am not a repeat; 1 means I am a repeat of the last frame;
-          if READY, 1 means interrupt the currently ongoing data write and start over
-          using this frame;
-          if REPEAT, 1 means repeat the last frame, 0 means repeat the whole sequence.
+[cccccc] - if DATA or READY: 6 bits of target class; if ACK/NACK: all 0s
+[1 bit] - if ACK/NACK, 1 means ACK, 0 means NACK. If DATA, 1 means this is a repeated frame
+          due to a NACK of the last DATA frame, 0 means this is fresh data.
 [1 bit] - if DATA, parity bit to indicate relative ordering of frames, otherwise should be 1.
 ```
 
-* *REPEAT frame 0xx1=0001*: This frame is sent after a COMPLETE frame to indicate that data was
-  not received properly and the entire transfer should start again.
+* *ACK/NACK frame 0xx1=0001*: When NACK and sent after a DATA frame, this frame indicates that
+  the last frame should be sent again. If NACK and sent after a COMPLETE frame, this indicates that
+  the transfer was not received properly and the entire transfer should start again. When ACK,
+  it must be sent by each receiver node after every DATA frame to indicate that the frame was received
+  (and that its parity was as expected). If a node receives a DATA frame that has incorrect parity according
+  to the receiver's state machine, that node should NACK the frame. If the repeated frame still has incorrect
+  parity, the receiver node should continue receiving until the end of the transmission and then NACK the
+  COMPLETE frame to request a retransmission of the entire sequence.
 * *READY frame 0xx1=0011*: This frame is sent from a writing node to a single device (tttttt != 0x3F)
   or to a class of devices (tttttt = 0x3F, cccccc = Bit mask, see below) to initiate a data transfer.
-  If this is sent with its interrupt bit set, it means all target nodes should discard the current block
-  transfer and restart on this frame. This may happen as a result of a receiver node sending back-to-back
-  REPEAT frames, and will usually happen after a cooldown period.
+  All nodes that receive this frame should ACK. The sending node will accumulate the ACKs from the nodes
+  in order to keep track of how many ACKs it expects to hear after each DATA frame. DATA frames will be sent
+  after a 1 second cooldown after the last ACK.
 * *DATA frame 0xx1=0111*: This frame is sent from a writing node to a single device or to a class of
   devices and contains up to 8 data bytes. If the repeat bit is set, it means this frame is a repeat
   of the last frame and should be discarded by any devices that did not send back a REPEAT on the last
   DATA frame. The parity bit should be set to 0 for the first DATA frame, then to 1, then back to 0,
   etc., and should be used by remote devices to determine if they have missed a frame.
+  The sending node will expect a number of ACKs equal to the number of ACKs it heard after the READY frame
+  during the ACK accumulation period (which should be equal to exactly 1 in the case that it is sending
+  a bulk transfer to a single node address). Each DATA frame is sent as soon as all ACKs are accounted for.
+  If after 5 seconds, the sending node still has not received all ACKs/NACKs it expects,
+  it aborts the transmission. If a NACK is received after a DATA frame,
+  the frame is repeated, this time with the repeat bit set.
 * *COMPLETE frame 0xx1=0101*: This frame is sent from a writing node to indicate the entire write is
   complete and reciever nodes should now check their received bytes according to the CRC (see data section
-  below). If a receiver node finds that their data was not received properly, they should send a REPEAT
-  frame, which indicates that the entire write should be redone. The writing node must honor these
-  requests until a suitable cooldown has transpired, or until their BWACP state machine becomes tied
-  up with receiving or sending a different bulk write.
+  below). If a receiver node finds that their data was not received properly, they should send a NACK
+  frame, which indicates that the entire write should be redone. Otherwise the node should send an ACK.
+  Once all ACKs are accounted for (or a 5s timeout has completed), the sender node considers the transfer complete.
+  If the timeout occurs without accumulating all expected ACKs/NACKs, a timeout error is reported.
 
 Multicasting:
 
