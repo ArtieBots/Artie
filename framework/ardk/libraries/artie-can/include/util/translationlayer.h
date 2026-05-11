@@ -91,6 +91,14 @@ bool create_thread(thread_handle_t *handle, thread_func_t func, void *arg);
  */
 bool join_thread(thread_handle_t handle, uint32_t timeout_ms);
 
+
+/**
+ * @brief Atomically store a value.
+ * @param ptr Pointer to the atomic variable.
+ * @param value Value to store.
+ */
+void atomic_store(atomic_uint32_t *ptr, uint32_t value);
+
 /**
  * @brief Atomically perform bitwise OR operation.
  * Performs *ptr |= value atomically and returns the previous value.

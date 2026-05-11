@@ -86,6 +86,17 @@ static void _critical_section_exit(uint32_t state)
 #endif
 }
 
+void atomic_store(atomic_uint32_t *ptr, uint32_t value)
+{
+#ifdef _WIN32
+    // Windows: Use InterlockedExchange which returns the original value, but we ignore it here
+    InterlockedExchange((volatile LONG *)ptr, (LONG)value);
+#else
+    // GCC/Clang: Use atomic built-ins with sequential consistency
+    __atomic_store_n(ptr, value, __ATOMIC_SEQ_CST);
+#endif
+}
+
 uint32_t atomic_fetch_or(atomic_uint32_t *ptr, uint32_t value)
 {
 #ifdef _WIN32

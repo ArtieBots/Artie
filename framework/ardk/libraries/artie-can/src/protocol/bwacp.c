@@ -266,28 +266,8 @@ static void _process_data_frame_from_isr(artie_can_context_t *context, const art
         return;
     }
 
-    // Extract parity
-    bool parity = (frame->id & BWACP_FRAME_ID_PARITY_MASK) != 0;
-
-    // Check parity - if mismatch, drop the frame and enter RECEIVE_IN_ERROR mode
-    // so that we can request retransmission at the end of the transfer.
-    if (parity != ctx->receive_expected_parity)
-    {
-        ARTIE_CAN_LOG(context, "BWACP: Parity mismatch, dropping frame; will request retransmission at end.\n");
-        ctx->transfer_invalidated = true;
-    }
-
-    // Toggle expected parity for next frame
-    ctx->receive_expected_parity = !ctx->receive_expected_parity;
-
-    // Copy frame to circular buffer
-    memcpy(&ctx->data_frame_buffer[ctx->data_frame_write_index], frame, sizeof(artie_can_frame_t));
-
-    // Update write index (wrap around)
-    ctx->data_frame_write_index = (ctx->data_frame_write_index + 1) % ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE;
-
-    // Atomically increment pending count (this makes the frame visible to main thread)
-    atomic_fetch_add(&ctx->data_frames_pending, 1);
+    // Copy frame to context for main thread processing (parity checking will be done in main thread)
+    memcpy(&ctx->received_data_frame, frame, sizeof(artie_can_frame_t));
 
     // Set flag for main thread
     atomic_fetch_or(&ctx->isr_flags, (uint32_t)BWACP_ISR_FLAG_DATA_RECEIVED);
@@ -352,14 +332,14 @@ static void _process_ack_nack_frame_from_isr(artie_can_context_t *context, const
     {
         // Atomically increment received ack count
         atomic_fetch_add(&ctx->received_ack_count, 1);
-        ARTIE_CAN_LOG(handle->context, "BWACP: ACK received (%u/%u)\n", ctx->received_ack_count, ctx->expected_ack_count);
+        ARTIE_CAN_LOG(context, "BWACP: ACK received (%u/%u)\n", ctx->received_ack_count, ctx->expected_ack_count);
     }
     else
     {
         // Atomically increment received nack count and set flag to repeat last data frame
         atomic_fetch_add(&ctx->received_nack_count, 1);
         ctx->need_repeat_data_frame = true;
-        ARTIE_CAN_LOG(handle->context, "BWACP: NACK received, will repeat last DATA frame\n");
+        ARTIE_CAN_LOG(context, "BWACP: NACK received, will repeat last DATA frame\n");
     }
 }
 
@@ -404,49 +384,105 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
 }
 
 /**
- * @brief Process DATA frame received in ISR (main thread handler).
+ * @brief Handle DATA frame when in RECEIVE_IN_ERROR state.
  */
-static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
+static artie_can_error_t _handle_data_received_in_error(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+
+    ARTIE_CAN_LOG(handle->context, "BWACP: In error state, sending ACK for DATA frame\n");
+    return _send_ack(handle, ctx->receive_sender_address);
+}
+
+/**
+ * @brief Handle DATA frame when in EXPECT_REPEAT state.
+ */
+static artie_can_error_t _handle_data_expect_repeat(artie_can_backend_t *handle, artie_can_frame_t *frame)
 {
     bwacp_context_t *ctx = &handle->context->bwacp_context;
     artie_can_error_t err = ARTIE_CAN_ERR_NONE;
 
-    // Only process if we're in receiving state
-    if (ctx->state != BWACP_STATE_RECEIVING)
-    {
-        atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_DATA_RECEIVED));
-        return ARTIE_CAN_ERR_NONE;
-    }
+    // Extract parity and repeat flag from frame
+    bool frame_parity = (frame->id & BWACP_FRAME_ID_PARITY_MASK) != 0;
+    bool is_repeat = (frame->id & BWACP_FRAME_ID_ACK_REPEAT_MASK) != 0;
 
-    // If we detected a parity mismatch, we need to enter RECEIVE_IN_ERROR state
-    // to ignore data frames until the end and then request retransmission.
-    if (ctx->transfer_invalidated)
+    if (!is_repeat)
     {
+        // Protocol violation - expected a repeat but got a fresh frame
+        ARTIE_CAN_LOG(handle->context, "BWACP: Expected repeat frame but got fresh frame; entering error state\n");
+        ctx->transfer_invalidated = true;
         ctx->state = BWACP_STATE_RECEIVE_IN_ERROR;
-
-        // "Process" all pending frames in the buffer by just discarding them
-        while (ctx->data_frames_pending > 0)
-        {
-            // Update read index (wrap around)
-            ctx->data_frame_read_index = (ctx->data_frame_read_index + 1) % ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE;
-
-            // Atomically decrement pending count
-            atomic_fetch_sub(&ctx->data_frames_pending, 1);
-        }
-        atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_DATA_RECEIVED));
-        return ARTIE_CAN_ERR_NONE;
+        return _send_ack(handle, ctx->receive_sender_address);
     }
 
-    // Process all pending DATA frames from circular buffer
-    while (ctx->data_frames_pending > 0)
-    {
-        // Read frame from circular buffer
-        artie_can_frame_t *frame = &ctx->data_frame_buffer[ctx->data_frame_read_index];
+    // This is a repeat frame - check parity
+    bool parity_correct = (frame_parity == ctx->receive_expected_parity);
 
-        // Check buffer space (address is the offset within the buffer where data should be written)
+    if (!parity_correct)
+    {
+        // Repeat still has wrong parity - give up and enter error state
+        ARTIE_CAN_LOG(handle->context, "BWACP: Repeat frame still has parity error; entering error state\n");
+        ctx->transfer_invalidated = true;
+        ctx->state = BWACP_STATE_RECEIVE_IN_ERROR;
+        err = _send_ack(handle, ctx->receive_sender_address);
+    }
+    else
+    {
+        // Repeat has correct parity - process it
+        ARTIE_CAN_LOG(handle->context, "BWACP: Repeat frame has correct parity; processing\n");
+
         if ((ctx->receive_address + ctx->receive_bytes_written + frame->dlc) <= ctx->receive_buffer_size)
         {
-            // Copy data to receive buffer at the specified offset
+            if (ctx->receive_buffer != NULL)
+            {
+                memcpy(&ctx->receive_buffer[ctx->receive_address + ctx->receive_bytes_written], frame->data, frame->dlc);
+                ctx->receive_bytes_written += frame->dlc;
+            }
+        }
+        else
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: Receive buffer overflow on repeat\n");
+            err = ARTIE_CAN_ERR_NO_SPACE;
+        }
+
+        // Toggle expected parity for next frame
+        ctx->receive_expected_parity = !ctx->receive_expected_parity;
+
+        // Send ACK and return to RECEIVING state
+        err = _send_ack(handle, ctx->receive_sender_address);
+        ctx->state = BWACP_STATE_RECEIVING;
+        ctx->transfer_invalidated = false;
+        ARTIE_CAN_LOG(handle->context, "BWACP: Repeat frame processed successfully; back to RECEIVING\n");
+    }
+
+    return err;
+}
+
+/**
+ * @brief Handle DATA frame when in RECEIVING state.
+ */
+static artie_can_error_t _handle_data_receiving(artie_can_backend_t *handle, artie_can_frame_t *frame)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    // Extract parity from frame
+    bool frame_parity = (frame->id & BWACP_FRAME_ID_PARITY_MASK) != 0;
+    bool parity_correct = (frame_parity == ctx->receive_expected_parity);
+
+    if (!parity_correct)
+    {
+        // Parity mismatch - send NACK and enter EXPECT_REPEAT state
+        ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame parity mismatch (expected=%d, got=%d); sending NACK and expecting repeat\n",
+                      ctx->receive_expected_parity, frame_parity);
+        ctx->state = BWACP_STATE_EXPECT_REPEAT;
+        err = _send_nack(handle, ctx->receive_sender_address);
+    }
+    else
+    {
+        // Parity correct - process the frame normally
+        if ((ctx->receive_address + ctx->receive_bytes_written + frame->dlc) <= ctx->receive_buffer_size)
+        {
             if (ctx->receive_buffer != NULL)
             {
                 memcpy(&ctx->receive_buffer[ctx->receive_address + ctx->receive_bytes_written], frame->data, frame->dlc);
@@ -459,12 +495,57 @@ static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
             err = ARTIE_CAN_ERR_NO_SPACE;
         }
 
-        // Update read index (wrap around)
-        ctx->data_frame_read_index = (ctx->data_frame_read_index + 1) % ARTIE_CAN_BWACP_DATA_FRAME_BUFFER_SIZE;
+        // Toggle expected parity for next frame
+        ctx->receive_expected_parity = !ctx->receive_expected_parity;
 
-        // Atomically decrement pending count
-        atomic_fetch_sub(&ctx->data_frames_pending, 1);
+        // Send ACK
+        err = _send_ack(handle, ctx->receive_sender_address);
+        ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame received and ACKed (bytes_written=%u)\n", ctx->receive_bytes_written);
     }
+
+    return err;
+}
+
+/**
+ * @brief Process DATA frame received in ISR (main thread handler).
+ */
+static artie_can_error_t _process_data_received(artie_can_backend_t *handle)
+{
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    // Only process if we're in receiving, expect repeat, or error state
+    if ((ctx->state != BWACP_STATE_RECEIVING) && (ctx->state != BWACP_STATE_EXPECT_REPEAT) && (ctx->state != BWACP_STATE_RECEIVE_IN_ERROR))
+    {
+        atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_DATA_RECEIVED));
+        return ARTIE_CAN_ERR_NONE;
+    }
+
+    // Get the received frame
+    artie_can_frame_t *frame = &ctx->received_data_frame;
+
+    // Handle based on current state
+    switch (ctx->state)
+    {
+    case BWACP_STATE_RECEIVE_IN_ERROR:
+        err = _handle_data_received_in_error(handle);
+        break;
+
+    case BWACP_STATE_EXPECT_REPEAT:
+        err = _handle_data_expect_repeat(handle, frame);
+        break;
+
+    case BWACP_STATE_RECEIVING:
+        err = _handle_data_receiving(handle, frame);
+        break;
+
+    default:
+        // Should not reach here due to initial check, but handle gracefully
+        break;
+    }
+
+    // Update timeout counter
+    ctx->last_packet_ms = handle->get_ms();
 
     atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_DATA_RECEIVED));
     return err;
@@ -482,12 +563,12 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
     if (ctx->transfer_invalidated)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Transfer was invalidated due to parity errors; sending NACK\n");
-        err = _send_nack(handle, ctx->receive_sender_address);
 
         // Reset state for potential retransmission
         ctx->receive_bytes_written = 0;
         ctx->receive_expected_parity = false;
         ctx->transfer_invalidated = false;
+        err = _send_nack(handle, ctx->receive_sender_address);
     }
     else if ((ctx->receive_buffer != NULL) && (ctx->receive_bytes_written > 0))
     {
@@ -495,20 +576,16 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
         uint32_t calculated_crc = _crc24_openpgp(&ctx->receive_buffer[ctx->receive_address], ctx->receive_bytes_written);
         if (calculated_crc != ctx->receive_crc24)
         {
-            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch (expected=0x%06X, got=0x%06X); sending NACK\n",
-                          ctx->receive_crc24, calculated_crc);
-            err = _send_nack(handle, ctx->receive_sender_address);
+            ARTIE_CAN_LOG(handle->context, "BWACP: CRC mismatch (expected=0x%06X, got=0x%06X); sending NACK\n", ctx->receive_crc24, calculated_crc);
 
             // Reset state for retransmission
             ctx->receive_bytes_written = 0;
             ctx->receive_expected_parity = false;
+            err = _send_nack(handle, ctx->receive_sender_address);
         }
         else
         {
             ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified; sending ACK and setting state to IDLE\n");
-
-            // Send ACK
-            err = _send_ack(handle, ctx->receive_sender_address);
 
             // Save this transfer info for cooldown period (not currently used in new scheme but kept for future)
             ctx->last_completed_sender_address = ctx->receive_sender_address;
@@ -518,6 +595,9 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
             // Return to IDLE
             ctx->sending_node_address = 0xFF;
             ctx->state = BWACP_STATE_IDLE;
+
+            // Send ACK
+            err = _send_ack(handle, ctx->receive_sender_address);
         }
     }
 
@@ -863,6 +943,8 @@ artie_can_error_t bwacp_tick(artie_can_backend_t *handle)
         case BWACP_STATE_SENDING_COMPLETE:
             err |= _handle_sending_complete(handle);
             break;
+        case BWACP_STATE_RECEIVE_IN_ERROR: // fall-through
+        case BWACP_STATE_EXPECT_REPEAT: // fall-through
         case BWACP_STATE_RECEIVING:
             err |= _check_timeout_receiving(handle);
             break;
