@@ -183,6 +183,11 @@ artie_can_error_t artie_can_tick_isr(artie_can_backend_t *handle)
         // No valid protocol configured
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
+    else if (handle->context->isr_handler == NULL)
+    {
+        // No ISR handler configured
+        return ARTIE_CAN_ERR_INVALID_ARG;
+    }
 
     return handle->context->isr_handler(handle->context);
 }

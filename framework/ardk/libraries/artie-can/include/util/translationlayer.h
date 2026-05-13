@@ -34,6 +34,15 @@
     #define SOCKET_ERROR_VALUE -1
 #endif
 
+// Platform-independent socket type aliases
+typedef struct sockaddr_in sockaddr_in_t;
+typedef struct sockaddr sockaddr_t;
+typedef struct ip_mreq ip_mreq_t;
+typedef struct timeval timeval_t;
+#ifdef _WIN32
+    typedef int socklen_t;
+#endif
+
 // Platform-independent socket shutdown modes
 typedef enum {
     SHUTDOWN_RECEIVE = 0,  ///< Stop receiving data

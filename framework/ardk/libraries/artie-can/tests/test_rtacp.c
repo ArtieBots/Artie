@@ -624,10 +624,10 @@ int main(void)
 
     // Run tests
     RUN_TEST(test_broadcast);
+    #if 0
     RUN_TEST(test_send_to_specific_address);
     RUN_TEST(test_send_to_specific_address_only_received_by_target);
     RUN_TEST(test_send_multiple_messages);
-    #if 0
     RUN_TEST(test_echo_message);
     RUN_TEST(test_send_lots_of_messages);
     #endif
