@@ -7,6 +7,7 @@
 #include "frame.h"
 #include "log.h"
 #include "rtacp.h"
+#include "util.h"
 
 /** Check if we have timed out waiting for an ACK. */
 static artie_can_error_t _check_ack_timeout(artie_can_backend_t *handle)
@@ -33,7 +34,7 @@ static artie_can_error_t _send_pending_ack(artie_can_backend_t *handle, size_t a
     artie_can_error_t err;
     artie_can_frame_t *ack_frame = (ack_buffer_index == 0) ? &handle->context->rtacp_context.ack_frame0 : &handle->context->rtacp_context.ack_frame1;
 
-    err = handle->send(handle->context, ack_frame);
+    err = artie_can_send_with_retry(handle, ack_frame);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         ARTIE_CAN_LOG(handle->context, "RTACP: Failed to send ACK frame, error code %d.\n", err);
@@ -203,7 +204,7 @@ artie_can_error_t artie_can_rtacp_send(artie_can_backend_t *handle, const artie_
     // Now send the requested frame
     ARTIE_CAN_LOG(handle->context, "RTACP: Attempting to send frame with dest addr %u and priority %u; setting state to sending\n", ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION), ((frame->id & (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_MASK) >> (uint32_t)ARTIE_CAN_FRAME_ID_USER_PRIORITY_LOCATION));
     memcpy(&handle->context->rtacp_context.in_flight_frame, frame, sizeof(artie_can_frame_t)); // Set this before we send, in case we get the ACK before we are ready for it
-    err = handle->send(handle->context, frame);
+    err = artie_can_send_with_retry(handle, frame);
     if (err != ARTIE_CAN_ERR_NONE)
     {
         ARTIE_CAN_LOG(handle->context, "RTACP: Failed to send frame, error code %d.\n", err);
@@ -261,6 +262,7 @@ void rtacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t 
         else
         {
             // Got an ACK that is addressed to us. Handle from the main thread.
+            ARTIE_CAN_LOG(context, "RTACP: Received ACK frame addressed to us, storing in context and setting pending ACK RX flag.\n");
             memcpy(&context->rtacp_context.received_ack, frame, sizeof(artie_can_frame_t));
 
             // Atomically set the pending ACK RX flag

@@ -160,3 +160,22 @@ int close_socket(socket_t sock);
  * @return 0 on success, -1 on error.
  */
 int shutdown_socket(socket_t sock, int how);
+
+/**
+ * @brief Get the last socket error code.
+ * @return Error code from the last socket operation.
+ */
+int get_socket_error(void);
+
+/**
+ * @brief Check if the last socket error was a timeout or interrupt (non-fatal).
+ * @return true if the error was a timeout or interrupt, false otherwise.
+ */
+bool is_socket_error_wouldblock(void);
+
+/**
+ * @brief Set SO_REUSEPORT option on a socket (Unix-specific, no-op on Windows).
+ * @param sock The socket to configure.
+ * @return 0 on success, -1 on error (non-fatal on systems without SO_REUSEPORT).
+ */
+int set_socket_reuse_port(socket_t sock);

@@ -6,6 +6,10 @@
 
 #include "translationlayer.h"
 
+#ifndef _WIN32
+#include <errno.h>
+#endif
+
 bool create_thread(thread_handle_t *handle, thread_func_t func, void *arg)
 {
     if (handle == NULL || func == NULL)
@@ -208,5 +212,44 @@ int shutdown_socket(socket_t sock, int how)
 #else
     // POSIX uses SHUT_RD (0), SHUT_WR (1), SHUT_RDWR (2)
     return shutdown(sock, how);
+#endif
+}
+
+int get_socket_error(void)
+{
+#ifdef _WIN32
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
+
+bool is_socket_error_wouldblock(void)
+{
+#ifdef _WIN32
+    int error = WSAGetLastError();
+    return (error == WSAETIMEDOUT || error == WSAEINTR || error == WSAEWOULDBLOCK);
+#else
+    return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
+#endif
+}
+
+int set_socket_reuse_port(socket_t sock)
+{
+#ifdef _WIN32
+    // Windows doesn't have SO_REUSEPORT; SO_REUSEADDR is sufficient
+    // This is a no-op on Windows
+    (void)sock;
+    return 0;
+#else
+    // On Unix-like systems, set SO_REUSEPORT if available
+    #ifdef SO_REUSEPORT
+    int reuse = 1;
+    return setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (char *)&reuse, sizeof(reuse));
+    #else
+    // SO_REUSEPORT not available on this platform
+    (void)sock;
+    return 0;
+    #endif
 #endif
 }

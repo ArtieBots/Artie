@@ -14,6 +14,7 @@
 #include "err.h"
 #include "frame.h"
 #include "log.h"
+#include "util.h"
 
 // OpenPGP CRC-24 parameters
 #define CRC24_INIT 0xB704CE
@@ -86,7 +87,8 @@ static artie_can_error_t _send_ack(artie_can_backend_t *handle, uint8_t target_a
     frame.dlc = 0; // ACK frames have no data
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending ACK frame to 0x%02X\n", target_address);
-    return handle->send(handle->context, &frame);
+
+    return artie_can_send_with_retry(handle, &frame);
 }
 
 /**
@@ -108,7 +110,8 @@ static artie_can_error_t _send_nack(artie_can_backend_t *handle, uint8_t target_
     frame.dlc = 0; // NACK frames have no data
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending NACK frame to 0x%02X\n", target_address);
-    return handle->send(handle->context, &frame);
+
+    return artie_can_send_with_retry(handle, &frame);
 }
 
 /**
@@ -143,7 +146,7 @@ static artie_can_error_t _send_ready(artie_can_backend_t *handle, const uint8_t 
     frame.dlc = 8;
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending READY frame (addr=0x%08X, size=%u)\n", address, payload_size);
-    return handle->send(handle->context, &frame);
+    return artie_can_send_with_retry(handle, &frame);
 }
 
 /**
@@ -172,7 +175,7 @@ static artie_can_error_t _send_data(artie_can_backend_t *handle, bool is_repeat)
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending DATA frame (offset=%u, dlc=%u, parity=%d)\n", ctx->send_payload_offset, frame.dlc, ctx->send_parity);
 
-    return handle->send(handle->context, &frame);
+    return artie_can_send_with_retry(handle, &frame);
 }
 
 /**
@@ -194,7 +197,7 @@ static artie_can_error_t _send_complete(artie_can_backend_t *handle)
     frame.dlc = 0; // COMPLETE frames have no data
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending COMPLETE frame\n");
-    return handle->send(handle->context, &frame);
+    return artie_can_send_with_retry(handle, &frame);
 }
 
 /**

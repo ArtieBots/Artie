@@ -66,8 +66,8 @@ function(add_artie_can_test test_name)
 endfunction()
 
 # Add individual test files here (no *.c suffix)
-#add_artie_can_test(test_rtacp)
-add_artie_can_test(test_bwacp)
+add_artie_can_test(test_rtacp)
+#add_artie_can_test(test_bwacp)
 
 # Print test information
 message(STATUS "Unity test framework configured")

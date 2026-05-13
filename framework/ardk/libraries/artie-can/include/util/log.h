@@ -20,9 +20,9 @@
     #define ARTIE_CAN_LOG(context, fmt, ...) \
         do { \
             if (context) { \
-                printf("[ARTIE CAN][Node %d] " fmt "\n", (context)->node_address, ##__VA_ARGS__); \
+                printf("[ARTIE CAN][Node %d] " fmt, (context)->node_address, ##__VA_ARGS__); \
             } else { \
-                printf("[ARTIE CAN][Node unknown] " fmt "\n", ##__VA_ARGS__); \
+                printf("[ARTIE CAN][Node unknown] " fmt, ##__VA_ARGS__); \
             } \
         } while(0)
 #else
