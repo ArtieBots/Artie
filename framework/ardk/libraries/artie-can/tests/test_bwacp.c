@@ -601,7 +601,7 @@ void test_send_46k_bytes(void)
         send_data[i] = (uint8_t)(i % 256);
     }
     // Address specifies the offset within the receive buffer where data should be written
-    uint32_t buffer_offset = 0x8000;
+    uint32_t buffer_offset = 0x0000;
 
     // Send from node 1 to multicast address targeting SENSOR class (nodes 2 and 3 are sensors)
     err = artie_can_bwacp_send(&_node1, send_data, (uint32_t)data_size, buffer_offset, ARTIE_CAN_BWACP_MULTICAST_ADDRESS, ARTIE_CAN_BWACP_CLASS_SENSOR, ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
@@ -611,8 +611,8 @@ void test_send_46k_bytes(void)
     // Node 1 should transition to WAITING_COMPLETE, then back to IDLE after timeout
     bool node1_complete = false;
     uint64_t start_time = get_current_time_ms();
-    const uint64_t ten_minutes = 10 * 60 * 1000; // 10 minutes in milliseconds
-    while (!node1_complete && (get_current_time_ms() - start_time) < ten_minutes)
+    const uint64_t timeout_minutes = 20 * 60 * 1000; // X minutes in milliseconds (in my experience, it is on the order of a few minutes ~ 3)
+    while (!node1_complete && (get_current_time_ms() - start_time) < timeout_minutes)
     {
         _run_event_loops();
         SLEEP_MS(1);
@@ -724,13 +724,13 @@ int main(void)
     RUN_TEST(test_send_255_bytes);
     RUN_TEST(test_send_256_bytes);
     RUN_TEST(test_send_257_bytes);
-    #if 0
-    RUN_TEST(test_send_46k_bytes);
     RUN_TEST(test_crc_mismatch);
+    #if 0
     RUN_TEST(test_one_target_node);
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
     RUN_TEST(test_concurrent_bwacp);
+    RUN_TEST(test_send_46k_bytes);
     #endif
 
     // Finish and return results

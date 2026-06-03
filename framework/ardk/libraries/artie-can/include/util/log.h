@@ -8,24 +8,15 @@
 
 #pragma once
 
-#include <stdio.h>
-
 /** Whether we should turn logging on or off. */
 #ifndef ARTIE_CAN_LOGGING_ENABLED
     #define ARTIE_CAN_LOGGING_ENABLED 0
 #endif
 
+
 #if ARTIE_CAN_LOGGING_ENABLED
-    /** Printf functionality when logging is enabled. Includes node address from context. */
-    #define ARTIE_CAN_LOG(context, fmt, ...) \
-        do { \
-            if (context) { \
-                printf("[ARTIE CAN][Node %d] " fmt, (context)->node_address, ##__VA_ARGS__); \
-            } else { \
-                printf("[ARTIE CAN][Node unknown] " fmt, ##__VA_ARGS__); \
-            } \
-        } while(0)
+    void artie_can_log(const artie_can_context_t *context, const char *fmt, ...);
+    #define ARTIE_CAN_LOG(context, fmt, ...) artie_can_log(context, fmt, ##__VA_ARGS__)
 #else
-    /** Printf functionality when logging is disabled. */
-    #define ARTIE_CAN_LOG(context, fmt, ...) do { } while(0)
-#endif
+    #define ARTIE_CAN_LOG(context, fmt, ...) do {} while(0)
+#endif // ARTIE_CAN_LOGGING_ENABLED
