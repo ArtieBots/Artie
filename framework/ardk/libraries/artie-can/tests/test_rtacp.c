@@ -25,7 +25,7 @@
 
 // Multicast configuration for all test nodes
 static const char *multicast_group = "239.0.0.1";
-static const uint16_t multicast_port = 5000;
+static const uint16_t multicast_port = 5007;
 
 static artie_can_context_t _node1_context;
 static artie_can_context_t _node2_context;

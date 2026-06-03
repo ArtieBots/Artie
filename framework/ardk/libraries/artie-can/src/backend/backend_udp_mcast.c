@@ -17,6 +17,8 @@
 #include "rtacp.h"
 #include "translationlayer.h"
 
+static const char *mcast_group = "239.0.0.1"; // Suitable multicast group for local testing
+
 static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 {
     // Convert from raw buffer to frame struct
@@ -78,11 +80,13 @@ static void *_receiver_thread_func(void *arg)
                 // We have received a full frame
                 ARTIE_CAN_LOG(context, "[UDP] Received frame (%d bytes)\n", recv_size);
                 _complete_frame(context, recvbuf);
+                memset(recvbuf, 0, sizeof(recvbuf)); // Clear buffer after processing
             }
             else
             {
                 // Partial or malformed frame
                 ARTIE_CAN_LOG(context, "[UDP] Received malformed frame (%d bytes, expected %zu)\n", recv_size, sizeof(artie_can_frame_t));
+                memset(recvbuf, 0, sizeof(recvbuf)); // Clear buffer after processing
             }
         }
         else if (recv_size == SOCKET_ERROR_VALUE)
@@ -90,11 +94,13 @@ static void *_receiver_thread_func(void *arg)
             if (is_socket_error_wouldblock())
             {
                 // Timeout or interrupted - just continue
+                memset(recvbuf, 0, sizeof(recvbuf));
                 continue;
             }
             else
             {
                 ARTIE_CAN_LOG(context, "[UDP] Receive error: %d\n", get_socket_error());
+                memset(recvbuf, 0, sizeof(recvbuf));
             }
         }
     }
@@ -122,8 +128,8 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
-    // Create UDP socket
-    mcast_ctx->socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    // Create socket
+    mcast_ctx->socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (mcast_ctx->socket_fd == INVALID_SOCKET_VALUE)
     {
         ARTIE_CAN_LOG(context, "[UDP] Failed to create socket\n");
@@ -139,31 +145,14 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
 
-    // On Unix-like systems, also set SO_REUSEPORT for better port sharing (no-op on Windows)
-    if (set_socket_reuse_port(mcast_ctx->socket_fd) == SOCKET_ERROR_VALUE)
-    {
-        ARTIE_CAN_LOG(context, "[UDP] Warning: Failed to set SO_REUSEPORT\n");
-        // Non-fatal on some systems
-    }
+    // Bind to the receive address
+    struct sockaddr_in recv_addr;
+    memset(&recv_addr, 0, sizeof(recv_addr));
+    recv_addr.sin_family = AF_INET;
+    recv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    recv_addr.sin_port = htons(mcast_ctx->config.port);
 
-    // Set receive timeout to allow checking should_stop flag periodically
-    timeval_t tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = 100000; // 100ms timeout
-    if (setsockopt(mcast_ctx->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(tv)) == SOCKET_ERROR_VALUE)
-    {
-        ARTIE_CAN_LOG(context, "[UDP] Warning: Failed to set receive timeout\n");
-        // Non-fatal
-    }
-
-    // Bind to the multicast port (bind to INADDR_ANY to receive multicast)
-    sockaddr_in_t local_addr;
-    memset(&local_addr, 0, sizeof(local_addr));
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    local_addr.sin_port = htons(mcast_ctx->config.port);
-
-    if (bind(mcast_ctx->socket_fd, (sockaddr_t *)&local_addr, sizeof(local_addr)) == SOCKET_ERROR_VALUE)
+    if (bind(mcast_ctx->socket_fd, (sockaddr_t *)&recv_addr, sizeof(recv_addr)) == SOCKET_ERROR_VALUE)
     {
         ARTIE_CAN_LOG(context, "[UDP] Failed to bind socket to port %d\n", mcast_ctx->config.port);
         close_socket(mcast_ctx->socket_fd);
@@ -172,15 +161,8 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
 
     // Join the multicast group
     ip_mreq_t mreq;
-    memset(&mreq, 0, sizeof(mreq));
-    if (inet_pton(AF_INET, mcast_ctx->config.group_addr, &mreq.imr_multiaddr) != 1)
-    {
-        ARTIE_CAN_LOG(context, "[UDP] Invalid multicast address: %s\n", mcast_ctx->config.group_addr);
-        close_socket(mcast_ctx->socket_fd);
-        return ARTIE_CAN_ERR_INIT_FAIL;
-    }
+    mreq.imr_multiaddr.s_addr = inet_addr(mcast_ctx->config.group_addr);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-
     if (setsockopt(mcast_ctx->socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq)) == SOCKET_ERROR_VALUE)
     {
         ARTIE_CAN_LOG(context, "[UDP] Failed to join multicast group %s\n", mcast_ctx->config.group_addr);
@@ -222,21 +204,16 @@ static artie_can_error_t _send_udp_mcast(void *ctx, const artie_can_frame_t *fra
     artie_can_context_t *context = (artie_can_context_t *)ctx;
     artie_can_udp_mcast_context_t *mcast_ctx = (artie_can_udp_mcast_context_t *)(context->backend_context);
 
-    // Set up multicast destination address
+    // Set up the destination address
     sockaddr_in_t dest_addr;
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr.s_addr = inet_addr(mcast_group);
     dest_addr.sin_port = htons(mcast_ctx->config.port);
-    if (inet_pton(AF_INET, mcast_ctx->config.group_addr, &dest_addr.sin_addr) != 1)
-    {
-        ARTIE_CAN_LOG(context, "[UDP] Invalid multicast address\n");
-        return ARTIE_CAN_ERR_SEND_FAIL;
-    }
 
     // Send the frame to the multicast group
     ARTIE_CAN_LOG(context, "[UDP] Sending frame with ID 0x%X to multicast group\n", frame->id);
     int send_result = sendto(mcast_ctx->socket_fd, (const char *)frame, sizeof(artie_can_frame_t), 0, (sockaddr_t *)&dest_addr, sizeof(dest_addr));
-
     if (send_result == SOCKET_ERROR_VALUE)
     {
         ARTIE_CAN_LOG(context, "[UDP] Failed to send frame\n");
