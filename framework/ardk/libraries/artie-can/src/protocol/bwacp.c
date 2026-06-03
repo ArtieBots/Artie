@@ -883,6 +883,17 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     return ARTIE_CAN_ERR_NONE;
 }
 
+bool artie_can_bwacp_is_busy(artie_can_backend_t *handle)
+{
+    if ((handle == NULL) || (handle->context == NULL))
+    {
+        return false;
+    }
+
+    bwacp_context_t *ctx = &handle->context->bwacp_context;
+    return (ctx->state != BWACP_STATE_IDLE);
+}
+
 void bwacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
     if ((context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_BWACP) == 0)

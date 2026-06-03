@@ -155,6 +155,14 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
 void bwacp_receive_in_isr(artie_can_context_t *context, const artie_can_frame_t *frame);
 
 /**
+ * @brief Check if the BWACP protocol handler is currently busy with an ongoing block write operation.
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend.
+ * @return true if BWACP is busy with an ongoing operation, false if it is idle and can accept a new block write.
+ */
+bool artie_can_bwacp_is_busy(artie_can_backend_t *handle);
+
+/**
  * @brief Tick function for the BWACP protocol. This function should be called periodically
  * to allow the BWACP state machine to process incoming frames, timeouts, and other protocol-specific tasks.
  *
