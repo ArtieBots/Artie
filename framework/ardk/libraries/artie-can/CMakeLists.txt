@@ -28,6 +28,7 @@ set(ARTIE_CAN_SOURCES
     src/protocol/rpcacp.c
     src/protocol/psacp.c
     src/util/circular_buffer.c
+    src/util/log.c
     src/util/translationlayer.c
     src/util/util.c
     src/artie_can_core.c
