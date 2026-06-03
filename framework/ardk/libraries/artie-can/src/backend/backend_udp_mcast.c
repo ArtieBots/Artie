@@ -161,7 +161,7 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
 
     // Join the multicast group
     ip_mreq_t mreq;
-    mreq.imr_multiaddr.s_addr = inet_addr(mcast_ctx->config.group_addr);
+    inet_pton(AF_INET, mcast_ctx->config.group_addr, &mreq.imr_multiaddr);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     if (setsockopt(mcast_ctx->socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq)) == SOCKET_ERROR_VALUE)
     {
@@ -208,7 +208,7 @@ static artie_can_error_t _send_udp_mcast(void *ctx, const artie_can_frame_t *fra
     sockaddr_in_t dest_addr;
     memset(&dest_addr, 0, sizeof(dest_addr));
     dest_addr.sin_family = AF_INET;
-    dest_addr.sin_addr.s_addr = inet_addr(mcast_group);
+    inet_pton(AF_INET, mcast_ctx->config.group_addr, &dest_addr.sin_addr);
     dest_addr.sin_port = htons(mcast_ctx->config.port);
 
     // Send the frame to the multicast group
