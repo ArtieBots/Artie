@@ -23,6 +23,9 @@
 // Default timeout for receive calls in tests (in milliseconds)
 #define DEFAULT_TIMEOUT_MS 3000
 
+// Timeout for retrying send operations when busy (in milliseconds)
+#define SEND_RETRY_TIMEOUT_MS 100
+
 // Multicast configuration for all test nodes
 static const char *multicast_group = "239.0.0.1";
 static const uint16_t multicast_port = 5007;
@@ -173,6 +176,40 @@ static void _run_event_loops(void)
 }
 
 /**
+ * @brief Wrapper function to send an RTACP frame with retry on busy.
+ * Retries sending if ARTIE_CAN_ERR_SEND_BUSY is returned, up to the timeout.
+ *
+ * @param handle Pointer to the backend handle.
+ * @param frame Pointer to the frame to send.
+ * @return artie_can_error_t Error code from the send operation.
+ */
+static artie_can_error_t _rtacp_send_with_retry(artie_can_backend_t *handle, const artie_can_frame_t *frame)
+{
+    artie_can_error_t err;
+    uint64_t start_time = get_current_time_ms();
+
+    while ((get_current_time_ms() - start_time) < SEND_RETRY_TIMEOUT_MS)
+    {
+        err = artie_can_rtacp_send(handle, frame);
+        if (err == ARTIE_CAN_ERR_SEND_BUSY)
+        {
+            // Run event loops to allow the system to make progress
+            _run_event_loops();
+            SLEEP_MS(1);
+            continue;
+        }
+        else
+        {
+            // Either success or a different error - return it
+            return err;
+        }
+    }
+
+    // Timeout - return the last error (which should be SEND_BUSY)
+    return err;
+}
+
+/**
  * @brief Setup function called before each test.
  *
  * This function runs before each individual test in this file.
@@ -283,7 +320,7 @@ void test_broadcast(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_rtacp_send(&_node1, &frame_to_send);
+    err = _rtacp_send_with_retry(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -332,7 +369,7 @@ void test_send_to_specific_address(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_rtacp_send(&_node1, &frame_to_send);
+    err = _rtacp_send_with_retry(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Blocking receive on node 2 to get the frame
@@ -373,7 +410,7 @@ void test_send_to_specific_address_only_received_by_target(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send the frame from node 1
-    err = artie_can_rtacp_send(&_node1, &frame_to_send);
+    err = _rtacp_send_with_retry(&_node1, &frame_to_send);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -428,26 +465,10 @@ void test_send_multiple_messages(void)
         err = artie_can_rtacp_init_frame(&frame_to_send, &rtacp_frame);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        // Send the frame (trying again if busy up to 5 times)
-        for (unsigned int i = 0; i < 5; i++)
-        {
-            _run_event_loops();
-            err = artie_can_rtacp_send(&_node1, &frame_to_send);
-            if (err == ARTIE_CAN_ERR_SEND_BUSY)
-            {
-                continue;
-            }
-            else if (err == ARTIE_CAN_ERR_NONE)
-            {
-                _run_event_loops();
-                break;
-            }
-            else
-            {
-                // Fail
-                TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
-            }
-        }
+        // Send the frame with retry on busy
+        err = _rtacp_send_with_retry(&_node1, &frame_to_send);
+        TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+        _run_event_loops();
 
         // Ensure node 2 receives the frame
         err = wait_with_timeout(&_callback_called2, DEFAULT_TIMEOUT_MS, _run_event_loops);
@@ -489,7 +510,7 @@ void test_echo_message(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send from 1 to 2
-    err = artie_can_rtacp_send(&_node1, &can_frame1to2);
+    err = _rtacp_send_with_retry(&_node1, &can_frame1to2);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -519,7 +540,7 @@ void test_echo_message(void)
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
     // Send from 2 to 1
-    err = artie_can_rtacp_send(&_node2, &can_frame2to1);
+    err = _rtacp_send_with_retry(&_node2, &can_frame2to1);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     _run_event_loops();
 
@@ -573,7 +594,7 @@ void test_send_lots_of_messages(void)
         err = artie_can_rtacp_init_frame(&can_frame1to2, &frame1to2);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        err = artie_can_rtacp_send(&_node1, &can_frame1to2);
+        err = _rtacp_send_with_retry(&_node1, &can_frame1to2);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         _run_event_loops();
 
@@ -601,7 +622,7 @@ void test_send_lots_of_messages(void)
         err = artie_can_rtacp_init_frame(&can_frame2to1, &frame2to1);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-        err = artie_can_rtacp_send(&_node2, &can_frame2to1);
+        err = _rtacp_send_with_retry(&_node2, &can_frame2to1);
         TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
         _run_event_loops();
 
