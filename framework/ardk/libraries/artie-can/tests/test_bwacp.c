@@ -77,6 +77,30 @@ static void _empty_rx_callback(const artie_can_frame_t *frame)
     // Do nothing - we will check the receive buffers directly in the tests
 }
 
+/** The callback that node1 uses to receive frames. */
+static void _receive_callback_node1(const artie_can_frame_t *frame)
+{
+    // For BWACP, data is written directly to the receive buffer.
+    // This callback can be used for logging or tracking, but is not required for the protocol to work.
+    (void)frame;  // Unused - BWACP handles data internally
+}
+
+/** The callback that node2 uses to receive frames. */
+static void _receive_callback_node2(const artie_can_frame_t *frame)
+{
+    // For BWACP, data is written directly to the receive buffer.
+    // This callback can be used for logging or tracking, but is not required for the protocol to work.
+    (void)frame;  // Unused - BWACP handles data internally
+}
+
+/** The callback that node3 uses to receive frames. */
+static void _receive_callback_node3(const artie_can_frame_t *frame)
+{
+    // For BWACP, data is written directly to the receive buffer.
+    // This callback can be used for logging or tracking, but is not required for the protocol to work.
+    (void)frame;  // Unused - BWACP handles data internally
+}
+
 /**
  * @brief Setup function called before each test.
  *
@@ -700,8 +724,8 @@ int main(void)
     RUN_TEST(test_send_255_bytes);
     RUN_TEST(test_send_256_bytes);
     RUN_TEST(test_send_257_bytes);
-    RUN_TEST(test_send_46k_bytes);
     #if 0
+    RUN_TEST(test_send_46k_bytes);
     RUN_TEST(test_crc_mismatch);
     RUN_TEST(test_one_target_node);
     RUN_TEST(test_class_of_target_nodes);

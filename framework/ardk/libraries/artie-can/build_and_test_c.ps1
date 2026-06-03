@@ -12,6 +12,11 @@ Remove-Item * -Recurse -Force -ErrorAction SilentlyContinue
 cmake .. -DBUILD_TESTS=ON -DARTIE_CAN_LOGGING_ENABLED=1
 cmake --build . --config Debug
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Build failed. Exiting."
+    exit $LASTEXITCODE
+}
+
 # Run tests with verbose output
 ctest -C Debug -V
 
