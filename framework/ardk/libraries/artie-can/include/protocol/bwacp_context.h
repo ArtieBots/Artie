@@ -14,6 +14,9 @@
 /** Maximum payload size for BWACP (64 KB) */
 #define ARTIE_CAN_BWACP_MAX_PAYLOAD_SIZE (65536U)
 
+/** Maximum number of times a DATA frame can be repeated */
+#define ARTIE_CAN_BWACP_MAX_REPEATS (5U)
+
 /**
  * @brief States that the BWACP state machine can be in for a given node.
  *
@@ -63,6 +66,7 @@ typedef struct {
     uint32_t received_ack_count;            ///< Number of ACKs received so far
     uint32_t received_nack_count;           ///< Number of NACKs received so far
     bool need_repeat_data_frame;            ///< Whether the last DATA frame needs to be repeated due to NACK
+    uint32_t current_frame_repeat_count;    ///< Number of times the current DATA frame has been repeated
 
     // Receiving state
     uint8_t *receive_buffer;                ///< Buffer for receiving data (owned by caller, must be provided before receiving)

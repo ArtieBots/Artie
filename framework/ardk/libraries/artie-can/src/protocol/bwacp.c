@@ -662,10 +662,6 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
     artie_can_error_t err;
 
     // Check if we need to repeat the last DATA frame
-    // TODO: Ensure we only send one repeat for a given frame. After that, we just keep going.
-    //       Once we have things working, we should also implement an optimization here where we blacklist
-    //       a node after it NACKs twice so that we don't repeat every single frame once a single node
-    //       gets crazy.
     if (ctx->need_repeat_data_frame)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Repeating last DATA frame\n");
@@ -722,15 +718,17 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
     uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
 
     // Check if we received all ACKs or if any NACKs were received
+    uint32_t repeat_increment = 0;
     if (ctx->received_nack_count > 0)
     {
         // NACK received - need to repeat this frame
         ARTIE_CAN_LOG(handle->context, "BWACP: NACK received; will repeat DATA frame\n");
         ctx->need_repeat_data_frame = true;
+        repeat_increment = 1;
     }
     else
     {
-        // No NACKs received - no need to repeat
+        // No NACKs received - no need to repeat (unless we timeout waiting for ACKs)
         ctx->need_repeat_data_frame = false;
     }
 
@@ -742,12 +740,25 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
     }
     else if (elapsed >= ARTIE_CAN_BWACP_TIMEOUT_MS)
     {
-        // Timeout - abort the transmission
-        ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout (%u/%u ACKs); aborting transmission\n", ctx->received_ack_count, ctx->expected_ack_count);
-        ctx->state = BWACP_STATE_IDLE;
-        return ARTIE_CAN_ERR_TIMEOUT;
+        // Timeout - abort the transmission if this is already a repeat, otherwise try repeating once
+        if (ctx->current_frame_repeat_count >= ARTIE_CAN_BWACP_MAX_REPEATS)
+        {
+            // TODO: Instead of aborting, we should keep going and simply blacklist the non-responsive nodes for the remainder
+            // of this transfer.
+            ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout and repeats exhausted (%u/%u ACKs); aborting transmission\n", ctx->received_ack_count, ctx->expected_ack_count);
+            ctx->state = BWACP_STATE_IDLE;
+            return ARTIE_CAN_ERR_TIMEOUT;
+        }
+        else
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout (%u/%u ACKs); repeating DATA frame\n", ctx->received_ack_count, ctx->expected_ack_count);
+            ctx->need_repeat_data_frame = true;
+            ctx->state = BWACP_STATE_SENDING_DATA;
+            repeat_increment = 1;
+        }
     }
 
+    ctx->current_frame_repeat_count += repeat_increment;
     return ARTIE_CAN_ERR_NONE;
 }
 
@@ -855,6 +866,7 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     ctx->received_ack_count = 0;
     ctx->received_nack_count = 0;
     ctx->need_repeat_data_frame = false;
+    ctx->current_frame_repeat_count = 0;
     ctx->last_packet_ms = handle->get_ms();
 
     // Send READY frame
