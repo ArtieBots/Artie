@@ -219,7 +219,7 @@ void test_send_one_byte(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -266,7 +266,7 @@ void test_send_four_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -319,7 +319,7 @@ void test_send_eight_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -384,7 +384,7 @@ void test_send_254_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -441,7 +441,7 @@ void test_send_255_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -498,7 +498,7 @@ void test_send_256_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -555,7 +555,7 @@ void test_send_257_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -616,7 +616,7 @@ void test_send_46k_bytes(void)
     {
         _run_event_loops();
         SLEEP_MS(1);
-        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        if (artie_can_bwacp_is_busy(&_node1) == false)
         {
             node1_complete = true;
         }
@@ -649,13 +649,70 @@ void test_send_46k_bytes(void)
  */
 void test_crc_mismatch(void)
 {
-    // This one's tricky. Need to set up a really long bulk write, and
-    // while that's going on, flip a bit in the place where the rx is happening (and has already been written to),
-    // so we invalidate the data and the CRC check should fail, causing the
-    // whole thing to happen again.
-    // After it finishes, we check if the data is actually correct now (since
-    // the write should have started over and the buffer that we meddled with
-    // should now have the correct contents this time)
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_crc_mismatch !!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a large-ish payload to ensure we have time to corrupt data mid-transfer
+    uint8_t send_data[1024];
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        send_data[i] = (uint8_t)(i & 0xFF);
+    }
+    uint32_t buffer_offset = 0x1000;
+
+    // Send from node 1 to node 2 (unicast to a single node)
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset,
+                               0x02, // target node 2 specifically
+                               0,    // class ignored for unicast
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops until node 2 is actively receiving and has written some data
+    bool data_received = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!data_received && (get_current_time_ms() - start_time) < 10000)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if ((_node2_context.bwacp_context.state == BWACP_STATE_RECEIVING) && (_node2_context.bwacp_context.receive_bytes_written > 50))
+        {
+            data_received = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(data_received, "Node 2 did not start receiving data");
+
+    printf("Node 2 has received %u bytes, corrupting data...\n", _node2_context.bwacp_context.receive_bytes_written);
+
+    // Corrupt a byte that's already been written (flip all bits)
+    _node2_receive_buffer[buffer_offset + 10] ^= 0xFF;
+
+    // Let the transfer complete - it should fail CRC check and request a retransmission.
+    // The transfer won't be entirely complete until the retransmission finishes
+    bool done = false;
+    start_time = get_current_time_ms();
+    while (!done && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if ((artie_can_bwacp_is_busy(&_node1) == false) && (artie_can_bwacp_is_busy(&_node2) == false))
+        {
+            done = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(done, "Transfer attempt (including retransmission) did not complete");
+
+    printf("Retransmission complete, verifying data...\n");
+
+    // Verify that the data is now correct (retransmission overwrote the corrupted byte)
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(i & 0xFF), _node2_receive_buffer[buffer_offset + i], "Data mismatch");
+    }
+
+    printf("!!!!!!!!!!!! test_crc_mismatch PASSED !!!!!!!!!!!!!\n");
 }
 
 /**
