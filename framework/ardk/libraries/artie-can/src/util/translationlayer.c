@@ -253,3 +253,18 @@ int set_socket_reuse_port(socket_t sock)
     #endif
 #endif
 }
+
+int set_socket_receive_timeout(socket_t sock, uint32_t timeout_ms)
+{
+#ifdef _WIN32
+    // Windows uses DWORD milliseconds for SO_RCVTIMEO
+    DWORD timeout = timeout_ms;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+#else
+    // POSIX uses struct timeval for SO_RCVTIMEO
+    timeval_t timeout;
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout));
+#endif
+}
