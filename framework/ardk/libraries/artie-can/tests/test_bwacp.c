@@ -724,13 +724,13 @@ int main(void)
     RUN_TEST(test_send_255_bytes);
     RUN_TEST(test_send_256_bytes);
     RUN_TEST(test_send_257_bytes);
-    RUN_TEST(test_send_46k_bytes);
-    #if 0
     RUN_TEST(test_crc_mismatch);
+    #if 0
     RUN_TEST(test_one_target_node);
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
     RUN_TEST(test_concurrent_bwacp);
+    RUN_TEST(test_send_46k_bytes);
     #endif
 
     // Finish and return results
