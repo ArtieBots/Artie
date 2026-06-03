@@ -188,3 +188,11 @@ bool is_socket_error_wouldblock(void);
  * @return 0 on success, -1 on error (non-fatal on systems without SO_REUSEPORT).
  */
 int set_socket_reuse_port(socket_t sock);
+
+/**
+ * @brief Set socket receive timeout (SO_RCVTIMEO).
+ * @param sock The socket to configure.
+ * @param timeout_ms Timeout in milliseconds.
+ * @return 0 on success, -1 on error.
+ */
+int set_socket_receive_timeout(socket_t sock, uint32_t timeout_ms);

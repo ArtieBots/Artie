@@ -71,7 +71,9 @@ static void *_receiver_thread_func(void *arg)
 
     while (!mcast_ctx->should_stop)
     {
-        // Receive a packet (blocks until data is received or timeout)
+        // Receive a packet (blocks until data is received or timeout occurs)
+        // The socket has SO_RCVTIMEO set, so recvfrom will periodically timeout
+        // to allow checking the should_stop flag. Timeout is not an error condition.
         int recv_size = recvfrom(mcast_ctx->socket_fd, recvbuf, sizeof(recvbuf), 0, (sockaddr_t *)&sender_addr, &sender_addr_len);
         if (recv_size > 0)
         {
@@ -93,7 +95,7 @@ static void *_receiver_thread_func(void *arg)
         {
             if (is_socket_error_wouldblock())
             {
-                // Timeout or interrupted - just continue
+                // Timeout occurred (expected behavior) - continue to check should_stop flag
                 memset(recvbuf, 0, sizeof(recvbuf));
                 continue;
             }
@@ -141,6 +143,15 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
     if (setsockopt(mcast_ctx->socket_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) == SOCKET_ERROR_VALUE)
     {
         ARTIE_CAN_LOG(context, "[UDP] Failed to set SO_REUSEADDR\n");
+        close_socket(mcast_ctx->socket_fd);
+        return ARTIE_CAN_ERR_INIT_FAIL;
+    }
+
+    // Set receive timeout to allow periodic checking of the should_stop flag
+    // Timeout is not an error condition, just a mechanism for thread control
+    if (set_socket_receive_timeout(mcast_ctx->socket_fd, 100) == SOCKET_ERROR_VALUE)
+    {
+        ARTIE_CAN_LOG(context, "[UDP] Failed to set SO_RCVTIMEO\n");
         close_socket(mcast_ctx->socket_fd);
         return ARTIE_CAN_ERR_INIT_FAIL;
     }
