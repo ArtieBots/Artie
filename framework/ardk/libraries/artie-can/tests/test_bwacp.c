@@ -670,10 +670,12 @@ void test_crc_mismatch(void)
                                ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
+    const uint64_t timeout_ms = 10000;
+
     // Run event loops until node 2 is actively receiving and has written some data
     bool data_received = false;
     uint64_t start_time = get_current_time_ms();
-    while (!data_received && (get_current_time_ms() - start_time) < 10000)
+    while (!data_received && (get_current_time_ms() - start_time) < timeout_ms)
     {
         _run_event_loops();
         SLEEP_MS(1);
@@ -693,7 +695,7 @@ void test_crc_mismatch(void)
     // The transfer won't be entirely complete until the retransmission finishes
     bool done = false;
     start_time = get_current_time_ms();
-    while (!done && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    while (!done && (get_current_time_ms() - start_time) < timeout_ms)
     {
         _run_event_loops();
         SLEEP_MS(1);
@@ -721,6 +723,54 @@ void test_crc_mismatch(void)
  */
 void test_one_target_node(void)
 {
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!! Starting test_one_target_node !!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a payload
+    uint8_t send_data[] = {0xAA, 0xBB, 0xCC, 0xDD};
+    uint32_t buffer_offset = 0x2000;
+
+    // Send from node 1 to node 2 specifically (unicast, not multicast)
+    // Even though node 3 is the same class as node 2, it should NOT receive this
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset,
+                               0x02, // target node 2 by address
+                               0,    // class ignored for unicast
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops and wait for node 1 to finish sending
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!node1_complete && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending");
+
+    // Check that node 2 received the data at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0xAA, _node2_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0xBB, _node2_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0xCC, _node2_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0xDD, _node2_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
+
+    // Check that node 3 did NOT receive the data (should still be all zeros)
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 3]);
+    // Node 3's receive_address should not be set to our buffer_offset
+    TEST_ASSERT_NOT_EQUAL(buffer_offset, _node3_context.bwacp_context.receive_address);
+
+    printf("!!!!!!!!!!!! test_one_target_node PASSED !!!!!!!!!\n");
 }
 
 /**
@@ -782,8 +832,8 @@ int main(void)
     RUN_TEST(test_send_256_bytes);
     RUN_TEST(test_send_257_bytes);
     RUN_TEST(test_crc_mismatch);
-    #if 0
     RUN_TEST(test_one_target_node);
+    #if 0
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
     RUN_TEST(test_concurrent_bwacp);
