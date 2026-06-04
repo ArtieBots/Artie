@@ -779,9 +779,82 @@ void test_one_target_node(void)
  */
 void test_class_of_target_nodes(void)
 {
-    // One node should consider itself a motor node and another should consider itself a
-    // sensor node. Test that we write to only the sensor node when we attempt to address
-    // to the sensor class.
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!! Starting test_class_of_target_nodes !!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Reconfigure node 3 to be a MOTOR node instead of SENSOR
+    err = artie_can_close(&_node3);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    memset(&_node3, 0, sizeof(_node3));
+    memset(&_node3_context, 0, sizeof(_node3_context));
+    memset(&_node3_udp_mcast_context, 0, sizeof(_node3_udp_mcast_context));
+
+    err = artie_can_init_context_udp_mcast(&_node3_context, &_node3_udp_mcast_context, multicast_group, multicast_port);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init_context_bwacp(&_node3_context, 0x03, ARTIE_CAN_BWACP_CLASS_MOTOR);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_bwacp_set_receive_buffer(&_node3_context, _node3_receive_buffer, sizeof(_node3_receive_buffer));
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_UDP_MCAST, _receive_callback_node3, get_current_time_ms);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Create a payload
+    uint8_t send_data[] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+    uint32_t buffer_offset = 0x3000;
+
+    // Send from node 1 to SENSOR class via multicast
+    // Node 2 is SENSOR, so it should receive
+    // Node 3 is MOTOR, so it should NOT receive
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset,
+                               ARTIE_CAN_BWACP_MULTICAST_ADDRESS, // multicast
+                               ARTIE_CAN_BWACP_CLASS_SENSOR,      // target SENSOR class only
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops and wait for node 1 to finish sending
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!node1_complete && (get_current_time_ms() - start_time) < DEFAULT_TIMEOUT_MS)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (_node1_context.bwacp_context.state == BWACP_STATE_IDLE)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending");
+
+    // Check that node 2 (SENSOR) received the data at the correct buffer offset
+    TEST_ASSERT_EQUAL_UINT8(0x11, _node2_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0x22, _node2_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x33, _node2_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0x44, _node2_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT8(0x55, _node2_receive_buffer[buffer_offset + 4]);
+    TEST_ASSERT_EQUAL_UINT8(0x66, _node2_receive_buffer[buffer_offset + 5]);
+    TEST_ASSERT_EQUAL_UINT8(0x77, _node2_receive_buffer[buffer_offset + 6]);
+    TEST_ASSERT_EQUAL_UINT8(0x88, _node2_receive_buffer[buffer_offset + 7]);
+    TEST_ASSERT_EQUAL_UINT32(buffer_offset, _node2_context.bwacp_context.receive_address);
+
+    // Check that node 3 (MOTOR) did NOT receive the data (should still be all zeros)
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 2]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 3]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 4]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 5]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 6]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, _node3_receive_buffer[buffer_offset + 7]);
+    // Node 3's receive_address should not be set to our buffer_offset
+    TEST_ASSERT_NOT_EQUAL(buffer_offset, _node3_context.bwacp_context.receive_address);
+
+    printf("!!!!!!!! test_class_of_target_nodes PASSED !!!!!!!!\n");
 }
 
 /**
@@ -833,9 +906,9 @@ int main(void)
     RUN_TEST(test_send_257_bytes);
     RUN_TEST(test_crc_mismatch);
     RUN_TEST(test_one_target_node);
-    #if 0
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
+    #if 0
     RUN_TEST(test_concurrent_bwacp);
     RUN_TEST(test_send_46k_bytes);
     #endif
