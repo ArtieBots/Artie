@@ -60,17 +60,17 @@
 
 // Location of BWACP-specific bits in ID field
 /** Location of class bits in ID field (6 bits for target class) */
-#define BWACP_FRAME_ID_CLASS_LOCATION 7U
+#define BWACP_FRAME_ID_CLASS_LOCATION ((ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION) - 6U)
 /** Mask for class bits in ID field */
 #define BWACP_FRAME_ID_CLASS_MASK (0x3FU << BWACP_FRAME_ID_CLASS_LOCATION)
 
 /** Location of ACK/repeat bit in ID field (1=ACK/repeat, 0=NACK/fresh) */
-#define BWACP_FRAME_ID_ACK_REPEAT_LOCATION 1U
+#define BWACP_FRAME_ID_ACK_REPEAT_LOCATION ((BWACP_FRAME_ID_CLASS_LOCATION) - 1U)
 /** Mask for ACK/repeat bit in ID field */
 #define BWACP_FRAME_ID_ACK_REPEAT_MASK (0x01U << BWACP_FRAME_ID_ACK_REPEAT_LOCATION)
 
 /** Location of parity bit in ID field */
-#define BWACP_FRAME_ID_PARITY_LOCATION 0U
+#define BWACP_FRAME_ID_PARITY_LOCATION ((BWACP_FRAME_ID_ACK_REPEAT_LOCATION) - 1U)
 /** Mask for parity bit in ID field */
 #define BWACP_FRAME_ID_PARITY_MASK (0x01U << BWACP_FRAME_ID_PARITY_LOCATION)
 
