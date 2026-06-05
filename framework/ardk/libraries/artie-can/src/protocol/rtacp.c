@@ -224,6 +224,18 @@ artie_can_error_t artie_can_rtacp_send(artie_can_backend_t *handle, const artie_
     }
 }
 
+bool artie_can_rtacp_is_busy(artie_can_backend_t *handle)
+{
+    if (handle == NULL)
+    {
+        return false;
+    }
+    else
+    {
+        return handle->context->rtacp_context.state == RTACP_STATE_WAITING_ACK;
+    }
+}
+
 // !! Make sure all code in this function interacts with the rest of the code in a re-entrant manner !!
 // In general we do this by only writing to items in the context that are meant to be owned by the ISR.
 // Also, don't read anything from the context that might be changed on the main thread at any moment, such as the state machine state.

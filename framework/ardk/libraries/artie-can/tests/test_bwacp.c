@@ -46,6 +46,14 @@ static uint8_t _node1_receive_buffer[RECEIVE_BUFFER_SIZE];
 static uint8_t _node2_receive_buffer[RECEIVE_BUFFER_SIZE];
 static uint8_t _node3_receive_buffer[RECEIVE_BUFFER_SIZE];
 
+// RTACP tracking for test_rtacp_while_bwacp
+static volatile bool _rtacp_callback_called1 = false;
+static volatile bool _rtacp_callback_called2 = false;
+static volatile bool _rtacp_callback_called3 = false;
+static volatile artie_can_frame_rtacp_t _rtacp_frame_received_in_callback1;
+static volatile artie_can_frame_rtacp_t _rtacp_frame_received_in_callback2;
+static volatile artie_can_frame_rtacp_t _rtacp_frame_received_in_callback3;
+
 static void _run_event_loops(void)
 {
     // Run one tick of the event loop for each node
@@ -81,24 +89,72 @@ static void _empty_rx_callback(const artie_can_frame_t *frame)
 static void _receive_callback_node1(const artie_can_frame_t *frame)
 {
     // For BWACP, data is written directly to the receive buffer.
-    // This callback can be used for logging or tracking, but is not required for the protocol to work.
-    (void)frame;  // Unused - BWACP handles data internally
+    // For RTACP, we need to parse and store the frame in the callback.
+    artie_can_frame_rtacp_t rtacp_frame;
+    artie_can_error_t err = artie_can_rtacp_parse_frame(frame, &rtacp_frame);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // This is an RTACP frame
+        _rtacp_frame_received_in_callback1.ack = rtacp_frame.ack;
+        _rtacp_frame_received_in_callback1.priority = rtacp_frame.priority;
+        _rtacp_frame_received_in_callback1.source_address = rtacp_frame.source_address;
+        _rtacp_frame_received_in_callback1.target_address = rtacp_frame.target_address;
+        _rtacp_frame_received_in_callback1.nbytes = rtacp_frame.nbytes;
+        for (uint8_t i = 0; i < rtacp_frame.nbytes; i++)
+        {
+            _rtacp_frame_received_in_callback1.data[i] = rtacp_frame.data[i];
+        }
+        _rtacp_callback_called1 = true;
+    }
+    // If not RTACP, it's BWACP and handled internally
 }
 
 /** The callback that node2 uses to receive frames. */
 static void _receive_callback_node2(const artie_can_frame_t *frame)
 {
     // For BWACP, data is written directly to the receive buffer.
-    // This callback can be used for logging or tracking, but is not required for the protocol to work.
-    (void)frame;  // Unused - BWACP handles data internally
+    // For RTACP, we need to parse and store the frame in the callback.
+    artie_can_frame_rtacp_t rtacp_frame;
+    artie_can_error_t err = artie_can_rtacp_parse_frame(frame, &rtacp_frame);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // This is an RTACP frame
+        _rtacp_frame_received_in_callback2.ack = rtacp_frame.ack;
+        _rtacp_frame_received_in_callback2.priority = rtacp_frame.priority;
+        _rtacp_frame_received_in_callback2.source_address = rtacp_frame.source_address;
+        _rtacp_frame_received_in_callback2.target_address = rtacp_frame.target_address;
+        _rtacp_frame_received_in_callback2.nbytes = rtacp_frame.nbytes;
+        for (uint8_t i = 0; i < rtacp_frame.nbytes; i++)
+        {
+            _rtacp_frame_received_in_callback2.data[i] = rtacp_frame.data[i];
+        }
+        _rtacp_callback_called2 = true;
+    }
+    // If not RTACP, it's BWACP and handled internally
 }
 
 /** The callback that node3 uses to receive frames. */
 static void _receive_callback_node3(const artie_can_frame_t *frame)
 {
     // For BWACP, data is written directly to the receive buffer.
-    // This callback can be used for logging or tracking, but is not required for the protocol to work.
-    (void)frame;  // Unused - BWACP handles data internally
+    // For RTACP, we need to parse and store the frame in the callback.
+    artie_can_frame_rtacp_t rtacp_frame;
+    artie_can_error_t err = artie_can_rtacp_parse_frame(frame, &rtacp_frame);
+    if (err == ARTIE_CAN_ERR_NONE)
+    {
+        // This is an RTACP frame
+        _rtacp_frame_received_in_callback3.ack = rtacp_frame.ack;
+        _rtacp_frame_received_in_callback3.priority = rtacp_frame.priority;
+        _rtacp_frame_received_in_callback3.source_address = rtacp_frame.source_address;
+        _rtacp_frame_received_in_callback3.target_address = rtacp_frame.target_address;
+        _rtacp_frame_received_in_callback3.nbytes = rtacp_frame.nbytes;
+        for (uint8_t i = 0; i < rtacp_frame.nbytes; i++)
+        {
+            _rtacp_frame_received_in_callback3.data[i] = rtacp_frame.data[i];
+        }
+        _rtacp_callback_called3 = true;
+    }
+    // If not RTACP, it's BWACP and handled internally
 }
 
 /**
@@ -116,6 +172,11 @@ void setUp(void)
     memset(_node2_receive_buffer, 0, sizeof(_node2_receive_buffer));
     memset(_node3_receive_buffer, 0, sizeof(_node3_receive_buffer));
 
+    // Reset RTACP callback flags
+    _rtacp_callback_called1 = false;
+    _rtacp_callback_called2 = false;
+    _rtacp_callback_called3 = false;
+
     // Set up the nodes with UDP multicast contexts
     err = artie_can_init_context_udp_mcast(&_node1_context, &_node1_udp_mcast_context, multicast_group, multicast_port);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
@@ -126,13 +187,19 @@ void setUp(void)
     err = artie_can_init_context_udp_mcast(&_node3_context, &_node3_udp_mcast_context, multicast_group, multicast_port);
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
-    // Set up the nodes to use BWACP
+    // Set up the nodes to use both RTACP and BWACP
+    err = artie_can_init_context_rtacp(&_node1_context, 0x01); // Node 1: Address 0x01
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     err = artie_can_init_context_bwacp(&_node1_context, 0x01, ARTIE_CAN_BWACP_CLASS_SBC); // Node 1: SBC
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
+    err = artie_can_init_context_rtacp(&_node2_context, 0x02); // Node 2: Address 0x02
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     err = artie_can_init_context_bwacp(&_node2_context, 0x02, ARTIE_CAN_BWACP_CLASS_SENSOR); // Node 2: Sensor
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
+    err = artie_can_init_context_rtacp(&_node3_context, 0x03); // Node 3: Address 0x03
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
     err = artie_can_init_context_bwacp(&_node3_context, 0x03, ARTIE_CAN_BWACP_CLASS_SENSOR); // Node 3: Sensor
     TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
 
@@ -863,9 +930,94 @@ void test_class_of_target_nodes(void)
  */
 void test_rtacp_while_bwacp(void)
 {
-    // Set up a longish bulk write, and in the middle of it,
-    // test that an RTACP transfer to a BWACP-receiving node still works.
-    // The node should successfully receive the RTACP data and the BWACP data.
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!! Starting test_rtacp_while_bwacp !!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a large BWACP payload (1024 bytes) to ensure transfer takes some time
+    uint8_t send_data[1024];
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        send_data[i] = (uint8_t)(i & 0xFF);
+    }
+    uint32_t buffer_offset = 0x5000;
+
+    // Start BWACP transfer from node 1 to node 2
+    err = artie_can_bwacp_send(&_node1, send_data, sizeof(send_data), buffer_offset,
+                               0x02, // target node 2
+                               0,    // class ignored for unicast
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    const uint64_t timeout_ms = 10000;
+
+    // Run event loops until node 2 is actively receiving and has written some data
+    bool data_received = false;
+    uint64_t start_time = get_current_time_ms();
+    while (!data_received && (get_current_time_ms() - start_time) < timeout_ms)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if ((_node2_context.bwacp_context.state == BWACP_STATE_RECEIVING) && (_node2_context.bwacp_context.receive_bytes_written > 50))
+        {
+            data_received = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(data_received, "Node 2 did not start receiving data");
+
+    printf("BWACP transfer in progress, sending RTACP message...\n");
+
+    // Now send an RTACP message from node 3 to node 2 (which is busy receiving BWACP)
+    artie_can_frame_rtacp_t rtacp_frame = {
+        .ack = false,
+        .priority = ARTIE_CAN_FRAME_PRIORITY_RTACP_HIGH,
+        .source_address = 0x03,
+        .target_address = 0x02,
+        .nbytes = 4,
+        .data = {0xAA, 0xBB, 0xCC, 0xDD, 0, 0, 0, 0}
+    };
+    artie_can_frame_t rtacp_can_frame;
+    err = artie_can_rtacp_init_frame(&rtacp_can_frame, &rtacp_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_rtacp_send(&_node3, &rtacp_can_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Continue running event loops until both transfers complete
+    bool both_complete = false;
+    start_time = get_current_time_ms();
+    while (!both_complete && (get_current_time_ms() - start_time) < timeout_ms)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (!artie_can_bwacp_is_busy(&_node1) && !artie_can_rtacp_is_busy(&_node1))
+        {
+            both_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(both_complete, "Transfers did not complete");
+
+    printf("Both transfers complete, verifying data...\n");
+
+    // Verify BWACP data was received correctly by node 2
+    for (size_t i = 0; i < sizeof(send_data); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(i & 0xFF), _node2_receive_buffer[buffer_offset + i], "BWACP data mismatch");
+    }
+
+    // Verify RTACP message was received correctly by node 2
+    TEST_ASSERT_TRUE(_rtacp_callback_called2);
+    TEST_ASSERT_EQUAL_UINT8(0x03, _rtacp_frame_received_in_callback2.source_address);
+    TEST_ASSERT_EQUAL_UINT8(0x02, _rtacp_frame_received_in_callback2.target_address);
+    TEST_ASSERT_EQUAL_UINT8(4, _rtacp_frame_received_in_callback2.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, _rtacp_frame_received_in_callback2.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xBB, _rtacp_frame_received_in_callback2.data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xCC, _rtacp_frame_received_in_callback2.data[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xDD, _rtacp_frame_received_in_callback2.data[3]);
+
+    printf("!!!!!!!! test_rtacp_while_bwacp PASSED !!!!!!!!!!!\n");
 }
 
 /**
@@ -884,6 +1036,21 @@ void test_concurrent_bwacp(void)
     // while node C should receive all the bytes from node A.
     // Node C is busy receiving from A so even though it is a sensor
     // node, it can't listen to the bwacp transfer from B.
+}
+
+/**
+ * @brief Test that if a node is blacklisted, it won't receive BWACP transfers
+ * until it is removed from the list.
+ *
+ */
+void test_blacklist(void)
+{
+    // Node 1 sends a BWACP transfer to SENSOR class (which includes nodes 2 and 3)
+    // Node 2 NACKs repeatedly, causing node 1 to blacklist it
+    // Node 3 should receive the transfer successfully, even while node 2 is blacklisted
+    // Wait for a cooldown time
+    // Node 2 should no longer be on the blacklist, and repeating the process should result in
+    //   Node 2 being able to receive the transfer successfully
 }
 
 /**
@@ -910,6 +1077,7 @@ int main(void)
     RUN_TEST(test_rtacp_while_bwacp);
     #if 0
     RUN_TEST(test_concurrent_bwacp);
+    RUN_TEST(test_blacklist);
     RUN_TEST(test_send_46k_bytes);
     #endif
 
