@@ -102,6 +102,15 @@ artie_can_error_t artie_can_rtacp_parse_frame(const artie_can_frame_t *in, artie
 artie_can_error_t artie_can_rtacp_send(artie_can_backend_t *handle, const artie_can_frame_t *frame);
 
 /**
+ * @brief Check if the RTACP backend is currently busy sending a frame and waiting for an ACK.
+ *
+ * @param handle Pointer to the artie_can_backend_t struct representing the backend.
+ * @return true If the backend is busy.
+ * @return false If the backend is not busy.
+ */
+bool artie_can_rtacp_is_busy(artie_can_backend_t *handle);
+
+/**
  * @brief Handle a received RTACP frame within an ISR context.
  * This function will be called by the backend when a new frame is received that matches the RTACP protocol.
  * We assume that the backend only calls this function for frames that match the RTACP protocol ID in their frame ID.

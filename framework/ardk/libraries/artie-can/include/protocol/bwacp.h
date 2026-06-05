@@ -22,6 +22,9 @@
 /** Timeout in ms for waiting for the next packet */
 #define ARTIE_CAN_BWACP_TIMEOUT_MS 5000U
 
+/** Timeout in ms for waiting for an ACK */
+#define ARTIE_CAN_BWACP_ACK_TIMEOUT_MS 2500U
+
 // BWACP READY frame data layout offsets
 /** Offset of CRC24 byte 0 (MSB) in READY frame data */
 #define BWACP_READY_DATA_CRC24_BYTE0 0U

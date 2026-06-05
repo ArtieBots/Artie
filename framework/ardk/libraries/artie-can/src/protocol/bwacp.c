@@ -738,7 +738,7 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
         ARTIE_CAN_LOG(handle->context, "BWACP: All ACKs received; sending next DATA frame\n");
         ctx->state = BWACP_STATE_SENDING_DATA;
     }
-    else if (elapsed >= ARTIE_CAN_BWACP_TIMEOUT_MS)
+    else if (elapsed >= ARTIE_CAN_BWACP_ACK_TIMEOUT_MS)
     {
         // Timeout - abort the transmission if this is already a repeat, otherwise try repeating once
         if (ctx->current_frame_repeat_count >= ARTIE_CAN_BWACP_MAX_REPEATS)
