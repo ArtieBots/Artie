@@ -1190,21 +1190,6 @@ void test_concurrent_bwacp(void)
 }
 
 /**
- * @brief Test that if a node is blacklisted, it won't receive BWACP transfers
- * until it is removed from the list.
- *
- */
-void test_blacklist(void)
-{
-    // Node 1 sends a BWACP transfer to SENSOR class (which includes nodes 2 and 3)
-    // Node 2 NACKs repeatedly, causing node 1 to blacklist it
-    // Node 3 should receive the transfer successfully, even while node 2 is blacklisted
-    // Wait for a cooldown time
-    // Node 2 should no longer be on the blacklist, and repeating the process should result in
-    //   Node 2 being able to receive the transfer successfully
-}
-
-/**
  * @brief Main function - runs all tests.
  *
  * This function sets up the Unity test runner and executes all tests.
@@ -1227,10 +1212,7 @@ int main(void)
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
     RUN_TEST(test_concurrent_bwacp);
-    #if 0
-    RUN_TEST(test_blacklist);
     RUN_TEST(test_send_46k_bytes);
-    #endif
 
     // Finish and return results
     return UNITY_END();
