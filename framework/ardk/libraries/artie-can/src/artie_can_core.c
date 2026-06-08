@@ -12,6 +12,7 @@
 #include "backend_udp_mcast.h"
 #include "bwacp.h"
 #include "err.h"
+#include "psacp.h"
 #include "rtacp.h"
 #include "translationlayer.h"
 
@@ -157,7 +158,7 @@ artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
 
     if (handle->context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_PSACP)
     {
-        // TODO
+        err |= psacp_tick(handle);
     }
 
     if (handle->context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_BWACP)

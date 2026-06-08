@@ -16,6 +16,7 @@
 #include "context.h"
 #include "err.h"
 #include "frame.h"
+#include "psacp.h"
 #include "rtacp.h"
 
 /**
