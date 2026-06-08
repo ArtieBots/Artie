@@ -34,17 +34,21 @@ static const uint16_t multicast_port = 6000;
 static artie_can_context_t _node1_context;
 static artie_can_context_t _node2_context;
 static artie_can_context_t _node3_context;
+static artie_can_context_t _node4_context; // Only used in test_concurrent_bwacp
 static artie_can_backend_t _node1;
 static artie_can_backend_t _node2;
 static artie_can_backend_t _node3;
+static artie_can_backend_t _node4; // Only used in test_concurrent_bwacp
 static artie_can_udp_mcast_context_t _node1_udp_mcast_context;
 static artie_can_udp_mcast_context_t _node2_udp_mcast_context;
 static artie_can_udp_mcast_context_t _node3_udp_mcast_context;
+static artie_can_udp_mcast_context_t _node4_udp_mcast_context; // Only used in test_concurrent_bwacp
 
 // Receive buffers for BWACP
 static uint8_t _node1_receive_buffer[RECEIVE_BUFFER_SIZE];
 static uint8_t _node2_receive_buffer[RECEIVE_BUFFER_SIZE];
 static uint8_t _node3_receive_buffer[RECEIVE_BUFFER_SIZE];
+static uint8_t _node4_receive_buffer[RECEIVE_BUFFER_SIZE]; // Only used in test_concurrent_bwacp
 
 // RTACP tracking for test_rtacp_while_bwacp
 static volatile bool _rtacp_callback_called1 = false;
@@ -77,6 +81,16 @@ static void _run_event_loops(void)
     {
         printf("Error ticking node 3: %d\n", err);
         TEST_FAIL_MESSAGE("Error ticking node 3");
+    }
+
+    if (_node4.context != NULL) // Only tick node 4 if it has been initialized (used in test_concurrent_bwacp)
+    {
+        err = artie_can_tick(&_node4);
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            printf("Error ticking node 4: %d\n", err);
+            TEST_FAIL_MESSAGE("Error ticking node 4");
+        }
     }
 }
 
@@ -157,11 +171,19 @@ static void _receive_callback_node3(const artie_can_frame_t *frame)
     // If not RTACP, it's BWACP and handled internally
 }
 
+/** Callback for node4, when it is used. */
+static void _receive_callback_node4(const artie_can_frame_t *frame)
+{
+    // Not used
+}
+
 /**
  * @brief Setup function called before each test.
  *
  * This function runs before each individual test in this file.
  * Use it to initialize any state needed for your tests.
+ *
+ * Note that node4 is only used in a subset of tests, so we do not initialize it here.
  */
 void setUp(void)
 {
@@ -1027,15 +1049,144 @@ void test_rtacp_while_bwacp(void)
  */
 void test_concurrent_bwacp(void)
 {
-    // Four nodes: A, B, C, and D
-    // Nodes C and D will be receiving bulk transfers and are
-    // both sensor nodes.
-    // Node A starts a bwacp transfer to node C by address.
-    // Node B starts a bwacp transfer to sensor class.
-    // Node D should receive all the bytes from node B,
-    // while node C should receive all the bytes from node A.
-    // Node C is busy receiving from A so even though it is a sensor
-    // node, it can't listen to the bwacp transfer from B.
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!! Starting test_concurrent_bwacp !!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // This test uses 4 nodes:
+    // Node 1 will send to Node 2 by unicast address
+    // Node 3 will send to SENSOR class via multicast
+    // Node 2 is a SENSOR and should receive only from Node 1 (busy, ignores Node 3)
+    // Node 4 is a SENSOR and should receive only from Node 3 (not busy, receives multicast)
+
+    // For this test, reconfigure nodes:
+    // Node 1: SBC - will send to Node 2 by address (already configured as SBC)
+    // Node 2: SENSOR (already configured as SENSOR)
+    // Node 3: SBC (sender B) - will send to SENSOR class (after Node 1 starts transfer)
+    // Node 4: SENSOR
+    err = artie_can_close(&_node3);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+    memset(&_node3, 0, sizeof(_node3));
+    memset(&_node3_context, 0, sizeof(_node3_context));
+    memset(&_node3_udp_mcast_context, 0, sizeof(_node3_udp_mcast_context));
+
+    // Node 3
+    err = artie_can_init_context_udp_mcast(&_node3_context, &_node3_udp_mcast_context, multicast_group, multicast_port);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init_context_bwacp(&_node3_context, 0x03, ARTIE_CAN_BWACP_CLASS_SBC);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_bwacp_set_receive_buffer(&_node3_context, _node3_receive_buffer, sizeof(_node3_receive_buffer));
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init(&_node3_context, &_node3, ARTIE_CAN_BACKEND_UDP_MCAST, _receive_callback_node3, get_current_time_ms);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Node 4
+    err = artie_can_init_context_udp_mcast(&_node4_context, &_node4_udp_mcast_context, multicast_group, multicast_port);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init_context_bwacp(&_node4_context, 0x04, ARTIE_CAN_BWACP_CLASS_SENSOR);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_bwacp_set_receive_buffer(&_node4_context, _node4_receive_buffer, sizeof(_node4_receive_buffer));
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    err = artie_can_init(&_node4_context, &_node4, ARTIE_CAN_BACKEND_UDP_MCAST, _receive_callback_node4, get_current_time_ms);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Create two different payloads
+    uint8_t send_data_A[512]; // From Node 1 to Node 2
+    for (size_t i = 0; i < sizeof(send_data_A); i++)
+    {
+        send_data_A[i] = (uint8_t)(i & 0xFF);
+    }
+
+    uint8_t send_data_B[512]; // From Node 3 to SENSOR class (multicast)
+    for (size_t i = 0; i < sizeof(send_data_B); i++)
+    {
+        send_data_B[i] = (uint8_t)((i + 128) & 0xFF); // Different pattern
+    }
+
+    const uint32_t timeout_ms = 50000;
+    uint32_t buffer_offset_A = 0x0060;
+    uint32_t buffer_offset_B = 0x0700; // enough space so that no overlap with the cross-talk we are testing for
+
+    // Start transfer from Node 1 to Node 2 by address (unicast)
+    err = artie_can_bwacp_send(&_node1, send_data_A, sizeof(send_data_A), buffer_offset_A,
+                               0x02, // target Node 2 specifically by address
+                               0,    // class ignored for unicast
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Wait a bit for Node 2 to start receiving
+    uint64_t start_time = get_current_time_ms();
+    bool node2_started = false;
+    while (!node2_started && (get_current_time_ms() - start_time) < timeout_ms)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (artie_can_bwacp_is_busy(&_node2) && _node2_context.bwacp_context.receive_bytes_written > 0)
+        {
+            node2_started = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node2_started, "Node 2 did not start receiving from Node 1");
+
+    printf("Node 2 is now busy receiving from Node 1, starting Node 3's multicast...\n");
+
+    // Now start transfer from Node 3 to SENSOR class (multicast)
+    // Node 2 is SENSOR class, but it's busy receiving from Node 1, so it should ignore this
+    // Node 4 is SENSOR class and not busy, so it should receive this
+    err = artie_can_bwacp_send(&_node3, send_data_B, sizeof(send_data_B), buffer_offset_B,
+                               ARTIE_CAN_BWACP_MULTICAST_ADDRESS, // multicast
+                               ARTIE_CAN_BWACP_CLASS_SENSOR,      // target SENSOR class
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Run event loops until both transfers complete
+    bool all_complete = false;
+    start_time = get_current_time_ms();
+    while (!all_complete && (get_current_time_ms() - start_time) < timeout_ms)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (!artie_can_bwacp_is_busy(&_node1) && !artie_can_bwacp_is_busy(&_node3))
+        {
+            all_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(all_complete, "Transfers did not complete");
+
+    printf("Both transfers complete, verifying data...\n");
+
+    // Verify Node 2 received data from Node 1 correctly
+    for (size_t i = 0; i < sizeof(send_data_A); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)(i & 0xFF), _node2_receive_buffer[buffer_offset_A + i], "Node 2 did not receive correct data from Node 1");
+    }
+
+    // Verify Node 2 did NOT receive data from Node 3 (B) - should still be zeros
+    // Check a few bytes at buffer_offset_B
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node2_receive_buffer[buffer_offset_B], "Node 2 should not have received multicast from Node 3 (was busy)");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node2_receive_buffer[buffer_offset_B + 1], "Node 2 should not have received multicast from Node 3 (was busy)");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node2_receive_buffer[buffer_offset_B + 100], "Node 2 should not have received multicast from Node 3 (was busy)");
+
+    // Verify Node 4 received data from Node 3 correctly
+    for (size_t i = 0; i < sizeof(send_data_B); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE((uint8_t)((i + 128) & 0xFF), _node4_receive_buffer[buffer_offset_B + i], "Node 4 did not receive correct data from Node 3");
+    }
+
+    // Verify Node 4 did NOT receive data from Node 1 - should still be zeros
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node4_receive_buffer[buffer_offset_A], "Node 4 should not have received from Node 1");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node4_receive_buffer[buffer_offset_A + 1], "Node 4 should not have received from Node 1");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0x00, _node4_receive_buffer[buffer_offset_A + 100], "Node 4 should not have received from Node 1");
+
+    printf("!!!!!!! test_concurrent_bwacp PASSED !!!!!!!!!!!!!!!\n");
 }
 
 /**
@@ -1075,8 +1226,8 @@ int main(void)
     RUN_TEST(test_one_target_node);
     RUN_TEST(test_class_of_target_nodes);
     RUN_TEST(test_rtacp_while_bwacp);
-    #if 0
     RUN_TEST(test_concurrent_bwacp);
+    #if 0
     RUN_TEST(test_blacklist);
     RUN_TEST(test_send_46k_bytes);
     #endif
