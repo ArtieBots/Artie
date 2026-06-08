@@ -14,6 +14,7 @@
 #include "context.h"
 #include "err.h"
 #include "log.h"
+#include "psacp.h"
 #include "rtacp.h"
 #include "translationlayer.h"
 
@@ -39,6 +40,11 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
     {
         case ARTIE_CAN_RTACP_PROTOCOL_ID:
             rtacp_receive_in_isr(context, frame);
+            break;
+
+        case ARTIE_CAN_PSACP_HIGH_PROTOCOL_ID:
+        case ARTIE_CAN_PSACP_LOW_PROTOCOL_ID:
+            psacp_receive_in_isr(context, frame);
             break;
 
         case ARTIE_CAN_BWACP_PROTOCOL_ID:

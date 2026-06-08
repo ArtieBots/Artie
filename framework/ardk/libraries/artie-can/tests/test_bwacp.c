@@ -1218,8 +1218,6 @@ int main(void)
     RUN_TEST(test_rtacp_while_bwacp);
     RUN_TEST(test_concurrent_bwacp);
     RUN_TEST(test_send_46k_bytes);
-#if 0
-#endif
 
     // Finish and return results
     return UNITY_END();

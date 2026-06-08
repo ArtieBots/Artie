@@ -279,7 +279,9 @@ of this protocol are:
 * High priority topics and low priority topics split the CAN priority space around BWACP
   so that logging doesn't drown out large data transfers like firmware upgrades.
 * No ACK, missed data is simply lost.
-* A published message can be of any data length.
+* A published message can be up to 8 bytes. For longer messages, additional protocols must be
+  placed on top of this.
+* A node can be subscribed to up to 32 topics simultaneously.
 
 ### PSACP Specification
 
@@ -291,16 +293,12 @@ The ID field looks like this:
 
 ```
 [100 OR 110] - specifies PSACP. When 100, it is High Priority Pub/Sub, when 110, it is Low Priority Pub/Sub.
-[00x1] - x can be 0, in which case this is a PUB frame, or 1, in which case this is a DATA frame.
+[0001] - Always a PUB frame.
 [pp] - 2 bits of user-assigned priority: LOW (11), MED-LOW (10), MED-HIGH (01), HIGH (00)
 [ssssss] - 6 bits of sender address, which must be unique among all nodes on the CAN bus
 [tttttttt] - 8 bits of topic, see below for reserved topic values
 1 for rest of ID field (6 bits)
 ```
-
-* *PUB frame 00x1=0001*: This frame is sent to start a publish sequence, and may be the entire sequence
-                         if the data we are publishing is small enough.
-* *DATA frame 00x1=0011*: These frames are sent one after another until all the data in a single publish sequence has been sent.
 
 Reserved topic values:
 
@@ -315,18 +313,7 @@ The data length code field should specify the number of bytes in the data field 
 
 #### Data
 
-The data field depends on the type of frame:
-
-*PUB frame*:
-A PUB frame's data field consists of the following:
-
-```
-[16 bits] - CRC16 computed over the byte-stuffed entire payload (before sharding across PUB and DATA frames)
-Rest of the data is byte-stuffed payload, which may be continued by DATA frames.
-```
-
-*DATA frame*:
-A DATA frame's data field is entirely [byte-stuffed](./ByteStuffing.md) payload data.
+Application-specified.
 
 ## Block Write Artie CAN Protocol (BWACP)
 
