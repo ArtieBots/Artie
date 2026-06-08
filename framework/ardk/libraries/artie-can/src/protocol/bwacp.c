@@ -142,8 +142,8 @@ static artie_can_error_t _send_ready(artie_can_backend_t *handle, const uint8_t 
     frame.data[BWACP_READY_DATA_ADDRESS_BYTE1] = (address >> BWACP_SHIFT_BYTE1) & 0xFF;
     frame.data[BWACP_READY_DATA_ADDRESS_BYTE2] = (address >> BWACP_SHIFT_BYTE2) & 0xFF;
     frame.data[BWACP_READY_DATA_ADDRESS_BYTE3] = (address >> BWACP_SHIFT_BYTE3) & 0xFF;
-    frame.data[BWACP_READY_DATA_STUFFING] = 0x00; // First stuffing byte (simplified - not implementing full byte stuffing)
-    frame.dlc = 8;
+    frame.data[BWACP_READY_DATA_STUFFING] = 0x00; // First stuffing byte
+    frame.dlc = 8; // 3-byte CRC24 + 4-byte address + 1-byte stuffing
 
     ARTIE_CAN_LOG(handle->context, "BWACP: Sending READY frame (addr=0x%08X, size=%u)\n", address, payload_size);
     return artie_can_send_with_retry(handle, &frame);
@@ -168,12 +168,18 @@ static artie_can_error_t _send_data(artie_can_backend_t *handle, bool is_repeat)
     // Set parity bit
     frame.id |= ((ctx->send_parity ? 1U : 0U) << BWACP_FRAME_ID_PARITY_LOCATION);
 
+    // Set repeat bit
+    if (is_repeat)
+    {
+        frame.id |= (1U << BWACP_FRAME_ID_ACK_REPEAT_LOCATION);
+    }
+
     // Copy up to 8 bytes of payload
     uint32_t bytes_remaining = ctx->send_payload_size - ctx->send_payload_offset;
     frame.dlc = (bytes_remaining > 8) ? 8 : (uint8_t)bytes_remaining;
     memcpy(frame.data, &ctx->send_payload[ctx->send_payload_offset], frame.dlc);
 
-    ARTIE_CAN_LOG(handle->context, "BWACP: Sending DATA frame (offset=%u, dlc=%u, parity=%d)\n", ctx->send_payload_offset, frame.dlc, ctx->send_parity);
+    ARTIE_CAN_LOG(handle->context, "BWACP: Sending DATA frame (offset=%u, dlc=%u, parity=%d, repeat=%d)\n", ctx->send_payload_offset, frame.dlc, ctx->send_parity, is_repeat);
 
     return artie_can_send_with_retry(handle, &frame);
 }
@@ -322,9 +328,19 @@ static void _process_ack_nack_frame_from_isr(artie_can_context_t *context, const
     bwacp_context_t *ctx = &context->bwacp_context;
 
     // Check if addressed to us
-    uint8_t target_address = (frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION;
+    uint8_t target_address = (uint8_t)((frame->id & ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_TARGET_ADDRESS_LOCATION);
     if (target_address != ctx->node_address)
     {
+        return;
+    }
+
+    // Extract sender address
+    uint8_t sender_address = (uint8_t)((frame->id & ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_MASK) >> ARTIE_CAN_FRAME_ID_SENDER_ADDRESS_LOCATION);
+
+    // Check if this node is blacklisted
+    if ((ctx->blacklisted_nodes_bitmap & (1ULL << sender_address)) != 0)
+    {
+        // Node is blacklisted, ignore their ACK/NACK
         return;
     }
 
@@ -333,16 +349,23 @@ static void _process_ack_nack_frame_from_isr(artie_can_context_t *context, const
 
     if (is_ack)
     {
-        // Atomically increment received ack count
-        atomic_fetch_add(&ctx->received_ack_count, 1);
-        ARTIE_CAN_LOG(context, "BWACP: ACK received (%u/%u)\n", ctx->received_ack_count, ctx->expected_ack_count);
+        // Check if we've already received an ACK from this node for this frame
+        if ((ctx->ack_received_bitmap & (1ULL << sender_address)) == 0)
+        {
+            // Mark this node as having ACKed
+            ctx->ack_received_bitmap |= (1ULL << sender_address);
+
+            // Atomically increment received ack count
+            atomic_fetch_add(&ctx->received_ack_count, 1);
+            ARTIE_CAN_LOG(context, "BWACP: ACK received from node 0x%02X (%u/%u)\n", sender_address, ctx->received_ack_count, ctx->expected_ack_count);
+        }
     }
     else
     {
         // Atomically increment received nack count and set flag to repeat last data frame
         atomic_fetch_add(&ctx->received_nack_count, 1);
         ctx->need_repeat_data_frame = true;
-        ARTIE_CAN_LOG(context, "BWACP: NACK received, will repeat last DATA frame\n");
+        ARTIE_CAN_LOG(context, "BWACP: NACK received from node 0x%02X, will repeat last DATA frame\n", sender_address);
     }
 }
 
@@ -476,8 +499,7 @@ static artie_can_error_t _handle_data_receiving(artie_can_backend_t *handle, art
     if (!parity_correct)
     {
         // Parity mismatch - send NACK and enter EXPECT_REPEAT state
-        ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame parity mismatch (expected=%d, got=%d); sending NACK and expecting repeat\n",
-                      ctx->receive_expected_parity, frame_parity);
+        ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame parity mismatch (expected=%d, got=%d); sending NACK and expecting repeat\n", ctx->receive_expected_parity, frame_parity);
         ctx->state = BWACP_STATE_EXPECT_REPEAT;
         err = _send_nack(handle, ctx->receive_sender_address);
     }
@@ -490,6 +512,11 @@ static artie_can_error_t _handle_data_receiving(artie_can_backend_t *handle, art
             {
                 memcpy(&ctx->receive_buffer[ctx->receive_address + ctx->receive_bytes_written], frame->data, frame->dlc);
                 ctx->receive_bytes_written += frame->dlc;
+            }
+            else
+            {
+                ARTIE_CAN_LOG(handle->context, "BWACP: Received DATA frame but receive buffer is NULL\n");
+                err = ARTIE_CAN_ERR_NO_SPACE;
             }
         }
         else
@@ -590,7 +617,7 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
         {
             ARTIE_CAN_LOG(handle->context, "BWACP: Transfer complete and verified; sending ACK and setting state to IDLE\n");
 
-            // Save this transfer info for cooldown period (not currently used in new scheme but kept for future)
+            // Save this transfer info for cooldown period
             ctx->last_completed_sender_address = ctx->receive_sender_address;
             ctx->last_completed_receive_address = ctx->receive_address;
             ctx->last_completed_timestamp_ms = handle->get_ms();
@@ -602,6 +629,11 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
             // Send ACK
             err = _send_ack(handle, ctx->receive_sender_address);
         }
+    }
+    else
+    {
+        ARTIE_CAN_LOG(handle->context, "BWACP: COMPLETE received but no data was received; sending NACK\n");
+        err = _send_nack(handle, ctx->receive_sender_address);
     }
 
     atomic_fetch_and(&ctx->isr_flags, ~((uint32_t)BWACP_ISR_FLAG_COMPLETE_RECEIVED));
@@ -638,6 +670,7 @@ static artie_can_error_t _handle_sending_ready(artie_can_backend_t *handle)
         if (ctx->received_ack_count > 0)
         {
             ctx->expected_ack_count = ctx->received_ack_count;
+            ctx->active_nodes_bitmap = ctx->ack_received_bitmap; // Save which nodes responded to READY
             ARTIE_CAN_LOG(handle->context, "BWACP: ACK accumulation complete (%u nodes); starting DATA transfer\n", ctx->expected_ack_count);
             ctx->state = BWACP_STATE_SENDING_DATA;
         }
@@ -665,8 +698,14 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
     if (ctx->need_repeat_data_frame)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Repeating last DATA frame\n");
-        err = _send_data(handle, true);  // Send with repeat bit set
+        atomic_store(&ctx->received_nack_count, 0); // received_ack_count remains the same and so does the ack bitmap, but reset nack count
+        ctx->send_payload_offset -= (ctx->send_payload_offset > 0) ? ((ctx->send_payload_offset >= 8) ? 8 : ctx->send_payload_offset) : 0; // Move offset back for repeat
         ctx->need_repeat_data_frame = false;
+        err = _send_data(handle, true);  // Send with repeat bit set
+        if (err != ARTIE_CAN_ERR_NONE)
+        {
+            return err;
+        }
     }
     else
     {
@@ -677,6 +716,7 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
             ARTIE_CAN_LOG(handle->context, "BWACP: All DATA sent; sending COMPLETE frame\n");
             atomic_store(&ctx->received_ack_count, 0);
             atomic_store(&ctx->received_nack_count, 0);
+            ctx->ack_received_bitmap = 0;
             ctx->last_packet_ms = handle->get_ms();
             err = _send_complete(handle);
             ctx->state = BWACP_STATE_SENDING_COMPLETE;
@@ -686,6 +726,7 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
         // Get ready for ACKs
         atomic_store(&ctx->received_ack_count, 0);
         atomic_store(&ctx->received_nack_count, 0);
+        ctx->ack_received_bitmap = 0; // Clear bitmap for new DATA frame
         ctx->last_packet_ms = handle->get_ms();
 
         // Send next DATA frame
@@ -736,18 +777,55 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
     {
         // All ACKs/NACKs received - send next frame (or repeat frame)
         ARTIE_CAN_LOG(handle->context, "BWACP: All ACKs received; sending next DATA frame\n");
+        ctx->current_frame_repeat_count = 0; // Reset repeat count for next frame
         ctx->state = BWACP_STATE_SENDING_DATA;
     }
     else if (elapsed >= ARTIE_CAN_BWACP_ACK_TIMEOUT_MS)
     {
-        // Timeout - abort the transmission if this is already a repeat, otherwise try repeating once
+        // Timeout - try repeating or blacklist non-responsive nodes
         if (ctx->current_frame_repeat_count >= ARTIE_CAN_BWACP_MAX_REPEATS)
         {
-            // TODO: Instead of aborting, we should keep going and simply blacklist the non-responsive nodes for the remainder
-            // of this transfer.
-            ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout and repeats exhausted (%u/%u ACKs); aborting transmission\n", ctx->received_ack_count, ctx->expected_ack_count);
-            ctx->state = BWACP_STATE_IDLE;
-            return ARTIE_CAN_ERR_TIMEOUT;
+            // Max repeats exhausted - blacklist non-responsive nodes and continue
+            // Identify non-responsive nodes: in active_nodes_bitmap but NOT in ack_received_bitmap
+            uint64_t non_responsive_nodes = ctx->active_nodes_bitmap & ~ctx->ack_received_bitmap;
+
+            if (non_responsive_nodes != 0)
+            {
+                // Add non-responsive nodes to blacklist
+                ctx->blacklisted_nodes_bitmap |= non_responsive_nodes;
+
+                // Remove blacklisted nodes from active nodes
+                ctx->active_nodes_bitmap &= ~non_responsive_nodes;
+
+                // Count remaining active nodes
+                uint32_t new_expected_ack_count = 0;
+                for (int i = 0; i < 64; i++)
+                {
+                    if ((ctx->active_nodes_bitmap & (1ULL << i)) != 0)
+                    {
+                        new_expected_ack_count++;
+                    }
+                }
+
+                ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout and repeats exhausted (%u/%u ACKs); blacklisting %u non-responsive nodes\n", ctx->received_ack_count, ctx->expected_ack_count, (ctx->expected_ack_count - new_expected_ack_count));
+
+                ctx->expected_ack_count = new_expected_ack_count;
+
+                // Check if any nodes are still active
+                if (ctx->expected_ack_count == 0)
+                {
+                    ARTIE_CAN_LOG(handle->context, "BWACP: All nodes blacklisted; aborting transmission\n");
+                    ctx->state = BWACP_STATE_IDLE;
+                    return ARTIE_CAN_ERR_TIMEOUT;
+                }
+
+                ARTIE_CAN_LOG(handle->context, "BWACP: Continuing transfer with %u remaining nodes\n", ctx->expected_ack_count);
+            }
+
+            // Reset repeat count and continue with next DATA frame
+            ctx->need_repeat_data_frame = false;
+            ctx->current_frame_repeat_count = 0;
+            ctx->state = BWACP_STATE_SENDING_DATA;
         }
         else
         {
@@ -867,6 +945,9 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     ctx->received_nack_count = 0;
     ctx->need_repeat_data_frame = false;
     ctx->current_frame_repeat_count = 0;
+    ctx->ack_received_bitmap = 0;
+    ctx->active_nodes_bitmap = 0;
+    ctx->blacklisted_nodes_bitmap = 0; // Clear blacklist for new transfer
     ctx->last_packet_ms = handle->get_ms();
 
     // Send READY frame
