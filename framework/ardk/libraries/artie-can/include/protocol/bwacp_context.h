@@ -67,6 +67,9 @@ typedef struct {
     uint32_t received_nack_count;           ///< Number of NACKs received so far
     bool need_repeat_data_frame;            ///< Whether the last DATA frame needs to be repeated due to NACK
     uint32_t current_frame_repeat_count;    ///< Number of times the current DATA frame has been repeated
+    uint64_t ack_received_bitmap;           ///< Bitmap of nodes that have sent ACK for the current frame (bit N = node address N)
+    uint64_t active_nodes_bitmap;           ///< Bitmap of nodes actively participating in transfer (responded to READY and not blacklisted)
+    uint64_t blacklisted_nodes_bitmap;      ///< Bitmap of nodes blacklisted for current transfer due to non-responsiveness
 
     // Receiving state
     uint8_t *receive_buffer;                ///< Buffer for receiving data (owned by caller, must be provided before receiving)
