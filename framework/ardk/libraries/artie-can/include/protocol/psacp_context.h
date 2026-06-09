@@ -20,6 +20,6 @@
  */
 typedef struct {
     uint8_t node_address;                                           ///< The address of this node on the CAN bus
-    uint8_t subscribed_topics[ARTIE_CAN_PSACP_MAX_SUBSCRIPTIONS];  ///< Array of topics this node has subscribed to
+    uint8_t subscribed_topics[ARTIE_CAN_PSACP_MAX_SUBSCRIPTIONS];   ///< Array of topics this node has subscribed to
     uint8_t subscribed_topic_count;                                 ///< Number of active subscriptions
 } psacp_context_t;

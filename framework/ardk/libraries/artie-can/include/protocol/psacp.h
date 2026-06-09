@@ -40,7 +40,7 @@
  *
  */
 typedef enum {
-    ARTIE_CAN_FRAME_PRIORITY_PSACP_LOW = 3,       ///< Low priority frame
+    ARTIE_CAN_FRAME_PRIORITY_PSACP_LOW = 3,        ///< Low priority frame
     ARTIE_CAN_FRAME_PRIORITY_PSACP_MEDIUM_LOW = 2, ///< Medium-low priority frame
     ARTIE_CAN_FRAME_PRIORITY_PSACP_MEDIUM_HIGH = 1,///< Medium-high priority frame
     ARTIE_CAN_FRAME_PRIORITY_PSACP_HIGH = 0,       ///< High priority frame
@@ -56,7 +56,7 @@ typedef struct {
     uint8_t source_address;                          ///< Source address of the frame
     uint8_t topic;                                   ///< Topic this message is published to (0x00 = broadcast)
     uint8_t nbytes;                                  ///< Number of data bytes in the message (0-8)
-    uint8_t data[ARTIE_CAN_PSACP_MAX_DATA_BYTES];   ///< Data bytes of the message (up to 8 bytes)
+    uint8_t data[ARTIE_CAN_PSACP_MAX_DATA_BYTES];    ///< Data bytes of the message (up to 8 bytes)
 } artie_can_frame_psacp_t;
 
 /**

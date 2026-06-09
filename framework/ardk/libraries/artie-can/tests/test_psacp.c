@@ -27,3 +27,8 @@
 //   successfully. We don't bother checking the received bytes of pub/sub in this test - we are just
 //   attempting to ensure that the BWACP transfer is unaffected by the low-priority pub/sub noise
 //   on the bus.
+// * Test 6: Node 1 sends a single byte to topic 0x0C
+//   - Nodes 2 and 3 receive
+//   - Nodes 1 and 4 do not
+//   Now node 2 unsubscribes from topic 0x0C, and Node 1 sends again
+//   - This time, node 3 receives and all others do not

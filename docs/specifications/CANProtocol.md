@@ -281,6 +281,7 @@ of this protocol are:
 * No ACK, missed data is simply lost.
 * A published message can be up to 8 bytes. For longer messages, additional protocols must be
   placed on top of this.
+* A node can be subscribed to up to 32 topics simultaneously.
 
 ### PSACP Specification
 
