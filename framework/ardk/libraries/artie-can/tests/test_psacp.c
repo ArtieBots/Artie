@@ -334,6 +334,10 @@ void tearDown(void)
     memset(&_node2_udp_mcast_context, 0, sizeof(_node2_udp_mcast_context));
     memset(&_node3_udp_mcast_context, 0, sizeof(_node3_udp_mcast_context));
     memset(&_node4_udp_mcast_context, 0, sizeof(_node4_udp_mcast_context));
+    memset(&_psacp_frame_node1, 0, sizeof(_psacp_frame_node1));
+    memset(&_psacp_frame_node2, 0, sizeof(_psacp_frame_node2));
+    memset(&_psacp_frame_node3, 0, sizeof(_psacp_frame_node3));
+    memset(&_psacp_frame_node4, 0, sizeof(_psacp_frame_node4));
 }
 
 /**
@@ -356,7 +360,7 @@ void test_publish_to_non_subscribed_topic(void)
         .source_address = NODE1_ADDR,
         .topic          = TOPIC_0x0C,
         .nbytes         = 1,
-        .data           = {0}
+        .data           = {7}
     };
     psacp_frame.data[0] = payload;
 
@@ -404,7 +408,63 @@ void test_publish_to_non_subscribed_topic(void)
  */
 void test_publish_broadcast(void)
 {
-    TEST_IGNORE_MESSAGE("Not yet implemented");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!!!!!!!!!! Starting test_publish_broadcast !!!!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Build the PSACP frame: node 1 publishes one byte to the broadcast topic (0x00)
+    uint8_t payload = 0xBC;
+    artie_can_frame_psacp_t psacp_frame = {
+        .high_priority  = false,
+        .priority       = ARTIE_CAN_FRAME_PRIORITY_PSACP_MEDIUM_LOW,
+        .source_address = NODE1_ADDR,
+        .topic          = ARTIE_CAN_PSACP_TOPIC_BROADCAST,
+        .nbytes         = 1,
+        .data           = {9}
+    };
+    psacp_frame.data[0] = payload;
+
+    artie_can_frame_t frame_to_send;
+    err = artie_can_psacp_init_frame(&frame_to_send, &psacp_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Publish from node 1. Local delivery should fire immediately for node 1
+    // (broadcast is always delivered, regardless of topic subscriptions).
+    err = artie_can_psacp_publish(&_node1, &frame_to_send);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Node 1 should have received via local delivery already
+    TEST_ASSERT_TRUE_MESSAGE(_psacp_received_node1, "Node 1 should have received its own broadcast via local delivery");
+    TEST_ASSERT_EQUAL_UINT8(ARTIE_CAN_PSACP_TOPIC_BROADCAST, _psacp_frame_node1.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node1.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node1.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node1.data[0]);
+
+    // Nodes 2, 3, and 4 should all receive via the bus
+    err = wait_with_timeout(&_psacp_received_node2, DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Node 2 timed out waiting for broadcast");
+    TEST_ASSERT_EQUAL_UINT8(ARTIE_CAN_PSACP_TOPIC_BROADCAST, _psacp_frame_node2.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node2.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node2.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node2.data[0]);
+
+    err = wait_with_timeout(&_psacp_received_node3, DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Node 3 timed out waiting for broadcast");
+    TEST_ASSERT_EQUAL_UINT8(ARTIE_CAN_PSACP_TOPIC_BROADCAST, _psacp_frame_node3.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node3.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node3.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node3.data[0]);
+
+    err = wait_with_timeout(&_psacp_received_node4, DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Node 4 timed out waiting for broadcast");
+    TEST_ASSERT_EQUAL_UINT8(ARTIE_CAN_PSACP_TOPIC_BROADCAST, _psacp_frame_node4.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node4.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node4.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node4.data[0]);
+
+    printf("!!!!!!!!!!!!! test_publish_broadcast PASSED !!!!!!!!!\n");
 }
 
 /**
