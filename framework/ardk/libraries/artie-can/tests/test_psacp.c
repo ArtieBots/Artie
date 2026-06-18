@@ -473,7 +473,61 @@ void test_publish_broadcast(void)
  */
 void test_publish_to_subscribed_topic(void)
 {
-    TEST_IGNORE_MESSAGE("Not yet implemented");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!! Starting test_publish_to_subscribed_topic !!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Build the PSACP frame: node 1 publishes one byte to topic 0x10 (low priority)
+    uint8_t payload = 0xC3;
+    artie_can_frame_psacp_t psacp_frame = {
+        .high_priority  = false,
+        .priority       = ARTIE_CAN_FRAME_PRIORITY_PSACP_MEDIUM_LOW,
+        .source_address = NODE1_ADDR,
+        .topic          = TOPIC_0x10,
+        .nbytes         = 1,
+        .data           = {9}
+    };
+    psacp_frame.data[0] = payload;
+
+    artie_can_frame_t frame_to_send;
+    err = artie_can_psacp_init_frame(&frame_to_send, &psacp_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Publish from node 1. Local delivery should fire immediately for node 1
+    // (since it is subscribed to topic 0x10).
+    err = artie_can_psacp_publish(&_node1, &frame_to_send);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Node 1 should have received via local delivery already
+    TEST_ASSERT_TRUE_MESSAGE(_psacp_received_node1, "Node 1 should have received its own message via local delivery");
+    TEST_ASSERT_EQUAL_UINT8(TOPIC_0x10, _psacp_frame_node1.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node1.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node1.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node1.data[0]);
+
+    // Node 2 is subscribed to 0x10 - wait for it to receive
+    err = wait_with_timeout(&_psacp_received_node2, DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Node 2 timed out waiting for PSACP frame");
+
+    TEST_ASSERT_EQUAL_UINT8(TOPIC_0x10, _psacp_frame_node2.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node2.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node2.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node2.data[0]);
+
+    // Node 3 should NOT have received (not subscribed to 0x10 per test spec)
+    // Wait a short time to be sure no late delivery arrives
+    SLEEP_MS(100);
+    _run_event_loops();
+    TEST_ASSERT_FALSE_MESSAGE(_psacp_received_node3, "Node 3 should not have received the frame");
+
+    // Node 4 should NOT have received (not subscribed to 0x10 per test spec)
+    SLEEP_MS(100);
+    _run_event_loops();
+    TEST_ASSERT_FALSE_MESSAGE(_psacp_received_node4, "Node 4 should not have received the frame");
+
+    printf("!!!!!!!!!!!!! test_publish_to_subscribed_topic PASSED !!!!!!!!!\n");
 }
 
 /**
