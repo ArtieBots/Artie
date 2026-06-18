@@ -473,17 +473,159 @@ void test_publish_broadcast(void)
  */
 void test_publish_to_subscribed_topic(void)
 {
-    TEST_IGNORE_MESSAGE("Not yet implemented");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!!!! Starting test_publish_to_subscribed_topic !!!!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Build the PSACP frame: node 1 publishes one byte to topic 0x10 (low priority)
+    uint8_t payload = 0xC3;
+    artie_can_frame_psacp_t psacp_frame = {
+        .high_priority  = false,
+        .priority       = ARTIE_CAN_FRAME_PRIORITY_PSACP_MEDIUM_LOW,
+        .source_address = NODE1_ADDR,
+        .topic          = TOPIC_0x10,
+        .nbytes         = 1,
+        .data           = {9}
+    };
+    psacp_frame.data[0] = payload;
+
+    artie_can_frame_t frame_to_send;
+    err = artie_can_psacp_init_frame(&frame_to_send, &psacp_frame);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Publish from node 1. Local delivery should fire immediately for node 1
+    // (since it is subscribed to topic 0x10).
+    err = artie_can_psacp_publish(&_node1, &frame_to_send);
+    TEST_ASSERT_EQUAL_INT(ARTIE_CAN_ERR_NONE, err);
+
+    // Node 1 should have received via local delivery already
+    TEST_ASSERT_TRUE_MESSAGE(_psacp_received_node1, "Node 1 should have received its own message via local delivery");
+    TEST_ASSERT_EQUAL_UINT8(TOPIC_0x10, _psacp_frame_node1.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node1.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node1.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node1.data[0]);
+
+    // Node 2 is subscribed to 0x10 - wait for it to receive
+    err = wait_with_timeout(&_psacp_received_node2, DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Node 2 timed out waiting for PSACP frame");
+
+    TEST_ASSERT_EQUAL_UINT8(TOPIC_0x10, _psacp_frame_node2.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE1_ADDR, _psacp_frame_node2.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node2.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(payload, _psacp_frame_node2.data[0]);
+
+    // Node 3 should NOT have received (not subscribed to 0x10 per test spec)
+    // Wait a short time to be sure no late delivery arrives
+    SLEEP_MS(100);
+    _run_event_loops();
+    TEST_ASSERT_FALSE_MESSAGE(_psacp_received_node3, "Node 3 should not have received the frame");
+
+    // Node 4 should NOT have received (not subscribed to 0x10 per test spec)
+    SLEEP_MS(100);
+    _run_event_loops();
+    TEST_ASSERT_FALSE_MESSAGE(_psacp_received_node4, "Node 4 should not have received the frame");
+
+    printf("!!!!!!!!!!!!! test_publish_to_subscribed_topic PASSED !!!!!!!!!\n");
 }
 
 /**
  * @brief Test 4: Node 1 begins a BWACP transaction to node 4.
- * Concurrently, node 3 publishes one byte to topic 0x45 at high-priority pub/sub.
+ * Concurrently, node 3 publishes one byte to topic 0x45 at high priority pub/sub.
  * Expected: BWACP transaction completes correctly AND node 4 receives the pub/sub byte.
  */
 void test_psacp_high_priority_during_bwacp(void)
 {
-    TEST_IGNORE_MESSAGE("Not yet implemented");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    printf("!!! Starting test_psacp_high_priority_during_bwacp !!!\n");
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+    artie_can_error_t err;
+
+    // Create a BWACP payload to transfer from Node 1 to Node 4
+    // We'll send 64 bytes as a representative state transfer payload
+    uint8_t bwacp_payload[1024];
+    for (size_t i = 0; i < sizeof(bwacp_payload); i++)
+    {
+        bwacp_payload[i] = (uint8_t)(i % 0xFF);
+    }
+
+    uint32_t buffer_offset_node4 = 0x0080;
+
+    // Build the high-priority PSACP frame: node 3 publishes one byte to topic 0x45
+    // This simulates important message arriving during BWACP transfer
+    uint8_t pub_sub_payload = 0xDE;
+    artie_can_frame_psacp_t psacp_frame = {
+        .high_priority  = true,           // High priority - should not be delayed by BWACP
+        .priority       = ARTIE_CAN_FRAME_PRIORITY_PSACP_HIGH,
+        .source_address = NODE3_ADDR,
+        .topic          = TOPIC_0x45,
+        .nbytes         = 1,
+        .data           = {2}
+    };
+    psacp_frame.data[0] = pub_sub_payload;
+
+    // Start BWACP transfer: Node 1 sends state to Node 4
+    printf("Node 1 initiating BWACP state transfer to Node 4 (64 bytes)...\n");
+    err = artie_can_bwacp_send(&_node1, bwacp_payload, sizeof(bwacp_payload), buffer_offset_node4,
+                               NODE4_ADDR, // target node 4 specifically by address
+                               ARTIE_CAN_BWACP_CLASS_SBC,
+                               ARTIE_CAN_FRAME_PRIORITY_BWACP_MEDIUM);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "BWACP send initiate failed");
+
+    printf("BWACP transfer in progress from Node 1 to Node 4...\n");
+
+    artie_can_frame_t frame_to_send;
+    err = artie_can_psacp_init_frame(&frame_to_send, &psacp_frame);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Failed to initialize PSACP frame");
+
+    // Publish the high-priority PSACP frame from Node 3 during BWACP transfer
+    // This simulates an urgent message arriving while state is being transferred
+    printf("Node 3 sending high-priority pub/sub message...\n");
+    err = artie_can_psacp_publish(&_node3, &frame_to_send);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err, "Failed to publish high-priority PSACP frame");
+
+    // Wait for BWACP transfer and high-priority message to be delivered
+    printf("Waiting for BWACP completion and pub/sub delivery...\n");
+
+    // Use a reasonable timeout for this combined operation
+    artie_can_error_t err_receive = wait_with_timeout(&_psacp_received_node4, 10 * DEFAULT_TIMEOUT_MS, _run_event_loops);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(ARTIE_CAN_ERR_NONE, err_receive, "Node 4 timed out waiting for messages");
+
+    // Verify that Node 4 received the high-priority PSACP frame from Node 3 on topic 0x45
+    TEST_ASSERT_TRUE_MESSAGE(_psacp_received_node4, "Node 4 should have received the high-priority pub/sub message");
+    TEST_ASSERT_EQUAL_UINT8(TOPIC_0x45, _psacp_frame_node4.topic);
+    TEST_ASSERT_EQUAL_UINT8(NODE3_ADDR, _psacp_frame_node4.source_address);
+    TEST_ASSERT_EQUAL_UINT8(1, _psacp_frame_node4.nbytes);
+    TEST_ASSERT_EQUAL_UINT8(pub_sub_payload, _psacp_frame_node4.data[0]);
+
+    // Wait until node is idle
+    bool node1_complete = false;
+    uint64_t start_time = get_current_time_ms();
+    const uint64_t timeout_minutes = 5 * 60 * 1000; // X minutes in milliseconds (in my experience, it is on the order of a few minutes ~ 3)
+    while (!node1_complete && (get_current_time_ms() - start_time) < timeout_minutes)
+    {
+        _run_event_loops();
+        SLEEP_MS(1);
+        if (artie_can_bwacp_is_busy(&_node1) == false)
+        {
+            node1_complete = true;
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(node1_complete, "Node 1 did not complete sending the BWACP message.");
+
+    // Verify the frame had HIGH priority (critical to the test)
+    TEST_ASSERT_TRUE_MESSAGE(_psacp_frame_node4.high_priority, "High-priority message should be marked as such");
+    TEST_ASSERT_EQUAL_UINT8(ARTIE_CAN_FRAME_PRIORITY_PSACP_HIGH, _psacp_frame_node4.priority);
+
+    // Verify that BWACP buffer transported properly
+    for (size_t i = 0; i < sizeof(bwacp_payload); i++)
+    {
+        TEST_ASSERT_EQUAL_UINT8(bwacp_payload[buffer_offset_node4 + i], _node4_receive_buffer[buffer_offset_node4 + i]);
+    }
+
+    printf("!!! test_psacp_high_priority_during_bwacp PASSED !!!!\n");
 }
 
 /**
