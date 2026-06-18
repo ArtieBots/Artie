@@ -705,7 +705,7 @@ void test_send_46k_bytes(void)
     // Node 1 should transition to WAITING_COMPLETE, then back to IDLE after timeout
     bool node1_complete = false;
     uint64_t start_time = get_current_time_ms();
-    const uint64_t timeout_minutes = 20 * 60 * 1000; // X minutes in milliseconds (in my experience, it is on the order of a few minutes ~ 3)
+    const uint64_t timeout_minutes = 6 * 60 * 1000; // X minutes in milliseconds (in my experience, it is on the order of a few minutes ~ 3)
     while (!node1_complete && (get_current_time_ms() - start_time) < timeout_minutes)
     {
         _run_event_loops();

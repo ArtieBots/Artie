@@ -700,6 +700,7 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
         ARTIE_CAN_LOG(handle->context, "BWACP: Repeating last DATA frame\n");
         atomic_store(&ctx->received_nack_count, 0); // received_ack_count remains the same and so does the ack bitmap, but reset nack count
         ctx->send_payload_offset -= (ctx->send_payload_offset > 0) ? ((ctx->send_payload_offset >= 8) ? 8 : ctx->send_payload_offset) : 0; // Move offset back for repeat
+        ctx->send_parity = !ctx->send_parity; // Flip the parity back to what it was before we flipped it in anticipation for the next frame
         ctx->need_repeat_data_frame = false;
         err = _send_data(handle, true);  // Send with repeat bit set
         if (err != ARTIE_CAN_ERR_NONE)
