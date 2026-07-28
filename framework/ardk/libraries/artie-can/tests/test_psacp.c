@@ -544,7 +544,6 @@ void test_psacp_high_priority_during_bwacp(void)
     artie_can_error_t err;
 
     // Create a BWACP payload to transfer from Node 1 to Node 4
-    // We'll send 64 bytes as a representative state transfer payload
     uint8_t bwacp_payload[1024];
     for (size_t i = 0; i < sizeof(bwacp_payload); i++)
     {
@@ -622,7 +621,7 @@ void test_psacp_high_priority_during_bwacp(void)
     // Verify that BWACP buffer transported properly
     for (size_t i = 0; i < sizeof(bwacp_payload); i++)
     {
-        TEST_ASSERT_EQUAL_UINT8(bwacp_payload[buffer_offset_node4 + i], _node4_receive_buffer[buffer_offset_node4 + i]);
+        TEST_ASSERT_EQUAL_UINT8(bwacp_payload[i], _node4_receive_buffer[buffer_offset_node4 + i]);
     }
 
     printf("!!! test_psacp_high_priority_during_bwacp PASSED !!!!\n");
