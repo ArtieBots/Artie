@@ -141,20 +141,18 @@ NOTE that the sender address is always the sender of the message - specifically,
 in the case of ACK, NACK, StartReturn, and RxData frames, 'sender address' refers to the remote node,
 while in the case of StartRPC and TxData frames, 'sender address' is the requesting node.
 
-* *ACK 0xxx=0000*: A single ACK frame is sent from the remote node to the requesting node at the end of
-  a complete request (see StartRPC and TxData, below) if the remote node has successfully
-  received all parts of the RPC request and it can service the request. If
-  an ACK is not received within 30ms, or if a NACK is received, the entire RPC request should be resent.
-* *NACK 0xxx=0001*: A single NACK frame should be sent from the remote node to the requesting node
-  at the end of a complete request (see StartRPC and TxData, below) if the remote node
-  did not successfully receive all parts of the RPC request or if it cannot service the request for some
-  reason.
+* *ACK 0xxx=0000*: An ACK frame is sent from the remote node to the requesting node at the end of
+  each packet during the transmission of the RPC request and from the requesting node to the remote
+  node during the transmission of the return value.
+* *NACK 0xxx=0001*: A NACK may be sent in any context in which an ACK is expected, and indicates
+  that the packet being NACKed should be resent. If the NACK is sent in response to the final
+  packet of an RPC request, its data field may contain a non-zero data byte that explains
+  what went wrong with the entire request.
 * *StartRPC 0xxx=0010*: A single StartRPC frame is sent from the requesting node to the remote node
   in order to start an RPC request. This frame may contain the entire request, in the case of simple
   RPCs (a single-frame RPC), or it may contain a part of the request along with metadata (multi-frame RPC).
   In the case of a partial request, the requesting node will start sending out TxData frames until the RPC request is completed.
-  The ACK/NACK frame should be sent from the remote node only once, at the end of the final TxData
-  frame (in the case of a multi-frame RPC) or after the StartRPC frame (in the case of a single-frame RPC).
+  The ACK/NACK frame should be sent from the remote node after each packet.
 * *StartReturn 0xxx=0011*: In the case of synchronous RPCs, a single StartReturn frame is sent from the remote
   node to the requesting node as soon as possible after the remote procedure call is finished.
   This frame may contain an entire return value, in the case of a single-frame return, or it may
@@ -172,14 +170,18 @@ The data length code field should specify the number of bytes in the data field 
 The data field depends on the type of frame:
 
 *ACK frame*:
-An ACK frame should have its random bits (in the ID field) set to the same value as the message it is ACK'ing.
-Note that the message being ACK'ed is the last frame in the RPC request. The data field should be zero bytes.
+An ACK frame is sent from the remote node to the requesting node at the end of each packet
+and from the remote node to the requesting node at the end of each packet.
+The ID field random bits should be set to match the message being ACK'ed for traceability.
+The data field should be zero bytes (empty).
 
 *NACK frame*:
-A NACK frame should have its random bits (in the ID field) set to the same value as the message it is NACK'ing.
-Note that the message being NACK'ed is the last frame in the RPC request.
-The data field contains 1 byte, which should be an error code. Allowable error codes include any Linux errno value,
-but in particular, the following values have specific meanings in this context:
+A NACK frame is sent by the remote node after a complete request if it did not successfully receive all
+parts, or when it cannot service the request. A NACK may also be sent by the requesting node to
+indicate that return data should be resent. The ID field random bits should match the message being NACK'ed
+for traceability. The data field contains 1 byte with an error code.
+Allowable error codes include any Linux errno value, and the following are called out with these
+specific meanings:
 
 * 0x00:            Something went wrong in transmission. Send whole request again.
 * 0x01: EPERM:     I can't complete this request because I do not have this capability. This is likely a programmer error
@@ -191,13 +193,14 @@ but in particular, the following values have specific meanings in this context:
                    it is a bug in the serialization/deserialization of the RPC.
 * 0x0b: EAGAIN:    Something transient went wrong, such as being overloaded with requests or just not able to get to it right now,
                    try again.
-* 0x16: EINVAL:    At least one of the RPC arguments is invalid. The arguments were unpacked correctly, but there is a RPC
+* 0x16: EINVAL:    At least one of the RPC arguments is invalid. The arguments were unpacked correctly, but there is an RPC
                    signature mismatch. This is a programmer error. Sending again will result in the same error.
 * 0x72: EALREADY:  We are already working on this RPC. This should only be sent if the RPC is identical and already being worked on.
                    "Identical" in this context includes the node addresses, but does *not* include the random values.
 
 *StartRPC frame*:
-A StartRPC frame is sent from a requesting node to a remote node, as specified in the addressing bits in the ID field.
+A StartRPC frame is sent from a requesting node to a remote node, as specified in the addressing
+bits in the ID field.
 The data bits are as follows:
 
 ```
