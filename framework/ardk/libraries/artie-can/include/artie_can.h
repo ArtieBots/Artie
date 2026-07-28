@@ -17,6 +17,7 @@
 #include "err.h"
 #include "frame.h"
 #include "psacp.h"
+#include "rpcacp.h"
 #include "rtacp.h"
 
 /**

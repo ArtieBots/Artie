@@ -69,6 +69,7 @@ endfunction()
 add_artie_can_test(test_rtacp)
 add_artie_can_test(test_bwacp)
 add_artie_can_test(test_psacp)
+add_artie_can_test(test_rpcacp)
 
 # Print test information
 message(STATUS "Unity test framework configured")
