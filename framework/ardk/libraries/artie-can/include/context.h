@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "err.h."
 #include "rtacp_context.h"
+#include "rpcacp_context.h"
 #include "bwacp_context.h"
 #include "psacp_context.h"
 #include "translationlayer.h"
@@ -49,6 +50,7 @@ typedef struct {
 typedef struct {
     void *backend_context;                  ///< Pointer to backend-specific context data (which could be custom)
     rtacp_context_t rtacp_context;          ///< Context for RTACP protocol handling.
+    rpcacp_context_t rpcacp_context;        ///< Context for RPCACP protocol handling.
     bwacp_context_t bwacp_context;          ///< Context for BWACP protocol handling.
     psacp_context_t psacp_context;          ///< Context for PSACP protocol handling.
     uint16_t protocol_flags;                ///< Mask of protocols that we are interested in. Use OR'd members of the artie_can_protocol_t enum.

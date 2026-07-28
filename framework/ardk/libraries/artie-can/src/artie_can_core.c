@@ -13,6 +13,7 @@
 #include "bwacp.h"
 #include "err.h"
 #include "psacp.h"
+#include "rpcacp.h"
 #include "rtacp.h"
 #include "translationlayer.h"
 
@@ -153,7 +154,7 @@ artie_can_error_t artie_can_tick(artie_can_backend_t *handle)
 
     if (handle->context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_RPCACP)
     {
-        // TODO
+        err |= rpcacp_tick(handle);
     }
 
     if (handle->context->protocol_flags & ARTIE_CAN_PROTOCOL_FLAG_PSACP)

@@ -15,6 +15,7 @@
 #include "err.h"
 #include "log.h"
 #include "psacp.h"
+#include "rpcacp.h"
 #include "rtacp.h"
 #include "translationlayer.h"
 
@@ -49,6 +50,10 @@ static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 
         case ARTIE_CAN_BWACP_PROTOCOL_ID:
             bwacp_receive_in_isr(context, frame);
+            break;
+
+        case ARTIE_CAN_RPCACP_PROTOCOL_ID:
+            rpcacp_receive_in_isr(context, frame);
             break;
 
         default:
