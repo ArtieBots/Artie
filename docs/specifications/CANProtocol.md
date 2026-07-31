@@ -112,6 +112,9 @@ If synchronous, a return value is given. Here are the general features:
   pointers and unions).
 * Guaranteed delivery both ways.
 * Point-to-point - there is no multi- or broadcast.
+* The requesting node is allowed to have one pending asynchronous RPC call in flight *per node*.
+  Therefore the RPCACP state machine must allow for up to 2^6 - 1 (63) in-flight asynchronous
+  RPC requests at a time.
 
 ### RPCACP Specification
 
