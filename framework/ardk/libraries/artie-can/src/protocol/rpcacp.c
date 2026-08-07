@@ -59,9 +59,7 @@ artie_can_error_t artie_can_rpcacp_set_receive_buffer(artie_can_context_t *ctx, 
 /**
  * @brief API function to initiate an RPC call from a node.
  */
-artie_can_error_t artie_can_rpcacp_call(artie_can_backend_t *handle, uint16_t procedure_id,
-                                        const artie_can_rpc_param_descriptor_t *params, uint8_t param_count,
-                                        bool synchronous)
+artie_can_error_t artie_can_rpcacp_call(artie_can_backend_t *handle, uint16_t procedure_id, const artie_can_rpc_param_descriptor_t *params, uint8_t param_count, bool synchronous)
 {
     if (handle == NULL || params == NULL)
     {
@@ -70,8 +68,7 @@ artie_can_error_t artie_can_rpcacp_call(artie_can_backend_t *handle, uint16_t pr
 
     // Placeholder: Logic to prepare RpcSignature and encode MsgPack payload would go here.
     // For now, we just acknowledge the call was initiated successfully.
-    ARTIE_CAN_LOG(handle->context, "RPCACP: Initiating procedure 0x%04X (%u params, sync=%d)\n",
-                  procedure_id, param_count, synchronous);
+    ARTIE_CAN_LOG(handle->context, "RPCACP: Initiating procedure 0x%04X (%u params, sync=%d)\n", procedure_id, param_count, synchronous);
 
     return ARTIE_CAN_ERR_NONE;
 }
@@ -137,8 +134,7 @@ artie_can_error_t artie_can_rpcacp_register_procedure(artie_can_backend_t *handl
     }
 
     // Placeholder: Logic to add the procedure_id and its function pointer to the node's registry.
-    ARTIE_CAN_LOG(handle->context, "RPCACP: Registered procedure 0x%04X (%s)\n",
-                  signature->procedure_id, signature->name);
+    ARTIE_CAN_LOG(handle->context, "RPCACP: Registered procedure 0x%04X (%s)\n", signature->procedure_id, signature->name);
 
     return ARTIE_CAN_ERR_NONE;
 }
