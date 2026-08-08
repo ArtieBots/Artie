@@ -222,6 +222,31 @@ static bool _type_name_is(const char *type_name, const char *candidate)
     return (type_name != NULL) && (strcmp(type_name, candidate) == 0);
 }
 
+/**
+ * Wire size, in bytes, of a fixed-size primitive type, or 0 for variable-length/unknown types
+ * (string, array, struct, NULL). Note that "float" is 16 bits and "double" is 32 bits on the wire.
+ */
+static uint32_t _primitive_wire_size(const char *type_name)
+{
+    if (_type_name_is(type_name, "uint8_t") || _type_name_is(type_name, "int8_t") || _type_name_is(type_name, "bool"))
+    {
+        return 1U;
+    }
+    else if (_type_name_is(type_name, "uint16_t") || _type_name_is(type_name, "int16_t") || _type_name_is(type_name, "float"))
+    {
+        return 2U;
+    }
+    else if (_type_name_is(type_name, "uint32_t") || _type_name_is(type_name, "int32_t") || _type_name_is(type_name, "double"))
+    {
+        return 4U;
+    }
+    else if (_type_name_is(type_name, "uint64_t") || _type_name_is(type_name, "int64_t"))
+    {
+        return 8U;
+    }
+    return 0U;
+}
+
 static artie_can_error_t _pack_values(const artie_can_rpc_param_descriptor_t *descriptors, uint8_t descriptor_count,
                                        const artie_can_rpc_value_t *values, uint8_t value_count,
                                        uint8_t *out, uint32_t out_cap, uint32_t *out_len)
@@ -297,9 +322,27 @@ static artie_can_error_t _prepare_dispatch_params(const artie_can_rpc_signature_
         const artie_can_rpc_param_descriptor_t *desc = &sig->params[i];
         uint32_t offset = desc->offset_in_msgpack;
 
+        if (_type_name_is(desc->type_name, "NULL"))
+        {
+            param_ptrs[i] = NULL;
+            continue;
+        }
+
+        uint32_t wire_size = _primitive_wire_size(desc->type_name);
+        bool missing = (wire_size > 0U) ? ((offset + wire_size) > raw_payload_len) : (offset >= raw_payload_len);
+        if (missing)
+        {
+            if (desc->optional)
+            {
+                // Optional parameter not present in this call; hand the procedure a NULL.
+                param_ptrs[i] = NULL;
+                continue;
+            }
+            return ARTIE_CAN_ERR_INVALID_ARG;
+        }
+
         if (_type_name_is(desc->type_name, "float"))
         {
-            if ((offset + 2U) > raw_payload_len) { return ARTIE_CAN_ERR_INVALID_ARG; }
             uint16_t half = (uint16_t)(((uint16_t)raw_payload[offset] << 8) | raw_payload[offset + 1U]);
             float f = _float16_to_float32(half);
             memcpy(scratch[i], &f, sizeof(f));
@@ -307,7 +350,6 @@ static artie_can_error_t _prepare_dispatch_params(const artie_can_rpc_signature_
         }
         else if (_type_name_is(desc->type_name, "double"))
         {
-            if ((offset + 4U) > raw_payload_len) { return ARTIE_CAN_ERR_INVALID_ARG; }
             uint32_t bits = ((uint32_t)raw_payload[offset] << 24) | ((uint32_t)raw_payload[offset + 1U] << 16) |
                              ((uint32_t)raw_payload[offset + 2U] << 8) | (uint32_t)raw_payload[offset + 3U];
             float f;
@@ -316,13 +358,8 @@ static artie_can_error_t _prepare_dispatch_params(const artie_can_rpc_signature_
             memcpy(scratch[i], &d, sizeof(d));
             param_ptrs[i] = scratch[i];
         }
-        else if (_type_name_is(desc->type_name, "NULL"))
-        {
-            param_ptrs[i] = NULL;
-        }
         else
         {
-            if (offset > raw_payload_len) { return ARTIE_CAN_ERR_INVALID_ARG; }
             param_ptrs[i] = &raw_payload[offset];
         }
     }
@@ -707,18 +744,25 @@ static artie_can_error_t _finish_incoming_request_with_return(artie_can_backend_
     ctx->return_crc16 = _crc16_ccitt_update(CRC16_INIT, &header_byte, 1U);
     ctx->return_crc16 = _crc16_ccitt_update(ctx->return_crc16, ctx->return_stuffed_payload, ctx->return_stuffed_payload_size);
 
+    // Accept the request with its final ACK. The requesting node transitions to waiting for the
+    // return value only once it processes this ACK, so the StartReturn frame is deferred slightly
+    // (see _handle_sending_return) rather than sent back-to-back with the ACK.
+    artie_can_error_t err = _send_ack_frame(handle, ctx->recv_sender_address, ctx->recv_random_id);
+    if (err != ARTIE_CAN_ERR_NONE)
+    {
+        ctx->recv_stuffed_payload_size = 0;
+        ctx->state = RPCACP_STATE_IDLE;
+        return err;
+    }
+
     ctx->recv_stuffed_payload_size = 0;
     ctx->return_random_id = _generate_random_id(handle);
     ctx->return_stuffed_payload_offset = 0;
+    ctx->return_last_chunk_size = 0;
     ctx->retry_count = 0;
+    ctx->last_activity_ms = handle->get_ms();
     ctx->state = RPCACP_STATE_SENDING_RETURN;
-
-    artie_can_error_t err = _send_next_return_chunk(handle);
-    if (err != ARTIE_CAN_ERR_NONE)
-    {
-        ctx->state = RPCACP_STATE_IDLE;
-    }
-    return err;
+    return ARTIE_CAN_ERR_NONE;
 }
 
 /** Called once a full request payload has been accumulated (byte-stuffing terminal found). Sends the final ACK/NACK itself. */
@@ -790,9 +834,33 @@ static artie_can_error_t _service_request(artie_can_backend_t *handle)
         return _finish_incoming_request(handle, ARTIE_CAN_RPCACP_ERRNO_EPERM);
     }
 
-    const void *param_ptrs[ARTIE_CAN_RPCACP_MAX_PARAMS];
+    // If every parameter has a fixed wire size, we can detect an argument list that is too long
+    // for this signature (i.e., the two nodes' signatures do not match).
+    bool all_params_fixed_size = true;
+    uint32_t expected_max_len = 0;
+    for (uint8_t i = 0; i < sig->param_count; i++)
+    {
+        const artie_can_rpc_param_descriptor_t *desc = &sig->params[i];
+        if (_type_name_is(desc->type_name, "NULL")) { continue; }
+
+        uint32_t wire_size = _primitive_wire_size(desc->type_name);
+        if (wire_size == 0U)
+        {
+            all_params_fixed_size = false;
+            break;
+        }
+        if (((uint32_t)desc->offset_in_msgpack + wire_size) > expected_max_len)
+        {
+            expected_max_len = (uint32_t)desc->offset_in_msgpack + wire_size;
+        }
+    }
+    if (all_params_fixed_size && (raw_len > expected_max_len))
+    {
+        return _finish_incoming_request(handle, ARTIE_CAN_RPCACP_ERRNO_E2BIG);
+    }
+
+    const void *param_ptrs[ARTIE_CAN_RPCACP_MAX_PARAMS] = {0};
     uint8_t scratch[ARTIE_CAN_RPCACP_MAX_PARAMS][8];
-    memset(param_ptrs, 0, sizeof(param_ptrs));
     if (_prepare_dispatch_params(sig, raw_payload, raw_len, param_ptrs, scratch) != ARTIE_CAN_ERR_NONE)
     {
         return _finish_incoming_request(handle, ARTIE_CAN_RPCACP_ERRNO_EINVAL);
@@ -1161,6 +1229,22 @@ static artie_can_error_t _handle_sending_return(artie_can_backend_t *handle)
     rpcacp_context_t *ctx = &handle->context->rpcacp_context;
     uint64_t now = handle->get_ms();
     artie_can_error_t err = ARTIE_CAN_ERR_NONE;
+
+    if ((ctx->return_stuffed_payload_offset == 0U) && (ctx->return_last_chunk_size == 0U))
+    {
+        // The StartReturn frame has not been sent yet; it is deferred until shortly after the
+        // request's final ACK so the requester processes that ACK first (see
+        // _finish_incoming_request_with_return).
+        if ((now - ctx->last_activity_ms) >= ARTIE_CAN_RPCACP_RETURN_START_DELAY_MS)
+        {
+            err = _send_next_return_chunk(handle);
+            if (err != ARTIE_CAN_ERR_NONE)
+            {
+                ctx->state = RPCACP_STATE_IDLE;
+            }
+        }
+        return err;
+    }
 
     if ((now - ctx->last_activity_ms) >= ARTIE_CAN_RPCACP_ACK_TIMEOUT_MS)
     {

@@ -12,7 +12,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <stdatomic.h>
 #include "err.h"
 #include "frame.h"
 #include "translationlayer.h"
