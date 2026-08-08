@@ -63,6 +63,13 @@
 /** Timeout, in ms, for a synchronous call waiting on the StartReturn/RxData sequence after its request was accepted. */
 #define ARTIE_CAN_RPCACP_RESPONSE_TIMEOUT_MS 5000U
 
+/**
+ * Delay, in ms, between ACKing a fully-received synchronous request and sending the StartReturn
+ * frame, so the requesting node has time to process the ACK (and transition to waiting for the
+ * return value) before the return data starts arriving.
+ */
+#define ARTIE_CAN_RPCACP_RETURN_START_DELAY_MS 2U
+
 // Location of the RPCACP-specific "random" traceability bits in the ID field (occupies the low 8 bits).
 /** Location of the random/traceability bits in the ID field. */
 #define RPCACP_FRAME_ID_RANDOM_LOCATION 0U
