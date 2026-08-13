@@ -75,6 +75,10 @@ function(set_artie_can_compile_options target)
         # Ignore the following warnings:
         # -Wunused-parameter: unreferenced formal parameter (common in callback implementations)
         target_compile_options(${target} PRIVATE -Wno-unused-parameter)
+        # -Wunused-function: static helpers that aren't wired up yet (e.g. the MCP2515 driver's
+        # per-instruction functions). MSVC's equivalent (C4505) is off by default, so this keeps
+        # the two toolchains consistent.
+        target_compile_options(${target} PRIVATE -Wno-unused-function)
         # Ignore -Werror=stringop-truncation
         target_compile_options(${target} PRIVATE -Wno-error=stringop-truncation)
     endif()
@@ -145,6 +149,32 @@ if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+# Documentation (Doxygen)
+# This only builds the local, manually-invoked build (build_and_test_c.ps1 + cmake); it is not yet
+# wired into the wider Docker-based build system.
+option(BUILD_DOCS "Generate API documentation with Doxygen" ON)
+if(BUILD_DOCS)
+    find_package(Doxygen QUIET)
+    if(DOXYGEN_FOUND)
+        set(DOXYGEN_INPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
+        set(DOXYGEN_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+        set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/docs)
+        set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${DOXYFILE_OUT} @ONLY)
+        file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR})
+
+        add_custom_target(artie_can_docs ALL
+            COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE_OUT}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "Generating Artie CAN API documentation with Doxygen (output: ${DOXYGEN_OUTPUT_DIR}/html)"
+            VERBATIM
+        )
+    else()
+        message(STATUS "Doxygen not found; skipping API documentation generation")
+    endif()
+endif()
+
 # Print configuration summary
 message(STATUS "")
 message(STATUS "Artie CAN Library Configuration:")
@@ -152,4 +182,5 @@ message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
 message(STATUS "  Build static libs: ${BUILD_STATIC_LIBS}")
 message(STATUS "  Build tests: ${BUILD_TESTS}")
+message(STATUS "  Build docs: ${BUILD_DOCS} (Doxygen found: ${DOXYGEN_FOUND})")
 message(STATUS "")

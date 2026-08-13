@@ -150,9 +150,13 @@ static artie_can_error_t _send_ready(artie_can_backend_t *handle, const uint8_t 
 }
 
 /**
- * @brief Send a DATA frame.
+ * @brief Send a DATA frame carrying the payload at @p offset with parity @p parity.
+ *
+ * The frame to transmit is passed in explicitly rather than read from the send cursor so that
+ * a repeat can be rebuilt from ctx->last_sent_* without rewinding (and then having to restore)
+ * ctx->send_payload_offset / ctx->send_parity.
  */
-static artie_can_error_t _send_data(artie_can_backend_t *handle, bool is_repeat)
+static artie_can_error_t _send_data(artie_can_backend_t *handle, uint32_t offset, bool parity, bool is_repeat)
 {
     artie_can_frame_t frame = {0};
     bwacp_context_t *ctx = &handle->context->bwacp_context;
@@ -166,7 +170,7 @@ static artie_can_error_t _send_data(artie_can_backend_t *handle, bool is_repeat)
                ((uint32_t)ctx->send_target_class << BWACP_FRAME_ID_CLASS_LOCATION);
 
     // Set parity bit
-    frame.id |= ((ctx->send_parity ? 1U : 0U) << BWACP_FRAME_ID_PARITY_LOCATION);
+    frame.id |= ((parity ? 1U : 0U) << BWACP_FRAME_ID_PARITY_LOCATION);
 
     // Set repeat bit
     if (is_repeat)
@@ -174,12 +178,13 @@ static artie_can_error_t _send_data(artie_can_backend_t *handle, bool is_repeat)
         frame.id |= (1U << BWACP_FRAME_ID_ACK_REPEAT_LOCATION);
     }
 
-    // Copy up to 8 bytes of payload
-    uint32_t bytes_remaining = ctx->send_payload_size - ctx->send_payload_offset;
+    // Copy up to 8 bytes of payload. The DLC is derived from the offset being sent, so a repeat of
+    // a short final frame carries the same number of bytes as the original did.
+    uint32_t bytes_remaining = ctx->send_payload_size - offset;
     frame.dlc = (bytes_remaining > 8) ? 8 : (uint8_t)bytes_remaining;
-    memcpy(frame.data, &ctx->send_payload[ctx->send_payload_offset], frame.dlc);
+    memcpy(frame.data, &ctx->send_payload[offset], frame.dlc);
 
-    ARTIE_CAN_LOG(handle->context, "BWACP: Sending DATA frame (offset=%u, dlc=%u, parity=%d, repeat=%d)\n", ctx->send_payload_offset, frame.dlc, ctx->send_parity, is_repeat);
+    ARTIE_CAN_LOG(handle->context, "BWACP: Sending DATA frame (offset=%u, dlc=%u, parity=%d, repeat=%d)\n", offset, frame.dlc, parity, is_repeat);
 
     return artie_can_send_with_retry(handle, &frame);
 }
@@ -396,6 +401,7 @@ static artie_can_error_t _process_ready_received(artie_can_backend_t *handle)
     // Reset receive state
     ctx->receive_bytes_written = 0;
     ctx->receive_expected_parity = false;
+    ctx->receive_accepted_any_frame = false;
     ctx->state = BWACP_STATE_RECEIVING;
     ctx->last_packet_ms = handle->get_ms();
     ctx->transfer_invalidated = false;
@@ -444,9 +450,18 @@ static artie_can_error_t _handle_data_expect_repeat(artie_can_backend_t *handle,
     // This is a repeat frame - check parity
     bool parity_correct = (frame_parity == ctx->receive_expected_parity);
 
+    if (!parity_correct && ctx->receive_accepted_any_frame)
+    {
+        // As in _handle_data_receiving: a repeat carrying the parity we already consumed is a
+        // duplicate of the last accepted frame, not a protocol error. We still need the frame we
+        // NACKed, so re-send the NACK and stay in EXPECT_REPEAT rather than invalidating the transfer.
+        ARTIE_CAN_LOG(handle->context, "BWACP: Duplicate repeat while expecting repeat; re-sending NACK\n");
+        return _send_nack(handle, ctx->receive_sender_address);
+    }
+
     if (!parity_correct)
     {
-        // Repeat still has wrong parity - give up and enter error state
+        // Repeat still has wrong parity and we have nothing to have duplicated - give up and enter error state
         ARTIE_CAN_LOG(handle->context, "BWACP: Repeat frame still has parity error; entering error state\n");
         ctx->transfer_invalidated = true;
         ctx->state = BWACP_STATE_RECEIVE_IN_ERROR;
@@ -473,6 +488,7 @@ static artie_can_error_t _handle_data_expect_repeat(artie_can_backend_t *handle,
 
         // Toggle expected parity for next frame
         ctx->receive_expected_parity = !ctx->receive_expected_parity;
+        ctx->receive_accepted_any_frame = true;
 
         // Send ACK and return to RECEIVING state
         err = _send_ack(handle, ctx->receive_sender_address);
@@ -492,13 +508,25 @@ static artie_can_error_t _handle_data_receiving(artie_can_backend_t *handle, art
     bwacp_context_t *ctx = &handle->context->bwacp_context;
     artie_can_error_t err = ARTIE_CAN_ERR_NONE;
 
-    // Extract parity from frame
+    // Extract parity and repeat flag from frame
     bool frame_parity = (frame->id & BWACP_FRAME_ID_PARITY_MASK) != 0;
+    bool is_repeat = (frame->id & BWACP_FRAME_ID_ACK_REPEAT_MASK) != 0;
     bool parity_correct = (frame_parity == ctx->receive_expected_parity);
+
+    if (!parity_correct && is_repeat && ctx->receive_accepted_any_frame)
+    {
+        // Parity is binary, so a repeat whose parity differs from the one we expect next is exactly
+        // the frame we just accepted. On a multicast transfer this is the normal case: the sender
+        // repeats because some *other* node missed the frame, so every node that did receive it sees
+        // a duplicate. Re-ACK it without writing or toggling parity - NACKing it here would tell the
+        // sender to repeat again, and the two sides would ping-pong out of sync.
+        ARTIE_CAN_LOG(handle->context, "BWACP: Duplicate repeat of last accepted DATA frame; re-ACKing without writing\n");
+        return _send_ack(handle, ctx->receive_sender_address);
+    }
 
     if (!parity_correct)
     {
-        // Parity mismatch - send NACK and enter EXPECT_REPEAT state
+        // Parity mismatch on a fresh frame - genuine desync. Send NACK and enter EXPECT_REPEAT state
         ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame parity mismatch (expected=%d, got=%d); sending NACK and expecting repeat\n", ctx->receive_expected_parity, frame_parity);
         ctx->state = BWACP_STATE_EXPECT_REPEAT;
         err = _send_nack(handle, ctx->receive_sender_address);
@@ -527,6 +555,7 @@ static artie_can_error_t _handle_data_receiving(artie_can_backend_t *handle, art
 
         // Toggle expected parity for next frame
         ctx->receive_expected_parity = !ctx->receive_expected_parity;
+        ctx->receive_accepted_any_frame = true;
 
         // Send ACK
         err = _send_ack(handle, ctx->receive_sender_address);
@@ -594,10 +623,14 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Transfer was invalidated due to parity errors; sending NACK\n");
 
-        // Reset state for potential retransmission
+        // Reset state for potential retransmission. The state must go back to RECEIVING: we are
+        // almost certainly in RECEIVE_IN_ERROR here, and leaving it there means the sender's restart
+        // is ACKed but discarded frame by frame, which loops forever.
         ctx->receive_bytes_written = 0;
         ctx->receive_expected_parity = false;
+        ctx->receive_accepted_any_frame = false;
         ctx->transfer_invalidated = false;
+        ctx->state = BWACP_STATE_RECEIVING;
         err = _send_nack(handle, ctx->receive_sender_address);
     }
     else if ((ctx->receive_buffer != NULL) && (ctx->receive_bytes_written > 0))
@@ -611,6 +644,8 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
             // Reset state for retransmission
             ctx->receive_bytes_written = 0;
             ctx->receive_expected_parity = false;
+            ctx->receive_accepted_any_frame = false;
+            ctx->state = BWACP_STATE_RECEIVING;
             err = _send_nack(handle, ctx->receive_sender_address);
         }
         else
@@ -624,6 +659,7 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
 
             // Return to IDLE
             ctx->sending_node_address = 0xFF;
+            ctx->receive_accepted_any_frame = false;
             ctx->state = BWACP_STATE_IDLE;
 
             // Send ACK
@@ -633,6 +669,9 @@ static artie_can_error_t _process_complete_received(artie_can_backend_t *handle)
     else
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: COMPLETE received but no data was received; sending NACK\n");
+        ctx->receive_expected_parity = false;
+        ctx->receive_accepted_any_frame = false;
+        ctx->state = BWACP_STATE_RECEIVING;
         err = _send_nack(handle, ctx->receive_sender_address);
     }
 
@@ -695,14 +734,22 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
     artie_can_error_t err;
 
     // Check if we need to repeat the last DATA frame
-    if (ctx->need_repeat_data_frame)
+    if (ctx->need_repeat_data_frame && ctx->have_sent_data_frame)
     {
         ARTIE_CAN_LOG(handle->context, "BWACP: Repeating last DATA frame\n");
-        atomic_store(&ctx->received_nack_count, 0); // received_ack_count remains the same and so does the ack bitmap, but reset nack count
-        ctx->send_payload_offset -= (ctx->send_payload_offset > 0) ? ((ctx->send_payload_offset >= 8) ? 8 : ctx->send_payload_offset) : 0; // Move offset back for repeat
-        ctx->send_parity = !ctx->send_parity; // Flip the parity back to what it was before we flipped it in anticipation for the next frame
         ctx->need_repeat_data_frame = false;
-        err = _send_data(handle, true);  // Send with repeat bit set
+
+        // A repeat is a fresh round of ACKs: nodes that ACKed the original still have their bit set
+        // in ack_received_bitmap, which would cause their ACK for the repeat to be deduplicated away
+        // (and their stale ACK to be counted towards the repeat's quorum).
+        atomic_store(&ctx->received_ack_count, 0);
+        atomic_store(&ctx->received_nack_count, 0);
+        ctx->ack_received_bitmap = 0;
+        ctx->last_packet_ms = handle->get_ms();
+
+        // Rebuild the previous frame from last_sent_*; the send cursor and parity stay where they
+        // are so that the next fresh frame carries on from the correct place.
+        err = _send_data(handle, ctx->last_sent_offset, ctx->last_sent_parity, true);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             return err;
@@ -710,6 +757,8 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
     }
     else
     {
+        ctx->need_repeat_data_frame = false;
+
         // Check if all data has been sent
         if (ctx->send_payload_offset >= ctx->send_payload_size)
         {
@@ -730,8 +779,13 @@ static artie_can_error_t _handle_sending_data(artie_can_backend_t *handle)
         ctx->ack_received_bitmap = 0; // Clear bitmap for new DATA frame
         ctx->last_packet_ms = handle->get_ms();
 
+        // Remember what we are about to send so that a later repeat can rebuild it exactly
+        ctx->last_sent_offset = ctx->send_payload_offset;
+        ctx->last_sent_parity = ctx->send_parity;
+        ctx->have_sent_data_frame = true;
+
         // Send next DATA frame
-        err = _send_data(handle, false);
+        err = _send_data(handle, ctx->send_payload_offset, ctx->send_parity, false);
         if (err != ARTIE_CAN_ERR_NONE)
         {
             return err;
@@ -759,26 +813,34 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
     bwacp_context_t *ctx = &handle->context->bwacp_context;
     uint64_t elapsed = handle->get_ms() - ctx->last_packet_ms;
 
-    // Check if we received all ACKs or if any NACKs were received
-    uint32_t repeat_increment = 0;
-    if (ctx->received_nack_count > 0)
-    {
-        // NACK received - need to repeat this frame
-        ARTIE_CAN_LOG(handle->context, "BWACP: NACK received; will repeat DATA frame\n");
-        ctx->need_repeat_data_frame = true;
-        repeat_increment = 1;
-    }
-    else
-    {
-        // No NACKs received - no need to repeat (unless we timeout waiting for ACKs)
-        ctx->need_repeat_data_frame = false;
-    }
+    // A NACK from any node means this frame has to be repeated, regardless of how many nodes ACKed
+    bool nacked = (ctx->received_nack_count > 0);
+    ctx->need_repeat_data_frame = nacked;
 
     if ((ctx->received_ack_count + ctx->received_nack_count) >= ctx->expected_ack_count)
     {
-        // All ACKs/NACKs received - send next frame (or repeat frame)
-        ARTIE_CAN_LOG(handle->context, "BWACP: All ACKs received; sending next DATA frame\n");
-        ctx->current_frame_repeat_count = 0; // Reset repeat count for next frame
+        if (nacked)
+        {
+            // A NACK-driven repeat has to count against the repeat budget too, otherwise a receiver
+            // that keeps NACKing the same frame keeps the sender in an unbounded repeat loop.
+            if (ctx->current_frame_repeat_count >= ARTIE_CAN_BWACP_MAX_REPEATS)
+            {
+                ARTIE_CAN_LOG(handle->context, "BWACP: DATA frame at offset %u NACKed %u times; aborting transfer\n", ctx->last_sent_offset, ctx->current_frame_repeat_count);
+                ctx->need_repeat_data_frame = false;
+                ctx->state = BWACP_STATE_IDLE;
+                return ARTIE_CAN_ERR_SEND_FAIL;
+            }
+
+            ctx->current_frame_repeat_count++;
+            ARTIE_CAN_LOG(handle->context, "BWACP: NACK received; will repeat DATA frame (%u/%u)\n", ctx->current_frame_repeat_count, ARTIE_CAN_BWACP_MAX_REPEATS);
+        }
+        else
+        {
+            // All ACKs received - move on to the next frame
+            ARTIE_CAN_LOG(handle->context, "BWACP: All ACKs received; sending next DATA frame\n");
+            ctx->current_frame_repeat_count = 0; // Reset repeat count for next frame
+        }
+
         ctx->state = BWACP_STATE_SENDING_DATA;
     }
     else if (elapsed >= ARTIE_CAN_BWACP_ACK_TIMEOUT_MS)
@@ -832,12 +894,11 @@ static artie_can_error_t _handle_waiting_ack_data(artie_can_backend_t *handle)
         {
             ARTIE_CAN_LOG(handle->context, "BWACP: ACK timeout (%u/%u ACKs); repeating DATA frame\n", ctx->received_ack_count, ctx->expected_ack_count);
             ctx->need_repeat_data_frame = true;
+            ctx->current_frame_repeat_count++;
             ctx->state = BWACP_STATE_SENDING_DATA;
-            repeat_increment = 1;
         }
     }
 
-    ctx->current_frame_repeat_count += repeat_increment;
     return ARTIE_CAN_ERR_NONE;
 }
 
@@ -853,13 +914,26 @@ static artie_can_error_t _handle_sending_complete(artie_can_backend_t *handle)
     // Check if we received any NACKs
     if (ctx->received_nack_count > 0)
     {
-        // NACK received - restart transfer
-        ARTIE_CAN_LOG(handle->context, "BWACP: NACK received after COMPLETE; restarting transfer\n");
+        // NACK received - restart transfer, but only a bounded number of times. Without a bound, a
+        // receiver that cannot be resynchronized keeps NACKing every COMPLETE and the sender streams
+        // the whole payload again indefinitely.
+        if (ctx->transfer_restart_count >= ARTIE_CAN_BWACP_MAX_TRANSFER_RESTARTS)
+        {
+            ARTIE_CAN_LOG(handle->context, "BWACP: NACK received after COMPLETE but restart limit (%u) reached; aborting transfer\n", ARTIE_CAN_BWACP_MAX_TRANSFER_RESTARTS);
+            ctx->state = BWACP_STATE_IDLE;
+            return ARTIE_CAN_ERR_SEND_FAIL;
+        }
+
+        ctx->transfer_restart_count++;
+        ARTIE_CAN_LOG(handle->context, "BWACP: NACK received after COMPLETE; restarting transfer (%u/%u)\n", ctx->transfer_restart_count, ARTIE_CAN_BWACP_MAX_TRANSFER_RESTARTS);
         ctx->send_payload_offset = 0;
         ctx->send_parity = false;
+        ctx->have_sent_data_frame = false;
         atomic_store(&ctx->received_ack_count, 0);
         atomic_store(&ctx->received_nack_count, 0);
+        ctx->ack_received_bitmap = 0;
         ctx->need_repeat_data_frame = false;
+        ctx->current_frame_repeat_count = 0;
         ctx->state = BWACP_STATE_SENDING_DATA;
     }
     else if (ctx->received_ack_count >= ctx->expected_ack_count)
@@ -941,6 +1015,10 @@ artie_can_error_t artie_can_bwacp_send(artie_can_backend_t *handle, const uint8_
     ctx->send_target_address = target_address;
     ctx->send_target_class = target_class;
     ctx->send_parity = false;
+    ctx->last_sent_offset = 0;
+    ctx->last_sent_parity = false;
+    ctx->have_sent_data_frame = false;
+    ctx->transfer_restart_count = 0;
     ctx->expected_ack_count = 0;
     ctx->received_ack_count = 0;
     ctx->received_nack_count = 0;

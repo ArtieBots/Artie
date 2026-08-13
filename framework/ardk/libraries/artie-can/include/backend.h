@@ -23,32 +23,39 @@ typedef uint64_t artie_can_get_ms_t(void);
 
 /**
  * @brief Struct for CAN backend function pointers and context.
- *
- * @param init Function pointer for backend initialization.
- * It is expected that this function will set up the backend and populate the context as needed.
- * Backends can assume this function will be called before any other functions in the backend are used.
- * @param send Function pointer for sending a CAN frame.
- * The backend should handle the actual transmission of the CAN frame. The frame data is provided as an argument.
- * This function is expected to be non-blocking, but even though it returns quickly, the message may not be sent until
- * the bus is free. If send is called again before the previous message has been sent,
- * the backend should return ARTIE_CAN_ERR_SEND_BUSY to indicate that this message cannot be sent, and it should
- * continue trying to send the previous message until some backend-specific timeout mechanism triggers
- * that frees up the backend for sending new messages.
- * @param close Function pointer for closing the backend.
- * The backend should handle any necessary cleanup and resource deallocation. This function will be called
- * when the backend is no longer needed, and the context should be considered invalid after this call.
- * After this function is called, the backend should not call any callbacks or attempt to send or receive any more messages.
- * @param get_ms Function pointer to a function that returns the current time in milliseconds.
- * The backend can use this function for any timing-related needs, such as implementing timeouts for sending messages or for timestamping received messages. This function is provided by the user of the library to allow the backend to access a time source without depending on any specific platform's timing APIs.
- * @param context Pointer to context data.
- *
  */
 typedef struct {
+    /**
+     * Function pointer for backend initialization.
+     * It is expected that this function will set up the backend and populate the context as needed.
+     * Backends can assume this function will be called before any other functions in the backend are used.
+     */
     artie_can_error_t (*init)(artie_can_context_t *ctx);
+    /**
+     * Function pointer for sending a CAN frame.
+     * The backend should handle the actual transmission of the CAN frame. The frame data is provided as an argument.
+     * This function is expected to be non-blocking, but even though it returns quickly, the message may not be sent until
+     * the bus is free. If send is called again before the previous message has been sent,
+     * the backend should return ARTIE_CAN_ERR_SEND_BUSY to indicate that this message cannot be sent, and it should
+     * continue trying to send the previous message until some backend-specific timeout mechanism triggers
+     * that frees up the backend for sending new messages.
+     */
     artie_can_error_t (*send)(artie_can_context_t *ctx, const artie_can_frame_t *frame);
+    /**
+     * Function pointer for closing the backend.
+     * The backend should handle any necessary cleanup and resource deallocation. This function will be called
+     * when the backend is no longer needed, and the context should be considered invalid after this call.
+     * After this function is called, the backend should not call any callbacks or attempt to send or receive any more messages.
+     */
     artie_can_error_t (*close)(artie_can_context_t *ctx);
+    /**
+     * Function pointer to a function that returns the current time in milliseconds.
+     * The backend can use this function for any timing-related needs, such as implementing timeouts for sending
+     * messages or for timestamping received messages. This function is provided by the user of the library to
+     * allow the backend to access a time source without depending on any specific platform's timing APIs.
+     */
     artie_can_get_ms_t *get_ms;
-    artie_can_context_t *context;
+    artie_can_context_t *context; ///< Pointer to context data.
 } artie_can_backend_t;
 
 /**

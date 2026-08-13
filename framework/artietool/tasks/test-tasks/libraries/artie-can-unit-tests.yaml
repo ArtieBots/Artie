@@ -1,6 +1,15 @@
 # Unit tests for the Artie CAN library.
-# Runs pytest suite to validate all CAN protocols.
-# Each test is tracked individually in the test results.
+#
+# The artie-can-test-image build task produces an image that compiles the C library and its
+# Unity test suite; this task runs that suite (via ctest) inside a single container and then
+# checks the container's logs for each individual test's result, so that every test shows up
+# separately in the test report.
+#
+# The tests exercise all four Artie CAN protocols against the UDP multicast backend, which
+# simulates a CAN bus between several nodes inside the container.
+#
+# NOTE: Each test must be listed here to be tracked, so this file needs to be updated whenever
+# a RUN_TEST() is added to or removed from framework/ardk/libraries/artie-can/tests.
 name: artie-can-unit-tests
 labels:
   - docker-image
@@ -15,521 +24,225 @@ steps:
       dependency:
         name: docker-image
         producing-task: artie-can-test-image
+    # No cmd-to-run-in-dut: the test image's default command already runs the whole suite
+    # ('ctest -V'), which prints a '<file>:<line>:<test-name>:PASS' line per test.
     steps:
-      # Core functionality tests
-      - test-name: test_init_with_mock_backend
+
+      # RTACP: real-time addressed messaging (test_rtacp.c)
+      - test-name: test_broadcast
         expected-outputs:
-          - what: "test_init_with_mock_backend PASSED"
+          - what: "test_broadcast:PASS"
             where: ${DUT}
-      - test-name: test_init_with_valid_address_range
+      - test-name: test_send_to_specific_address
         expected-outputs:
-          - what: "test_init_with_valid_address_range PASSED"
+          - what: "test_send_to_specific_address:PASS"
             where: ${DUT}
-      - test-name: test_init_with_invalid_address_low
+      - test-name: test_send_to_specific_address_only_received_by_target
         expected-outputs:
-          - what: "test_init_with_invalid_address_low PASSED"
+          - what: "test_send_to_specific_address_only_received_by_target:PASS"
             where: ${DUT}
-      - test-name: test_init_with_invalid_address_high
+      - test-name: test_send_multiple_messages
         expected-outputs:
-          - what: "test_init_with_invalid_address_high PASSED"
+          - what: "test_send_multiple_messages:PASS"
             where: ${DUT}
-      - test-name: test_context_manager
+      - test-name: test_echo_message
         expected-outputs:
-          - what: "test_context_manager PASSED"
+          - what: "test_echo_message:PASS"
             where: ${DUT}
-      - test-name: test_multiple_contexts
+      - test-name: test_send_lots_of_messages
         expected-outputs:
-          - what: "test_multiple_contexts PASSED"
-            where: ${DUT}
-      - test-name: test_mock_tcp_initialization
-        expected-outputs:
-          - what: "test_mock_tcp_initialization PASSED"
-            where: ${DUT}
-      - test-name: test_backend_enum_values
-        expected-outputs:
-          - what: "test_backend_enum_values PASSED"
-            where: ${DUT}
-      - test-name: test_mock_backend_available
-        expected-outputs:
-          - what: "test_mock_backend_available PASSED"
+          - what: "test_send_lots_of_messages:PASS"
             where: ${DUT}
 
-      # Address tests
-      - test-name: test_broadcast_address
+      # BWACP: multi-frame block writes (test_bwacp.c)
+      - test-name: test_send_one_byte
         expected-outputs:
-          - what: "test_broadcast_address PASSED"
+          - what: "test_send_one_byte:PASS"
             where: ${DUT}
-      - test-name: test_unicast_addresses
+      - test-name: test_send_four_bytes
         expected-outputs:
-          - what: "test_unicast_addresses PASSED"
+          - what: "test_send_four_bytes:PASS"
             where: ${DUT}
-      - test-name: test_max_valid_address
+      - test-name: test_send_eight_bytes
         expected-outputs:
-          - what: "test_max_valid_address PASSED"
+          - what: "test_send_eight_bytes:PASS"
             where: ${DUT}
-
-      # RTACP message tests
-      - test-name: test_send_unicast_message
+      - test-name: test_send_254_bytes
         expected-outputs:
-          - what: "test_send_unicast_message PASSED"
+          - what: "test_send_254_bytes:PASS"
             where: ${DUT}
-      - test-name: test_send_broadcast_message
+      - test-name: test_send_255_bytes
         expected-outputs:
-          - what: "test_send_broadcast_message PASSED"
+          - what: "test_send_255_bytes:PASS"
             where: ${DUT}
-      - test-name: test_send_empty_message
+      - test-name: test_send_256_bytes
         expected-outputs:
-          - what: "test_send_empty_message PASSED"
+          - what: "test_send_256_bytes:PASS"
             where: ${DUT}
-      - test-name: test_send_max_length_message
+      - test-name: test_send_257_bytes
         expected-outputs:
-          - what: "test_send_max_length_message PASSED"
+          - what: "test_send_257_bytes:PASS"
             where: ${DUT}
-      - test-name: test_send_with_invalid_target
+      - test-name: test_crc_mismatch
         expected-outputs:
-          - what: "test_send_with_invalid_target PASSED"
+          - what: "test_crc_mismatch:PASS"
             where: ${DUT}
-
-      # Priority tests
-      - test-name: test_send_high_priority
+      - test-name: test_one_target_node
         expected-outputs:
-          - what: "test_send_high_priority PASSED"
+          - what: "test_one_target_node:PASS"
             where: ${DUT}
-      - test-name: test_send_med_high_priority
+      - test-name: test_class_of_target_nodes
         expected-outputs:
-          - what: "test_send_med_high_priority PASSED"
+          - what: "test_class_of_target_nodes:PASS"
             where: ${DUT}
-      - test-name: test_send_med_low_priority
+      - test-name: test_rtacp_while_bwacp
         expected-outputs:
-          - what: "test_send_med_low_priority PASSED"
+          - what: "test_rtacp_while_bwacp:PASS"
             where: ${DUT}
-      - test-name: test_send_low_priority
+      - test-name: test_concurrent_bwacp
         expected-outputs:
-          - what: "test_send_low_priority PASSED"
+          - what: "test_concurrent_bwacp:PASS"
             where: ${DUT}
-
-      # Receive tests
-      - test-name: test_receive_timeout
+      - test-name: test_send_46k_bytes
         expected-outputs:
-          - what: "test_receive_timeout PASSED"
-            where: ${DUT}
-      - test-name: test_receive_with_zero_timeout
-        expected-outputs:
-          - what: "test_receive_with_zero_timeout PASSED"
-            where: ${DUT}
-      - test-name: test_receive_with_large_timeout
-        expected-outputs:
-          - what: "test_receive_with_large_timeout PASSED"
+          - what: "test_send_46k_bytes:PASS"
             where: ${DUT}
 
-      # Communication tests
-      - test-name: test_send_and_receive_simple
+      # PSACP: publish/subscribe (test_psacp.c)
+      - test-name: test_publish_to_non_subscribed_topic
         expected-outputs:
-          - what: "test_send_and_receive_simple PASSED"
+          - what: "test_publish_to_non_subscribed_topic:PASS"
             where: ${DUT}
-      - test-name: test_broadcast_communication
+      - test-name: test_publish_broadcast
         expected-outputs:
-          - what: "test_broadcast_communication PASSED"
+          - what: "test_publish_broadcast:PASS"
             where: ${DUT}
-      - test-name: test_multiple_messages
+      - test-name: test_publish_to_subscribed_topic
         expected-outputs:
-          - what: "test_multiple_messages PASSED"
+          - what: "test_publish_to_subscribed_topic:PASS"
             where: ${DUT}
-
-      # ACK tests
-      - test-name: test_send_with_wait_ack
+      - test-name: test_psacp_high_priority_during_bwacp
         expected-outputs:
-          - what: "test_send_with_wait_ack PASSED"
+          - what: "test_psacp_high_priority_during_bwacp:PASS"
             where: ${DUT}
-      - test-name: test_send_without_wait_ack
+      # These two are TEST_IGNORE_MESSAGE("Not yet implemented") stubs, so they report IGNORE
+      # rather than PASS. They are tracked anyway so that this file stays a complete mirror of the
+      # suite; when they get implemented, this task will fail until these are flipped over to
+      # ':PASS' like the rest.
+      - test-name: test_bwacp_unaffected_by_low_priority_psacp_noise
         expected-outputs:
-          - what: "test_send_without_wait_ack PASSED"
+          - what: "test_bwacp_unaffected_by_low_priority_psacp_noise:IGNORE"
             where: ${DUT}
-      - test-name: test_broadcast_cannot_wait_ack
+      - test-name: test_unsubscribe
         expected-outputs:
-          - what: "test_broadcast_cannot_wait_ack PASSED"
-            where: ${DUT}
-
-      # Data type tests
-      - test-name: test_ascii_data
-        expected-outputs:
-          - what: "test_ascii_data PASSED"
-            where: ${DUT}
-      - test-name: test_binary_data
-        expected-outputs:
-          - what: "test_binary_data PASSED"
-            where: ${DUT}
-      - test-name: test_single_byte
-        expected-outputs:
-          - what: "test_single_byte PASSED"
-            where: ${DUT}
-      - test-name: test_numeric_data
-        expected-outputs:
-          - what: "test_numeric_data PASSED"
+          - what: "test_unsubscribe:IGNORE"
             where: ${DUT}
 
-      # RPCACP simple RPC tests
-      - test-name: test_simple_rpc_call
+      # RPCACP: remote procedure calls (test_rpcacp.c)
+      - test-name: test_rpcacp_whoami_function
         expected-outputs:
-          - what: "test_simple_rpc_call PASSED"
+          - what: "test_rpcacp_whoami_function:PASS"
             where: ${DUT}
-      - test-name: test_rpc_with_payload
+      - test-name: test_rpcacp_status_function
         expected-outputs:
-          - what: "test_rpc_with_payload PASSED"
+          - what: "test_rpcacp_status_function:PASS"
             where: ${DUT}
-      - test-name: test_rpc_with_empty_payload
+      - test-name: test_rpcacp_list_function
         expected-outputs:
-          - what: "test_rpc_with_empty_payload PASSED"
+          - what: "test_rpcacp_list_function:PASS"
             where: ${DUT}
-      - test-name: test_rpc_to_invalid_target
+      - test-name: test_rpcacp_invalid_function_id
         expected-outputs:
-          - what: "test_rpc_to_invalid_target PASSED"
+          - what: "test_rpcacp_invalid_function_id:PASS"
             where: ${DUT}
-
-      # Procedure ID tests
-      - test-name: test_procedure_id_zero
+      - test-name: test_rpcacp_too_many_parameters
         expected-outputs:
-          - what: "test_procedure_id_zero PASSED"
+          - what: "test_rpcacp_too_many_parameters:PASS"
             where: ${DUT}
-      - test-name: test_procedure_id_max
+      - test-name: test_rpcacp_invalid_parameters
         expected-outputs:
-          - what: "test_procedure_id_max PASSED"
+          - what: "test_rpcacp_invalid_parameters:PASS"
             where: ${DUT}
-      - test-name: test_procedure_id_mid_range
+      - test-name: test_rpcacp_no_args_no_return
         expected-outputs:
-          - what: "test_procedure_id_mid_range PASSED"
+          - what: "test_rpcacp_no_args_no_return:PASS"
             where: ${DUT}
-      - test-name: test_procedure_id_invalid_negative
+      - test-name: test_rpcacp_uint8_args_uint8_return
         expected-outputs:
-          - what: "test_procedure_id_invalid_negative PASSED"
+          - what: "test_rpcacp_uint8_args_uint8_return:PASS"
             where: ${DUT}
-      - test-name: test_procedure_id_invalid_too_large
+      - test-name: test_rpcacp_uint16_args_uint16_return
         expected-outputs:
-          - what: "test_procedure_id_invalid_too_large PASSED"
+          - what: "test_rpcacp_uint16_args_uint16_return:PASS"
             where: ${DUT}
-
-      # Synchronous/Asynchronous tests
-      - test-name: test_synchronous_call
+      - test-name: test_rpcacp_uint32_args_uint32_return
         expected-outputs:
-          - what: "test_synchronous_call PASSED"
+          - what: "test_rpcacp_uint32_args_uint32_return:PASS"
             where: ${DUT}
-      - test-name: test_synchronous_with_all_priorities
+      - test-name: test_rpcacp_uint64_args_uint64_return
         expected-outputs:
-          - what: "test_synchronous_with_all_priorities PASSED"
+          - what: "test_rpcacp_uint64_args_uint64_return:PASS"
             where: ${DUT}
-      - test-name: test_synchronous_to_multiple_targets
+      - test-name: test_rpcacp_int8_args_int8_return
         expected-outputs:
-          - what: "test_synchronous_to_multiple_targets PASSED"
+          - what: "test_rpcacp_int8_args_int8_return:PASS"
             where: ${DUT}
-      - test-name: test_asynchronous_call
+      - test-name: test_rpcacp_int16_args_int16_return
         expected-outputs:
-          - what: "test_asynchronous_call PASSED"
+          - what: "test_rpcacp_int16_args_int16_return:PASS"
             where: ${DUT}
-      - test-name: test_asynchronous_fire_and_forget
+      - test-name: test_rpcacp_int32_args_int32_return
         expected-outputs:
-          - what: "test_asynchronous_fire_and_forget PASSED"
+          - what: "test_rpcacp_int32_args_int32_return:PASS"
             where: ${DUT}
-      - test-name: test_multiple_asynchronous_calls
+      - test-name: test_rpcacp_int64_args_int64_return
         expected-outputs:
-          - what: "test_multiple_asynchronous_calls PASSED"
+          - what: "test_rpcacp_int64_args_int64_return:PASS"
             where: ${DUT}
-
-      # RPC priority tests
-      - test-name: test_high_priority_rpc
+      - test-name: test_rpcacp_float_args_float_return
         expected-outputs:
-          - what: "test_high_priority_rpc PASSED"
+          - what: "test_rpcacp_float_args_float_return:PASS"
             where: ${DUT}
-      - test-name: test_low_priority_rpc
+      - test-name: test_rpcacp_double_args_double_return
         expected-outputs:
-          - what: "test_low_priority_rpc PASSED"
+          - what: "test_rpcacp_double_args_double_return:PASS"
             where: ${DUT}
-      - test-name: test_priority_order
+      - test-name: test_rpcacp_array_args_array_return
         expected-outputs:
-          - what: "test_priority_order PASSED"
+          - what: "test_rpcacp_array_args_array_return:PASS"
             where: ${DUT}
-
-      # RPC payload tests
-      - test-name: test_small_payload
+      - test-name: test_rpcacp_struct_args_struct_return
         expected-outputs:
-          - what: "test_small_payload PASSED"
+          - what: "test_rpcacp_struct_args_struct_return:PASS"
             where: ${DUT}
-      - test-name: test_medium_payload
+      - test-name: test_rpcacp_string_args_string_return
         expected-outputs:
-          - what: "test_medium_payload PASSED"
+          - what: "test_rpcacp_string_args_string_return:PASS"
             where: ${DUT}
-      - test-name: test_max_payload
+      - test-name: test_rpcacp_async_call
         expected-outputs:
-          - what: "test_max_payload PASSED"
+          - what: "test_rpcacp_async_call:PASS"
             where: ${DUT}
-      - test-name: test_binary_payload
+      - test-name: test_rpcacp_async_call_busy_async
         expected-outputs:
-          - what: "test_binary_payload PASSED"
+          - what: "test_rpcacp_async_call_busy_async:PASS"
             where: ${DUT}
-      - test-name: test_structured_payload
+      - test-name: test_rpcacp_async_call_busy_sync
         expected-outputs:
-          - what: "test_structured_payload PASSED"
+          - what: "test_rpcacp_async_call_busy_sync:PASS"
             where: ${DUT}
-
-      # RPC edge cases
-      - test-name: test_rpc_to_self
+      - test-name: test_rpcacp_async_call_multiple_nodes
         expected-outputs:
-          - what: "test_rpc_to_self PASSED"
+          - what: "test_rpcacp_async_call_multiple_nodes:PASS"
             where: ${DUT}
-      - test-name: test_rapid_rpc_calls
+      - test-name: test_rpcacp_15_parameters
         expected-outputs:
-          - what: "test_rapid_rpc_calls PASSED"
-            where: ${DUT}
-      - test-name: test_alternating_sync_async
-        expected-outputs:
-          - what: "test_alternating_sync_async PASSED"
+          - what: "test_rpcacp_15_parameters:PASS"
             where: ${DUT}
 
-      # PSACP publish tests
-      - test-name: test_simple_publish
+      # Suite-level guard: catches a test binary that dies part way through after having
+      # already logged some passing tests.
+      - test-name: whole-suite-passed
         expected-outputs:
-          - what: "test_simple_publish PASSED"
-            where: ${DUT}
-      - test-name: test_publish_empty_data
-        expected-outputs:
-          - what: "test_publish_empty_data PASSED"
-            where: ${DUT}
-      - test-name: test_publish_max_data
-        expected-outputs:
-          - what: "test_publish_max_data PASSED"
-            where: ${DUT}
-      - test-name: test_publish_to_broadcast_topic
-        expected-outputs:
-          - what: "test_publish_to_broadcast_topic PASSED"
-            where: ${DUT}
-
-      # Topic tests
-      - test-name: test_valid_topic_range
-        expected-outputs:
-          - what: "test_valid_topic_range PASSED"
-            where: ${DUT}
-      - test-name: test_min_valid_topic
-        expected-outputs:
-          - what: "test_min_valid_topic PASSED"
-            where: ${DUT}
-      - test-name: test_max_valid_topic
-        expected-outputs:
-          - what: "test_max_valid_topic PASSED"
-            where: ${DUT}
-      - test-name: test_reserved_topic_areas
-        expected-outputs:
-          - what: "test_reserved_topic_areas PASSED"
-            where: ${DUT}
-
-      # Publish priority tests
-      - test-name: test_high_priority_publish
-        expected-outputs:
-          - what: "test_high_priority_publish PASSED"
-            where: ${DUT}
-      - test-name: test_low_priority_publish
-        expected-outputs:
-          - what: "test_low_priority_publish PASSED"
-            where: ${DUT}
-      - test-name: test_all_priority_levels
-        expected-outputs:
-          - what: "test_all_priority_levels PASSED"
-            where: ${DUT}
-      - test-name: test_high_priority_flag_enabled
-        expected-outputs:
-          - what: "test_high_priority_flag_enabled PASSED"
-            where: ${DUT}
-      - test-name: test_high_priority_flag_disabled
-        expected-outputs:
-          - what: "test_high_priority_flag_disabled PASSED"
-            where: ${DUT}
-      - test-name: test_high_priority_with_low_message_priority
-        expected-outputs:
-          - what: "test_high_priority_with_low_message_priority PASSED"
-            where: ${DUT}
-
-      # Subscribe/receive tests
-      - test-name: test_receive_zero_timeout
-        expected-outputs:
-          - what: "test_receive_zero_timeout PASSED"
-            where: ${DUT}
-      - test-name: test_receive_large_timeout
-        expected-outputs:
-          - what: "test_receive_large_timeout PASSED"
-            where: ${DUT}
-      - test-name: test_publish_and_receive
-        expected-outputs:
-          - what: "test_publish_and_receive PASSED"
-            where: ${DUT}
-      - test-name: test_multiple_publishes
-        expected-outputs:
-          - what: "test_multiple_publishes PASSED"
-            where: ${DUT}
-      - test-name: test_different_topics
-        expected-outputs:
-          - what: "test_different_topics PASSED"
-            where: ${DUT}
-
-      # Publish payload tests
-      - test-name: test_ascii_payload
-        expected-outputs:
-          - what: "test_ascii_payload PASSED"
-            where: ${DUT}
-      - test-name: test_binary_payload
-        expected-outputs:
-          - what: "test_binary_payload PASSED"
-            where: ${DUT}
-      - test-name: test_single_byte_payload
-        expected-outputs:
-          - what: "test_single_byte_payload PASSED"
-            where: ${DUT}
-      - test-name: test_numeric_payload
-        expected-outputs:
-          - what: "test_numeric_payload PASSED"
-            where: ${DUT}
-      - test-name: test_sensor_data_payload
-        expected-outputs:
-          - what: "test_sensor_data_payload PASSED"
-            where: ${DUT}
-
-      # Publish edge cases
-      - test-name: test_rapid_publishes
-        expected-outputs:
-          - what: "test_rapid_publishes PASSED"
-            where: ${DUT}
-      - test-name: test_alternating_topics
-        expected-outputs:
-          - what: "test_alternating_topics PASSED"
-            where: ${DUT}
-      - test-name: test_broadcast_and_targeted
-        expected-outputs:
-          - what: "test_broadcast_and_targeted PASSED"
-            where: ${DUT}
-      - test-name: test_priority_combinations
-        expected-outputs:
-          - what: "test_priority_combinations PASSED"
-            where: ${DUT}
-
-      # BWACP block write tests
-      - test-name: test_small_block_write
-        expected-outputs:
-          - what: "test_small_block_write PASSED"
-            where: ${DUT}
-      - test-name: test_empty_block_write
-        expected-outputs:
-          - what: "test_empty_block_write PASSED"
-            where: ${DUT}
-      - test-name: test_single_byte_block
-        expected-outputs:
-          - what: "test_single_byte_block PASSED"
-            where: ${DUT}
-      - test-name: test_block_write_to_invalid_target
-        expected-outputs:
-          - what: "test_block_write_to_invalid_target PASSED"
-            where: ${DUT}
-
-      # Block ID tests
-      - test-name: test_block_id_zero
-        expected-outputs:
-          - what: "test_block_id_zero PASSED"
-            where: ${DUT}
-      - test-name: test_block_id_max
-        expected-outputs:
-          - what: "test_block_id_max PASSED"
-            where: ${DUT}
-      - test-name: test_sequential_block_ids
-        expected-outputs:
-          - what: "test_sequential_block_ids PASSED"
-            where: ${DUT}
-      - test-name: test_random_block_ids
-        expected-outputs:
-          - what: "test_random_block_ids PASSED"
-            where: ${DUT}
-      - test-name: test_block_id_invalid_negative
-        expected-outputs:
-          - what: "test_block_id_invalid_negative PASSED"
-            where: ${DUT}
-
-      # Block size tests
-      - test-name: test_medium_block
-        expected-outputs:
-          - what: "test_medium_block PASSED"
-            where: ${DUT}
-      - test-name: test_large_block
-        expected-outputs:
-          - what: "test_large_block PASSED"
-            where: ${DUT}
-      - test-name: test_very_large_block
-        expected-outputs:
-          - what: "test_very_large_block PASSED"
-            where: ${DUT}
-      - test-name: test_firmware_size_block
-        expected-outputs:
-          - what: "test_firmware_size_block PASSED"
-            where: ${DUT}
-
-      # Block write priority tests
-      - test-name: test_high_priority_block
-        expected-outputs:
-          - what: "test_high_priority_block PASSED"
-            where: ${DUT}
-      - test-name: test_low_priority_block
-        expected-outputs:
-          - what: "test_low_priority_block PASSED"
-            where: ${DUT}
-      - test-name: test_all_priorities
-        expected-outputs:
-          - what: "test_all_priorities PASSED"
-            where: ${DUT}
-
-      # Frame tests
-      - test-name: test_data_requiring_multiple_frames
-        expected-outputs:
-          - what: "test_data_requiring_multiple_frames PASSED"
-            where: ${DUT}
-      - test-name: test_exactly_one_frame
-        expected-outputs:
-          - what: "test_exactly_one_frame PASSED"
-            where: ${DUT}
-      - test-name: test_just_over_one_frame
-        expected-outputs:
-          - what: "test_just_over_one_frame PASSED"
-            where: ${DUT}
-
-      # Block write data tests
-      - test-name: test_structured_binary_data
-        expected-outputs:
-          - what: "test_structured_binary_data PASSED"
-            where: ${DUT}
-      - test-name: test_null_bytes_in_data
-        expected-outputs:
-          - what: "test_null_bytes_in_data PASSED"
-            where: ${DUT}
-
-      # Block write edge cases
-      - test-name: test_write_to_multiple_targets
-        expected-outputs:
-          - what: "test_write_to_multiple_targets PASSED"
-            where: ${DUT}
-      - test-name: test_write_to_broadcast
-        expected-outputs:
-          - what: "test_write_to_broadcast PASSED"
-            where: ${DUT}
-      - test-name: test_consecutive_blocks_same_target
-        expected-outputs:
-          - what: "test_consecutive_blocks_same_target PASSED"
-            where: ${DUT}
-      - test-name: test_interleaved_targets
-        expected-outputs:
-          - what: "test_interleaved_targets PASSED"
-            where: ${DUT}
-      - test-name: test_same_block_id_different_targets
-        expected-outputs:
-          - what: "test_same_block_id_different_targets PASSED"
-            where: ${DUT}
-      - test-name: test_rapid_block_writes
-        expected-outputs:
-          - what: "test_rapid_block_writes PASSED"
-            where: ${DUT}
-      - test-name: test_varying_block_sizes
-        expected-outputs:
-          - what: "test_varying_block_sizes PASSED"
+          - what: "100% tests passed, 0 tests failed"
             where: ${DUT}

@@ -43,15 +43,13 @@ bool join_thread(thread_handle_t handle, uint32_t timeout_ms)
 #endif
 }
 
+// The critical section helpers are only used by the atomic fallbacks below, which in turn are
+// only compiled on platforms without native atomics. Defining them anywhere else trips
+// -Werror=unused-function.
+#if !defined(_WIN32) && !defined(__GNUC__) && !defined(__clang__)
 static uint32_t _critical_section_enter(void)
 {
-#ifdef _WIN32
-    // On Windows with native atomics, critical sections are not needed
-    return 0;
-#elif defined(__GNUC__) || defined(__clang__)
-    // On POSIX with native atomics, critical sections are not needed
-    return 0;
-#elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
+#if defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
     // ARM Cortex-M: Disable interrupts using CPSID i (Change Processor State, Interrupt Disable)
     uint32_t primask;
     __asm__ volatile ("mrs %0, primask" : "=r" (primask));
@@ -72,13 +70,7 @@ static uint32_t _critical_section_enter(void)
 
 static void _critical_section_exit(uint32_t state)
 {
-#ifdef _WIN32
-    // On Windows with native atomics, critical sections are not needed
-    (void)state;
-#elif defined(__GNUC__) || defined(__clang__)
-    // On POSIX with native atomics, critical sections are not needed
-    (void)state;
-#elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
+#if defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || defined(__ARM_ARCH_6M__)
     // ARM Cortex-M: Restore interrupt state using PRIMASK
     __asm__ volatile ("msr primask, %0" : : "r" (state) : "memory");
 #elif defined(__ARM_ARCH)
@@ -89,6 +81,7 @@ static void _critical_section_exit(uint32_t state)
     (void)state;
 #endif
 }
+#endif  // !_WIN32 && !__GNUC__ && !__clang__
 
 void atomic_store(atomic_uint32_t *ptr, uint32_t value)
 {
@@ -112,10 +105,10 @@ uint32_t atomic_fetch_or(atomic_uint32_t *ptr, uint32_t value)
     return __atomic_fetch_or(ptr, value, __ATOMIC_SEQ_CST);
 #else
     // Bare metal or unsupported platform: Use critical section
-    uint32_t state = critical_section_enter();
+    uint32_t state = _critical_section_enter();
     uint32_t old_value = *ptr;
     *ptr = old_value | value;
-    critical_section_exit(state);
+    _critical_section_exit(state);
     return old_value;
 #endif
 }

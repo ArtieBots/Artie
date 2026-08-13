@@ -736,3 +736,31 @@ def start_docker_container(image_name: str|DockerImageName, cmd: str|None, remov
     common.info(f"Running command: {cmd}")
     container = client.containers.run(str(image_name), cmd, remove=remove, detach=True, **kwargs)
     return container
+
+def wait_for_container_to_exit(container, timeout_s: float, poll_interval_s=1.0) -> bool:
+    """
+    Block until the given container has stopped running, or until `timeout_s` has elapsed.
+
+    Returns `True` if the container is done running (or is already gone), `False` if we
+    gave up waiting on it.
+
+    Args
+    ----
+    - container: A `Container` object from the `docker` package, such as `start_docker_container()` returns.
+    - timeout_s: How long (in seconds) to wait for the container before giving up.
+    - poll_interval_s: How long (in seconds) to wait between checks of the container's status.
+    """
+    started_at = time.time()
+    while time.time() - started_at < timeout_s:
+        try:
+            container.reload()
+        except docker_errors.NotFound:
+            # The container has exited and has already been cleaned up
+            return True
+
+        if container.status not in ("created", "running"):
+            return True
+
+        time.sleep(poll_interval_s)
+
+    return False

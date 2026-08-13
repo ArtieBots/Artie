@@ -19,8 +19,6 @@
 #include "rtacp.h"
 #include "translationlayer.h"
 
-static const char *mcast_group = "239.0.0.1"; // Suitable multicast group for local testing
-
 static void _complete_frame(artie_can_context_t *context, const char *recvbuf)
 {
     // Convert from raw buffer to frame struct
@@ -212,9 +210,9 @@ static artie_can_error_t _init_udp_mcast(artie_can_context_t *context)
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _send_udp_mcast(void *ctx, const artie_can_frame_t *frame)
+static artie_can_error_t _send_udp_mcast(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
-    if (ctx == NULL)
+    if (context == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -223,7 +221,6 @@ static artie_can_error_t _send_udp_mcast(void *ctx, const artie_can_frame_t *fra
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
 
-    artie_can_context_t *context = (artie_can_context_t *)ctx;
     artie_can_udp_mcast_context_t *mcast_ctx = (artie_can_udp_mcast_context_t *)(context->backend_context);
 
     // Set up the destination address

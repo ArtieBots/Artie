@@ -29,9 +29,9 @@
 // (included above) to avoid a circular #include between this file and context.h.
 
 // Standard Procedure IDs (Shared across all compliant devices; 0x00-0x0F is reserved)
-#define ARTIE_CAN_RPC_ID_WHOAMI    0x00U
-#define ARTIE_CAN_RPC_ID_STATUS    0x01U
-#define ARTIE_CAN_RPC_ID_LIST      0x02U
+#define ARTIE_CAN_RPC_ID_WHOAMI    0x00U ///< Identify the node (name, address, firmware version). Answered internally.
+#define ARTIE_CAN_RPC_ID_STATUS    0x01U ///< Report node uptime and error flags. Answered internally.
+#define ARTIE_CAN_RPC_ID_LIST      0x02U ///< Page through this node's registered RPC signatures. Answered internally.
 
 /** Highest procedure ID that is reserved for standard/future use; device-specific IDs start after this. */
 #define ARTIE_CAN_RPCACP_RESERVED_ID_MAX 0x0FU
@@ -116,17 +116,17 @@ typedef struct {
  * @brief Response structure for the WHOAMI procedure.
  */
 typedef struct {
-    char *node_name;        // Human-readable name of the responding node
-    uint8_t node_address;   // Artie CAN bus address of this Node
-    char *fw_version;       // Firmware version running on this Node
+    char *node_name;        ///< Human-readable name of the responding node
+    uint8_t node_address;   ///< Artie CAN bus address of this Node
+    char *fw_version;       ///< Firmware version running on this Node
 } artie_can_whoami_response_t;
 
 /**
  * @brief Response structure for the STATUS procedure.
  */
 typedef struct {
-    uint64_t uptime_ms;     // Total runtime in milliseconds
-    uint32_t err_flags;     // Bit mask of node-specific error flags
+    uint64_t uptime_ms;     ///< Total runtime in milliseconds
+    uint32_t err_flags;     ///< Bit mask of node-specific error flags
 } artie_can_status_response_t;
 
 /**

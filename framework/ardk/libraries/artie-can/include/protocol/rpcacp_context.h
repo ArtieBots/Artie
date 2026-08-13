@@ -50,9 +50,20 @@ typedef struct {
     bool optional;                   ///< true if parameter may be omitted
 } artie_can_rpc_param_descriptor_t;
 
-// Void * return type signature. The void * return should be cast according to the return_descriptor in the signature.
-// The function should write its result into return_buffer (of return_buffer_size bytes) and return return_buffer on
-// success, or NULL to indicate the request could not be serviced (reported to the caller as EINVAL).
+/**
+ * @brief Function signature for a registered device-specific RPC procedure.
+ *
+ * The void* return should be cast according to the return_descriptor in the signature. The
+ * function should write its result into return_buffer (of return_buffer_size bytes) and return
+ * return_buffer on success, or NULL to indicate the request could not be serviced (reported to
+ * the caller as EINVAL).
+ *
+ * @param params Array of pointers to the decoded parameter values, one per entry in the signature's params array.
+ * @param param_count Number of entries in params.
+ * @param return_buffer Buffer the function should write its result into, if it has a non-NULL return_descriptor.
+ * @param return_buffer_size Size of return_buffer, in bytes.
+ * @return return_buffer on success, or NULL if the request could not be serviced.
+ */
 typedef void *(*artie_can_rpc_function_t)(const void **params, uint8_t param_count, void *return_buffer, size_t return_buffer_size);
 
 /**

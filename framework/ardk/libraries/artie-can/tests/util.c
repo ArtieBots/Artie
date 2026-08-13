@@ -1,5 +1,8 @@
 #include <stdbool.h>
 #include <stdint.h>
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
 #include "unity.h"
 #include "artie_can.h"
 #include "util.h"

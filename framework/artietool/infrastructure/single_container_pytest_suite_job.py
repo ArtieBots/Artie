@@ -3,7 +3,6 @@ from . import result
 from . import test_job
 from .. import common
 from .. import docker
-import time
 
 
 class PytestTest:
@@ -119,9 +118,11 @@ class SingleContainerPytestSuiteJob(test_job.TestJob):
         for step in self.steps:
             step.link_pids_to_expected_outs(args, {docker_image_name: self._dut_container.id})
 
-        # Give some time for the container to initialize before we start testing it
-        common.info("Waiting for DUT to come online...")
-        time.sleep(min(args.test_timeout_s / 3, 10))
+        # The whole suite runs inside the DUT, and we check each test's result by scraping the
+        # DUT's logs afterwards, so we need to let the suite run to completion before we start.
+        common.info("Waiting for the test suite to finish running inside the DUT...")
+        if not docker.wait_for_container_to_exit(self._dut_container, args.test_timeout_s):
+            common.warning(f"DUT is still running after {args.test_timeout_s}s. Checking whatever output it has produced so far; if tests fail spuriously, try raising --test-timeout-s.")
 
     def teardown(self, args, results: list[result.TestResult]):
         """
