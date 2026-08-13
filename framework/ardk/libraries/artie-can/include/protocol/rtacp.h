@@ -22,8 +22,17 @@
 /** The RTACP protocol ID */
 #define ARTIE_CAN_RTACP_PROTOCOL_ID 0x00U
 
-/** The timeout in ms for waiting for an ACK */
-#define ARTIE_CAN_RTACP_ACK_TIMEOUT_MS 1U
+/**
+ * The timeout in ms for waiting for an ACK.
+ *
+ * This has to cover the full round trip: our DATA frame reaching the peer, the peer's main loop
+ * noticing it (artie_can_tick() runs on the order of once per millisecond, and the ACK is sent from
+ * the main thread rather than the ISR), and the ACK travelling back to us. One millisecond does not
+ * leave room for any of that and times out on ACKs that are in fact on their way, which shows up as
+ * a spurious ARTIE_CAN_ERR_TIMEOUT out of artie_can_tick(). RTACP is still the low-latency protocol
+ * here - this is an order of magnitude below ARTIE_CAN_RPCACP_ACK_TIMEOUT_MS.
+ */
+#define ARTIE_CAN_RTACP_ACK_TIMEOUT_MS 10U
 
 /**
  * @brief Enumeration for RTACP frame types.

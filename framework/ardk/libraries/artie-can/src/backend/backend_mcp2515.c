@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include "backend.h"
 #include "backend_mcp2515_context.h"
 #include "backend_mcp2515.h"
@@ -34,9 +35,9 @@ static artie_can_error_t _init_mcp2515(artie_can_context_t *context)
     return ARTIE_CAN_ERR_NONE;
 }
 
-static artie_can_error_t _send_mcp2515(void *ctx, const artie_can_frame_t *frame)
+static artie_can_error_t _send_mcp2515(artie_can_context_t *context, const artie_can_frame_t *frame)
 {
-    if (ctx == NULL)
+    if (context == NULL)
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
@@ -44,9 +45,6 @@ static artie_can_error_t _send_mcp2515(void *ctx, const artie_can_frame_t *frame
     {
         return ARTIE_CAN_ERR_INVALID_ARG;
     }
-
-    // Cast context
-    artie_can_context_t *context = (artie_can_context_t *)ctx;
 
     // Send the frame using the MCP2515 driver
     return driver_mcp2515_send(context, frame);

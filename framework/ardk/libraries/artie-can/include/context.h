@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "err.h."
+#include "err.h"
 #include "rtacp_context.h"
 #include "rpcacp_context.h"
 #include "bwacp_context.h"
@@ -18,8 +18,11 @@
 /** The callback function that gets executed whenever a non-filtered CAN frame is received. */
 typedef void (*artie_can_rx_callback_t)(const artie_can_frame_t *frame);
 
-/** The function that the backend will call from an ISR when the CAN peripheral generates an interrupt. Context is an artie_can_context_t. */
-typedef artie_can_error_t (*driver_isr_handler_t)(void *context);
+/** Forward declaration so that the ISR handler below can be typed; defined at the bottom of this file. */
+struct artie_can_context_s;
+
+/** The function that the backend will call from an ISR when the CAN peripheral generates an interrupt. */
+typedef artie_can_error_t (*driver_isr_handler_t)(struct artie_can_context_s *context);
 
 /**
  * @brief Enumeration of supported protocols in the Artie CAN library.
@@ -47,7 +50,7 @@ typedef struct {
  * @brief Struct for Artie CAN library's state and configuration.
  *
  */
-typedef struct {
+typedef struct artie_can_context_s {
     void *backend_context;                  ///< Pointer to backend-specific context data (which could be custom)
     rtacp_context_t rtacp_context;          ///< Context for RTACP protocol handling.
     rpcacp_context_t rpcacp_context;        ///< Context for RPCACP protocol handling.

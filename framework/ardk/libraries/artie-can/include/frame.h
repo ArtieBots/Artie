@@ -50,12 +50,18 @@
 
 // Detect compiler and define PACKED macros
 #if defined(_MSC_VER)
+    /** Placed before a packed struct definition; MSVC packs via a preceding #pragma instead of an attribute. */
     #define PACKED_STRUCT_BEGIN __pragma(pack(push, 1))
+    /** Placed after a packed struct definition to restore the previous MSVC pack alignment. */
     #define PACKED_STRUCT_END   __pragma(pack(pop))
+    /** Placed between `struct` and `{` in a packed struct definition; a no-op on MSVC, since packing is done via PACKED_STRUCT_BEGIN/END instead. */
     #define PACKED
 #else
+    /** Placed before a packed struct definition; a no-op on GCC/Clang, since packing is done via the PACKED attribute instead. */
     #define PACKED_STRUCT_BEGIN
+    /** Placed after a packed struct definition; a no-op on GCC/Clang, since packing is done via the PACKED attribute instead. */
     #define PACKED_STRUCT_END
+    /** Placed between `struct` and `{` in a packed struct definition to disable padding, via the compiler's packed attribute. */
     #define PACKED __attribute__((packed))
 #endif
 

@@ -274,16 +274,21 @@ A sanity test job looks like this:
 
 ### Pytest Test Job
 
-A pytest test job is designed for Python projects with pytest-based unit tests. It runs pytest once in a Docker container and then checks the output for each individual test's pass/fail status:
+A pytest test job runs a whole test suite once inside a Docker container and then checks that container's
+output for each individual test's pass/fail status. Despite the name, the suite doesn't have to be a pytest
+suite - anything that runs the tests and prints a recognizable line per test works, such as `ctest -V` over a
+Unity suite (see [artie-can-unit-tests](./test-tasks/libraries/artie-can-unit-tests.yaml)):
 
-- *job*: single-container-pytest-suite; this runs pytest once inside a Docker container to execute the entire test suite,
+- *job*: single-container-pytest-suite; this runs the suite once inside a Docker container,
          then checks the container's output for each individual test result. Each test is tracked separately in the final test report.
 - *docker-image-under-test*: The `DUT` (Docker image Under Test). Can be either a `dependency`
-          (with name and producing-task) or a hard-coded Docker image name. The image should have pytest installed
-          and the test files present. It should run pytest and then sleep forever.
-- *cmd-to-run-in-dut*: The pytest command to run in the container (e.g., `"pytest tests/ -v --tb=short"`).
-- *steps*: Each step represents one individual pytest test that you want to track separately:
-  - *test-name*: The name of the individual test (should match the pytest test function name).
+          (with name and producing-task) or a hard-coded Docker image name. The image should have the test
+          runner and the test files present. The container is expected to run the suite and then exit - we wait
+          for it to finish (up to `--test-timeout-s`) before checking its output.
+- *cmd-to-run-in-dut*: (Optional) The command to run in the container (e.g., `"pytest tests/ -v --tb=short"`).
+          If omitted, the image's default command is used.
+- *steps*: Each step represents one individual test that you want to track separately:
+  - *test-name*: The name of the individual test (should match the test function name).
   - *expected-outputs*: A list of `what` and `where` entries that define what output indicates test success.
       * *what*: The string to expect in the output/logs (typically `"test_name PASSED"`).
       * *where*: The container we are reading from (typically `${DUT}`).

@@ -31,6 +31,9 @@ typedef enum {
     ARTIE_CAN_ERR_NO_RESPONSE = (1 << 12),  /**< No response received when one was expected (e.g. no ACK received for a sent frame that requires ACKs) */
 } artie_can_error_t;
 
+/** Mask of error codes that are considered transient and worth retrying (timeouts, busy bus, full buffers, missing responses). */
 #define ARTIE_CAN_ERR_RETRIABLE_MASK (ARTIE_CAN_ERR_TIMEOUT | ARTIE_CAN_ERR_SEND_BUSY | ARTIE_CAN_ERR_NO_SPACE | ARTIE_CAN_ERR_NO_RESPONSE)
+/** True if err has at least one retriable error flag set (it may also have non-retriable flags set). */
 #define ARTIE_CAN_ERR_AT_LEAST_ONE_RETRIABLE(err) ((err) & ARTIE_CAN_ERR_RETRIABLE_MASK)
+/** True if err is non-zero and every flag set in it is retriable. */
 #define ARTIE_CAN_ERR_ONLY_RETRIABLE(err) ((err) && !((err) & ~ARTIE_CAN_ERR_RETRIABLE_MASK))

@@ -20,6 +20,9 @@ typedef enum {
     RTACP_STATE_WAITING_ACK,   ///< The node has sent a frame and is waiting for an ACK.
 } rtacp_state_t;
 
+/**
+ * @brief ISR flags for RTACP protocol.
+ */
 typedef enum {
     RTACP_ISR_FLAG_NONE = 0,                 ///< No special conditions for this ISR call
     RTACP_ISR_FLAG_PENDING_ACK_RX = 1 << 0,  ///< We received an ACK in the ISR that we need to process from the main thread context

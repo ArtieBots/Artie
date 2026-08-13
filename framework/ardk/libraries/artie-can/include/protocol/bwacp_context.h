@@ -17,6 +17,9 @@
 /** Maximum number of times a DATA frame can be repeated */
 #define ARTIE_CAN_BWACP_MAX_REPEATS (5U)
 
+/** Maximum number of times a whole transfer can be restarted after a receiver NACKs the COMPLETE frame */
+#define ARTIE_CAN_BWACP_MAX_TRANSFER_RESTARTS (3U)
+
 /**
  * @brief States that the BWACP state machine can be in for a given node.
  *
@@ -60,7 +63,11 @@ typedef struct {
     uint32_t send_address;                  ///< Buffer offset where the receiving node(s) should write the data
     uint8_t send_target_address;            ///< Target node address (or 0x3F for multicast)
     uint8_t send_target_class;              ///< Target class bitmask (for multicast)
-    bool send_parity;                       ///< Current parity bit for DATA frames
+    bool send_parity;                       ///< Parity bit to use for the next fresh DATA frame
+    uint32_t last_sent_offset;              ///< Payload offset of the most recently transmitted DATA frame (used to build repeats without disturbing the send cursor)
+    bool last_sent_parity;                  ///< Parity bit of the most recently transmitted DATA frame
+    bool have_sent_data_frame;              ///< Whether at least one DATA frame has been transmitted for the current transfer
+    uint32_t transfer_restart_count;        ///< Number of times the current transfer has been restarted from offset 0
     uint32_t send_crc24;                    ///< CRC24 over the payload
     uint32_t expected_ack_count;            ///< Number of ACKs expected after READY, DATA, or COMPLETE frames
     uint32_t received_ack_count;            ///< Number of ACKs received so far
@@ -78,6 +85,7 @@ typedef struct {
     uint32_t receive_address;               ///< Buffer offset where received data should be written
     uint8_t receive_sender_address;         ///< Address of the sender
     bool receive_expected_parity;           ///< Expected parity bit for next DATA frame
+    bool receive_accepted_any_frame;        ///< Whether at least one DATA frame has been accepted for the current transfer (a repeat can only be a duplicate if we have already accepted something)
     uint32_t receive_crc24;                 ///< Expected CRC24 for the received data
     bool receive_ready_interrupt;           ///< Whether the READY frame had the interrupt bit set
     uint8_t sending_node_address;           ///< The address of the node we are receiving from

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include "err.h"
 #include "frame.h"
 
@@ -22,20 +23,21 @@ size_t cb_get_count(void);
 /**
  * @brief Read a frame from the circular buffer if there is one.
  *
- * If the circular buffer has no more frames to read, returns ARTIE_CAN_ERR_NO_DATA.
- * Otherwise, byte-by-byte copies the next frame from the buffer into the output pointer.
+ * Byte-by-byte copies the next frame from the buffer into the output pointer.
  *
+ * @param out Pointer to the artie_can_frame_t struct to copy the read frame into.
+ * @return ARTIE_CAN_ERR_NONE on success, or ARTIE_CAN_ERR_NO_DATA if the buffer has no frames to read.
  */
 artie_can_error_t cb_read(artie_can_frame_t *out);
 
 /**
  * @brief Write a frame to the circular buffer.
  *
- * If inserting will overwrite a frame that has not been read, ARTIE_CAN_NO_SPACE is returned
- * and the frame is not written to the buffer.
- *
  * If an insertion is successful, it is done by means of a byte-by-byte copy of the frame,
  * allowing the caller to free the input frame.
  *
+ * @param in Pointer to the artie_can_frame_t struct to copy into the buffer.
+ * @return ARTIE_CAN_ERR_NONE on success, or ARTIE_CAN_ERR_NO_SPACE if inserting would overwrite
+ * a frame that has not yet been read.
  */
 artie_can_error_t cb_write(const artie_can_frame_t *in);

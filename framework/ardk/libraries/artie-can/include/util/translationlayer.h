@@ -24,26 +24,33 @@
 #endif
 
 // Platform-specific definitions for sockets
+/** Platform-independent socket handle type. */
 #ifdef _WIN32
     typedef SOCKET socket_t;
+    /** Value a socket_t holds when it does not refer to an open socket. */
     #define INVALID_SOCKET_VALUE INVALID_SOCKET
+    /** Return value used by socket_t functions to indicate failure. */
     #define SOCKET_ERROR_VALUE SOCKET_ERROR
 #else
     typedef int socket_t;
+    /** Value a socket_t holds when it does not refer to an open socket. */
     #define INVALID_SOCKET_VALUE -1
+    /** Return value used by socket_t functions to indicate failure. */
     #define SOCKET_ERROR_VALUE -1
 #endif
 
 // Platform-independent socket type aliases
-typedef struct sockaddr_in sockaddr_in_t;
-typedef struct sockaddr sockaddr_t;
-typedef struct ip_mreq ip_mreq_t;
-typedef struct timeval timeval_t;
+typedef struct sockaddr_in sockaddr_in_t;  ///< IPv4 socket address structure.
+typedef struct sockaddr sockaddr_t;        ///< Generic socket address structure.
+typedef struct ip_mreq ip_mreq_t;          ///< IPv4 multicast group membership request structure.
+typedef struct timeval timeval_t;          ///< Seconds/microseconds time value structure, used for socket timeouts.
 #ifdef _WIN32
-    typedef int socklen_t;
+    typedef int socklen_t; ///< Length type for socket address structures (already provided by POSIX headers; defined here for Windows).
 #endif
 
-// Platform-independent socket shutdown modes
+/**
+ * @brief Platform-independent socket shutdown modes.
+ */
 typedef enum {
     SHUTDOWN_RECEIVE = 0,  ///< Stop receiving data
     SHUTDOWN_SEND = 1,     ///< Stop sending data
@@ -51,25 +58,33 @@ typedef enum {
 } socket_shutdown_mode_t;
 
 // Platform-specific definitions for threads
+/** Platform-independent thread handle type. */
 #ifdef _WIN32
     typedef HANDLE thread_handle_t;
+    /** Value a thread_handle_t holds when it does not refer to a running thread. */
     #define INVALID_THREAD_HANDLE NULL
 #else
     typedef pthread_t thread_handle_t;
+    /** Value a thread_handle_t holds when it does not refer to a running thread. */
     #define INVALID_THREAD_HANDLE 0
 #endif
 
 // Platform-specific sleep functions
+/** Sleep the calling thread for ms milliseconds. */
 #ifdef _WIN32
     #define SLEEP_MS(ms) Sleep(ms)
-    #define SLEEP_US(us) Sleep((us) / 1000)
 #else
     #define SLEEP_MS(ms) usleep((ms) * 1000)
+#endif
+/** Sleep the calling thread for us microseconds. */
+#ifdef _WIN32
+    #define SLEEP_US(us) Sleep((us) / 1000)
+#else
     #define SLEEP_US(us) usleep(us)
 #endif
 
 // Platform-specific atomic type definitions
-// We use volatile uint32_t for atomic operations on all platforms
+/** A uint32_t that is safe to use with the atomic_* functions below. We use volatile uint32_t for atomic operations on all platforms. */
 typedef volatile uint32_t atomic_uint32_t;
 
 /**

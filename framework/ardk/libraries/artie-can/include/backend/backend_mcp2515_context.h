@@ -48,6 +48,5 @@ typedef struct {
     uint8_t read_byte;                          ///< The most recently read byte from SPI, updated by the write_byte function.
     uint8_t rx_buffer[BYTES_IN_MCP1515_CAN_FRAME]; ///< Buffer for storing the bytes read from the MCP2515 when receiving a frame, which will then be parsed and fed up to the appropriate protocol handler.
 
-    // Configuration struct for the MCP2515
-    driver_mcp2515_config_t mcp2515_config;
+    driver_mcp2515_config_t mcp2515_config; ///< Configuration struct for the MCP2515.
 } artie_can_mcp2515_context_t;

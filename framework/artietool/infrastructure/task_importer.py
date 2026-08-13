@@ -738,6 +738,12 @@ def _import_task(fpath: str) -> task.Task:
         with open(fpath, 'r') as f:
             task_config = yaml.load(f, yaml.FullLoader)
 
+        if task_config is None:
+            # An empty YAML file is a placeholder for a task that hasn't been written yet.
+            # Skip it rather than taking down every other task with it.
+            print(f"Skipping {fpath}: file is empty.")
+            return None
+
         _validate_dict(task_config, 'type')
         _validate_dict(task_config, 'steps')
         task_type = task_config['type']
@@ -769,7 +775,9 @@ def import_tasks(dpath: str) -> List[task.Task]:
     tasks = []
     for fpath in fpaths:
         t = _import_task(fpath)
-        if t.name in task_to_yaml_dict:
+        if t is None:
+            continue
+        elif t.name in task_to_yaml_dict:
             raise FileExistsError(f"Already have a task with the name {t.name}. Task names must be unique. Offending YAML files: {fpath} and {task_to_yaml_dict[t.name]}")
         else:
             task_to_yaml_dict[t.name] = fpath
