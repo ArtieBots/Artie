@@ -147,6 +147,10 @@ endif()
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+
+    # The integration-test node binary. Built alongside the unit tests (and so shipped in the same
+    # test image), but not registered with CTest - it is driven from Docker compose instead.
+    add_subdirectory(itest)
 endif()
 
 # Documentation (Doxygen)
