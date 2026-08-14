@@ -63,7 +63,7 @@ class CollectedHardwareTestSteps:
     """
     The logic that we run inside the single hardware test job.
     """
-    def __init__(self, steps: List[test_job.HWTest]) -> None:
+    def __init__(self, steps: List[HWTest]) -> None:
         self.steps = steps
         self.job_def = None  # Filled in during test setup
         self.job_name = None  # Filled in during __call__
@@ -150,7 +150,7 @@ class CollectedHardwareTestSteps:
         else:
             return default
 
-    def _convert_test_into_script(self, args, artie_id: str, test_def: test_job.HWTest) -> str:
+    def _convert_test_into_script(self, args, artie_id: str, test_def: HWTest) -> str:
         """
         Returns a single test's contents as lines in a script.
 
@@ -343,7 +343,7 @@ data:
         self.steps.extend(other.steps)
 
 class HardwareTestJob(test_job.TestJob):
-    def __init__(self, steps: List[test_job.HWTest]) -> None:
+    def __init__(self, steps: List[HWTest]) -> None:
         # Create a single super-step from the list of HWTests we are passed (to be compatable with the rest of the test infrastructure)
         single_step = CollectedHardwareTestSteps(steps)
         steps = [single_step]
