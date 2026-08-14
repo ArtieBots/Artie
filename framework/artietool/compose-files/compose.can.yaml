@@ -3,35 +3,42 @@ networks:
   can-itest:
     external: true
 
+# Two long-lived Artie CAN peer nodes, each in its own container, sharing a UDP multicast bus over
+# the can-itest bridge network. The third node (address 0x01) is the one-shot scenario driver that
+# the can-integration-tests task runs per test step, so it is not declared here.
+#
+# Node addresses must stay unique across all three: the UDP multicast backend filters out its own
+# traffic by comparing each frame's source address against its own node address, so two nodes
+# sharing an address would silently discard each other's frames.
 services:
-  # CAN server node - listens for messages
-  can-server:
-    container_name: can-itest-server
-    image: ${ARTIE_CLI_TEST_IMAGE}
-    command: >
-      sh -c "
-        echo 'Starting CAN server on port 5555...' &&
-        artie-cli can rtacp-receive
-          --node-address 0x02
-          --mock
-          --mock-host 0.0.0.0
-          --mock-port 5555
-          --mock-server
-          --timeout 30000
-      "
+  can-node-2:
+    container_name: can-itest-node-2
+    image: ${ARTIE_CAN_TEST_IMAGE}
+    command: /artie-can/build/itest/itest_node --role peer --address 0x02
     networks:
       - can-itest
-    expose:
-      - 5555
     environment:
       - ARTIE_RUN_MODE=integration
       - ARTIE_LOG_LEVEL=DEBUG
-      - ARTIE_CAN_MOCK_HOST=0.0.0.0
-      - ARTIE_CAN_MOCK_PORT=5555
-      - ARTIE_CAN_MOCK_SERVER=true
     healthcheck:
-      test: ["CMD-SHELL", "timeout 5 sh -c '</dev/tcp/localhost/5555' || exit 1"]
+      test: ["CMD-SHELL", "pgrep itest_node > /dev/null || exit 1"]
       interval: 2s
       timeout: 5s
       retries: 10
-      start_period: 5s
+      start_period: 2s
+
+  can-node-3:
+    container_name: can-itest-node-3
+    image: ${ARTIE_CAN_TEST_IMAGE}
+    command: /artie-can/build/itest/itest_node --role peer --address 0x03
+    networks:
+      - can-itest
+    environment:
+      - ARTIE_RUN_MODE=integration
+      - ARTIE_LOG_LEVEL=DEBUG
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep itest_node > /dev/null || exit 1"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 2s

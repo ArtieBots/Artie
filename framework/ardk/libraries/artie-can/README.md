@@ -287,6 +287,46 @@ artie_can_whoami_response_t whoami;
 artie_can_rpcacp_get_whoami_result(&node1, &whoami); // whoami.node_name == "node2", etc.
 ```
 
+## Testing
+
+There are two suites, and they test different things.
+
+The **unit tests** (`tests/`) are Unity tests that stand several nodes up inside a single process
+on the UDP multicast backend. Run them locally with `build_and_test_c.ps1`, or in a container via
+`artie-tool test artie-can-unit-tests`. Because every node shares one process, frames never actually
+leave it - what these cover is the protocol state machines.
+
+The **integration tests** (`itest/`) close that gap by putting each node in its own container, so
+frames really do cross a network. `itest/itest_node.c` builds a single binary with two roles: a
+long-lived `peer` that answers whatever it is sent (echoing RTACP frames, acknowledging PSACP
+publishes and completed BWACP blocks, and servicing an ECHO RPC), and a one-shot `driver` that runs
+one scenario, decides pass/fail, and prints `ITEST <scenario>:PASS`. Docker compose hosts two peers
+(addresses `0x02` and `0x03`) and each test step runs a driver as node `0x01`:
+
+```bash
+artie-tool test can-integration-tests
+```
+
+To drive it by hand instead - useful when adding a scenario:
+
+```bash
+docker network create can-itest
+docker run -d --name can-itest-node-2 --network can-itest <image> \
+    /artie-can/build/itest/itest_node --role peer --address 0x02
+docker run -d --name can-itest-node-3 --network can-itest <image> \
+    /artie-can/build/itest/itest_node --role peer --address 0x03
+docker run --rm --network can-itest <image> \
+    /artie-can/build/itest/itest_node --role driver --address 0x01 --scenario rtacp-unicast
+```
+
+Two things to know before adding scenarios. Every node needs a **unique address**, because the UDP
+multicast backend filters out its own traffic by comparing each frame's source address to its own -
+two nodes sharing an address silently discard each other's frames. And each scenario needs its own
+**payload marker**, because the peers outlive every individual test while the task streams their
+logs from container start, so a marker reused across scenarios could match the wrong test's line.
+
+`itest_node` is deliberately not registered with CTest, so `ctest` still runs only the unit tests.
+
 ## Integrating
 
 To integrate the Artie CAN Library into an application, there are several ways to do it depending
