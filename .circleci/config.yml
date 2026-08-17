@@ -72,21 +72,18 @@ jobs:
             python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --force-build --docker-tag $DOCKER_TAG --fail-fast --platforms linux/arm64
           working_directory: framework
 
-  # Multi-arch manifests are assembled from the already-pushed per-arch images.
-  # Without --force-build or --platforms, everything already pushed is treated as
-  # cached, so only the manifest steps do real work here.
+  # Multi-arch manifests are assembled registry-side from the per-arch images the two
+  # build jobs already pushed. --manifests-only skips every image build, so nothing is
+  # rebuilt and no per-arch images are pulled onto this machine.
   assemble-manifests:
     executor: small-ubuntu-executor
     steps:
       - checkout
-      - attach_workspace:
-          at: .
       - setup
       - run:
           name: Assemble Multi-Arch Manifests
           command: |
-            docker buildx create --use
-            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --fail-fast
+            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --fail-fast --manifests-only
           working_directory: framework
 
   test-sanity:

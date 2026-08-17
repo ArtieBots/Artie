@@ -24,9 +24,13 @@ except ModuleNotFoundError:
 
 API_CALL_TIMEOUT_S = 600
 BUILD_NRETRIES = 3
+CONTAINER_START_TIMEOUT_S = 60
 
 # Cached result of `docker buildx inspect` driver detection (per process)
 _BUILDX_DRIVER = None
+
+# Cached result of the Docker server's architecture (per process)
+_HOST_ARCH = None
 
 class DockerImageName:
     def __init__(self, repo: str, name: str, tag: str) -> None:
@@ -248,6 +252,26 @@ def _run_build_command_with_retries(dockercmd: str, builddpath: str, docker_imag
             common.warning(f"Docker build of {docker_image_name} failed with return code {p.returncode} (attempt {attempt}/{nretries}). Retrying in {delay_s}s...")
             time.sleep(delay_s)
     p.check_returncode()
+
+def get_host_architecture() -> str:
+    """
+    Returns the architecture of the Docker server ('amd64', 'arm64', ...), or '' if
+    it can't be determined. Containers can only be run from images built for this
+    architecture (barring emulation).
+    """
+    global _HOST_ARCH
+    if _HOST_ARCH is None:
+        p = subprocess.run(["docker", "version", "--format", "{{.Server.Arch}}"], capture_output=True, encoding='utf-8')
+        _HOST_ARCH = p.stdout.strip() if p.returncode == 0 else ""
+    return _HOST_ARCH
+
+def get_local_image_architecture(image_name: str|DockerImageName) -> str:
+    """
+    Returns the architecture of the given image as it exists in the local image store
+    ('amd64', 'arm64', ...), or '' if the image cannot be found locally.
+    """
+    p = subprocess.run(["docker", "image", "inspect", str(image_name), "--format", "{{.Architecture}}"], capture_output=True, encoding='utf-8')
+    return p.stdout.strip() if p.returncode == 0 else ""
 
 def check_and_pull_if_docker_image_exists(args, imgname: DockerImageName) -> bool:
     """
@@ -560,10 +584,23 @@ def docker_copy(image: str, paths_in_container: list, path_on_host: str):
     Copy a given item or list of items from a Docker image onto the host.
     """
     cidfile_fpath = _get_cidfile_path()
-    p = subprocess.Popen(["docker", "run", "--rm", "--cidfile", cidfile_fpath, image], stdout=subprocess.DEVNULL)
+    p = subprocess.Popen(["docker", "run", "--rm", "--cidfile", cidfile_fpath, image], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-    # Give it a moment to let the container start up
-    time.sleep(1)
+    # Wait for the container to start up (i.e., for it to write its cidfile), but don't
+    # keep waiting if 'docker run' has already exited - that means it never started.
+    started_at = time.time()
+    while not os.path.isfile(cidfile_fpath):
+        if p.poll() is not None:
+            stderr = p.stderr.read().decode('utf-8').strip() if p.stderr else ""
+            msg = f"Could not start a container from image {image} (docker run exited with {p.returncode}): {stderr}"
+            common.error(msg)
+            raise RuntimeError(msg)
+        if time.time() - started_at > CONTAINER_START_TIMEOUT_S:
+            p.kill()
+            msg = f"Timed out after {CONTAINER_START_TIMEOUT_S}s waiting for a container to start from image {image}."
+            common.error(msg)
+            raise TimeoutError(msg)
+        time.sleep(0.1)
 
     # Get the docker ID
     docker_id = _get_docker_id_from_cidfile(cidfile_fpath)
@@ -692,9 +729,21 @@ def add_network(network_name: str, exists_okay=False):
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     client.networks.create(network_name)
 
-def _try_pull_once(docker_image_name: DockerImageName, client):
+def get_platform_from_name(docker_image_name: str|DockerImageName) -> str:
+    """
+    Returns the Docker platform ('linux/amd64', 'linux/arm64') implied by the image's
+    tag suffix, or '' if the tag doesn't name an architecture. Per-arch images are tagged
+    '<tag>-<arch>' by construct_docker_image_name().
+    """
+    tag = get_tag_from_name(docker_image_name)
+    for arch in ("amd64", "arm64"):
+        if tag.endswith(f"-{arch}"):
+            return f"linux/{arch}"
+    return ""
+
+def _try_pull_once(docker_image_name: DockerImageName, client, platform=None):
     try:
-        ret = client.api.pull(f"{docker_image_name.repo}{docker_image_name.name}", docker_image_name.tag, stream=True, decode=True)
+        ret = client.api.pull(f"{docker_image_name.repo}{docker_image_name.name}", docker_image_name.tag, stream=True, decode=True, platform=platform if platform else None)
         for line in ret:
             if 'error' in line:
                 common.warning(line)
@@ -716,16 +765,20 @@ def pull_docker_image(args, imgname: DockerImageName, nretries=3):
     if p.returncode != 0:
         raise Exception(f"Cannot find {imgname} remotely, so cannot pull it: {p.stderr}\n{p.stdout}".strip())
 
+    # Per-arch images (tagged '<tag>-<arch>') must be pulled with an explicit platform, or
+    # Docker will look for the host's architecture in them and fail on a foreign-arch image.
+    platform = get_platform_from_name(imgname)
+
     client = docker.from_env(timeout=API_CALL_TIMEOUT_S)
     err = None
     for i in range(nretries):
         if i == 0:
-            common.info(f"Pulling Docker image {imgname}...")
+            common.info(f"Pulling Docker image {imgname}{f' for platform {platform}' if platform else ''}...")
         else:
             common.warning(f"Pulling failed. Retrying {imgname}...")
             time.sleep(1)
 
-        err = _try_pull_once(imgname, client)
+        err = _try_pull_once(imgname, client, platform)
         if err is None:
             break
 

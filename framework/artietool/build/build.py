@@ -90,7 +90,8 @@ def fill_subparser(parser_build: argparse.ArgumentParser, parent: argparse.Argum
     group = option_parser.add_argument_group("Build", "Build Options")
     group.add_argument("--clean", action='store_true', help="If given, we will run a 'clean' action first, then build.")
     group.add_argument("--include-yocto", action='store_true', help="When building with 'all', we typically exclude Yocto images. Use this flag if you want to include them in 'all'.")
-    group.add_argument("--platforms", nargs='+', default=None, metavar="PLATFORM", help="If given (e.g. 'linux/arm64'), only Docker build steps targeting one of these platforms will run; steps for other platforms are skipped (their images are picked up from the registry if already pushed). Manifest assembly is skipped while this filter is active - run again without --platforms to assemble manifests.")
+    group.add_argument("--platforms", nargs='+', default=None, metavar="PLATFORM", help="If given (e.g. 'linux/arm64'), only Docker build steps targeting one of these platforms will run; steps for other platforms are skipped and assumed to have been built elsewhere. Manifest assembly is skipped while this filter is active - run again with --manifests-only to assemble manifests.")
+    group.add_argument("--manifests-only", action='store_true', help="If given, we skip all Docker image builds (assuming they have already been built and pushed) and only assemble/push the multi-arch manifests. Use this after per-platform builds done with --platforms.")
 
     # Add the all* classes of tasks
     for name in BUILD_CLASSES:
