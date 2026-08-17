@@ -201,6 +201,9 @@ def _remove_tasks_based_on_cache(args, tasks: List[task.Task], all_tasks: List[t
     if args.force_build:
         common.info("--force-build detected. Skipping cache checks.")
         return tasks
+    elif getattr(args, 'manifests_only', False):
+        common.info("--manifests-only detected. Skipping cache checks so that manifest jobs always run.")
+        return tasks
     else:
         common.info("Removing tasks based on cache...")
 
@@ -228,6 +231,11 @@ def _mark_tasks_as_cached(args, tasks: List[task.Task]) -> List[task.Task]:
     unless --force-build has been passed.
     """
     if args.force_build:
+        return tasks
+
+    if getattr(args, 'manifests_only', False):
+        # Every build job is skipped in this mode, so there is nothing to check - and checking
+        # would pull every per-arch image onto this machine for no reason.
         return tasks
 
     common.info("Checking which tasks are cached...")

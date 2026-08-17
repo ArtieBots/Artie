@@ -23,6 +23,29 @@ class FileTransferFromContainerJob(job.Job):
             docker_image_name = self.image
         return docker_image_name
 
+    def _expected_target_fpaths(self, args, docker_image_name: str) -> List[str]:
+        """
+        The final (tag-stamped) paths that _copy_out_files() would produce for this image.
+        """
+        tag = docker.get_tag_from_name(docker_image_name)
+        targets = []
+        for fpath in self.fw_fpaths_in_container:
+            fname_no_ext, suf = os.path.splitext(os.path.basename(fpath))
+            targets.append(os.path.join(args.artifact_folder, fname_no_ext) + "-" + tag + suf)
+        return targets
+
+    def _can_run_container(self, docker_image_name: str) -> tuple:
+        """
+        Returns (can_run, image_arch, host_arch). We can only run a container to copy files
+        out if the image is present in this machine's image store AND was built for this
+        machine's architecture. Neither is guaranteed: the image's build step may have been
+        skipped by a --platforms filter (e.g. the amd64-only firmware builders during an
+        arm64-only CI job).
+        """
+        image_arch = docker.get_local_image_architecture(docker_image_name)
+        host_arch = docker.get_host_architecture()
+        return (image_arch != "" and (host_arch == "" or image_arch == host_arch), image_arch, host_arch)
+
     def _copy_out_files(self, args, docker_image_name: str):
         common.info(f"Running a Docker container from image {docker_image_name} to retrieve FW files...")
         docker.docker_copy(docker_image_name, self.fw_fpaths_in_container, args.artifact_folder)
@@ -39,9 +62,26 @@ class FileTransferFromContainerJob(job.Job):
             shutil.move(fpath, target)
 
     def __call__(self, args) -> result.JobResult:
-        # Run the Docker image and copy its files out
+        if getattr(args, 'manifests_only', False):
+            common.info("--manifests-only given: skipping the container file transfer.")
+            self.mark_all_artifacts_as_built()
+            return result.JobResult(self.name, success=True, artifacts=self.artifacts)
+
         docker_image_name = self._evaluate_docker_image(args)
-        self._copy_out_files(args, docker_image_name)
+
+        can_run_container, image_arch, host_arch = self._can_run_container(docker_image_name)
+        if can_run_container:
+            self._copy_out_files(args, docker_image_name)
+        else:
+            targets = self._expected_target_fpaths(args, docker_image_name)
+            if all(os.path.isfile(fpath) for fpath in targets):
+                common.info(f"Cannot run a container from {docker_image_name} on this machine (image arch: {image_arch or 'not present'}, host arch: {host_arch}), but the files it would produce are already in {args.artifact_folder} (e.g. from an attached CI workspace). Skipping the container file transfer.")
+            else:
+                msg = (f"Cannot transfer files out of {docker_image_name}: the image is not runnable on this machine "
+                       f"(image arch: {image_arch or 'not present locally'}, host arch: {host_arch}), and the expected files were not found: {targets}. "
+                       f"If this image's build step was skipped by a --platforms filter, make sure the files are available in {args.artifact_folder} (e.g. via the CI workspace).")
+                common.error(msg)
+                raise RuntimeError(msg)
 
         # Now mark all artifacts
         self.mark_all_artifacts_as_built()
@@ -80,7 +120,12 @@ class FileTransferFromContainerJob(job.Job):
             # So we aren't cached and the artifacts have marked themselves.
             return
 
-        # If we pulled the image or it exists locally, let's copy out the files.
+        # If we pulled the image or it exists locally, let's copy out the files - but only if we
+        # can actually run it on this machine (see _can_run_container).
+        can_run_container, image_arch, host_arch = self._can_run_container(docker_image_name)
+        if not can_run_container:
+            common.info(f"Cannot run a container from {docker_image_name} on this machine (image arch: {image_arch or 'not present'}, host arch: {host_arch}), so we cannot transfer files out of it. Defaulting to not cached.")
+            return
         self._copy_out_files(args, docker_image_name)
 
         # Now remark the artifacts

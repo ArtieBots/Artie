@@ -32,10 +32,18 @@ class DockerBuildJob(job.Job):
     def __call__(self, args) -> result.JobResult:
         platform = self.platform if self.platform else ("linux/arm64" if self.buildx else "linux/amd64")
         platforms_filter = getattr(args, 'platforms', None)
+
+        if getattr(args, 'manifests_only', False):
+            common.info(f"--manifests-only given: not building {self.img_base_name} for {platform}. Assuming it has already been built and pushed.")
+            self.mark_all_artifacts_as_built()
+            return result.JobResult(self.name, success=True, artifacts=self.artifacts)
+
         if platforms_filter and platform.split('/')[-1] not in [p.split('/')[-1] for p in platforms_filter]:
-            common.info(f"Skipping build of {self.img_base_name} for {platform}: not in --platforms {platforms_filter}.")
-            # If a matching image was already pushed (e.g. by another CI job), pick it up so dependent jobs can still run.
-            self.mark_if_cached(args)
+            # Mark the artifact as built (by name) rather than pulling it: another job/machine is
+            # responsible for this platform, and pulling a foreign-arch image here would be a large
+            # download that nothing on this machine can run anyway.
+            common.info(f"Skipping build of {self.img_base_name} for {platform}: not in --platforms {platforms_filter}. Assuming another build produced it.")
+            self.mark_all_artifacts_as_built()
             return result.JobResult(self.name, success=True, artifacts=self.artifacts)
 
         if self.artifacts and all(art.built for art in self.artifacts) and not args.force_build:
