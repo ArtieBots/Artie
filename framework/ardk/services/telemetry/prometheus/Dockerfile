@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     wget
 
-# Pip
-RUN pip3 install requests==2.34.2
+# Pip (debian bullseye has Python 3.9; requests >= 2.33 needs 3.10+)
+RUN pip3 install requests==2.32.5
 
 # Install Prometheus (checksums come from the release's sha256sums.txt)
 WORKDIR /app
