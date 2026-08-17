@@ -106,11 +106,27 @@ def _get_cidfile_path():
     cidfile_fpath = os.path.join(scratch_location, f"_docker_id_{''.join(random.choices(string.ascii_letters, k=12))}.txt")
     return cidfile_fpath
 
+def _read_docker_id_from_cidfile(fpath):
+    """
+    Return the Docker ID from the given CIDfile, or None if the container ID isn't
+    in there (yet).
+
+    The Docker CLI creates the cidfile as soon as `docker run` starts, but only fills
+    it in once the daemon has actually created the container - and removes it again if
+    the container could not be created. So a missing or empty cidfile just means
+    "no container ID available", not "something went wrong".
+    """
+    try:
+        with open(fpath) as f:
+            return f.read().strip() or None
+    except FileNotFoundError:
+        return None
+
 def _get_docker_id_from_cidfile(fpath):
     """
     Return the Docker ID from the given CIDfile.
     """
-    docker_id = open(fpath).read().strip()
+    docker_id = _read_docker_id_from_cidfile(fpath)
     if not docker_id:
         raise OSError(f"Docker ID not found in CID file {fpath}")
     return docker_id
@@ -311,8 +327,10 @@ def clean_docker_containers():
             docker_id_fpaths.append(fpath)
 
     for cidfile_fpath in docker_id_fpaths:
-        # Get the docker ID
-        docker_id = open(cidfile_fpath).read().strip()
+        # Get the docker ID. It may not be in there, in which case there's no container to stop.
+        docker_id = _read_docker_id_from_cidfile(cidfile_fpath)
+        if not docker_id:
+            continue
         short_id = docker_id[:8]
 
         # Stop the container
@@ -586,10 +604,17 @@ def docker_copy(image: str, paths_in_container: list, path_on_host: str):
     cidfile_fpath = _get_cidfile_path()
     p = subprocess.Popen(["docker", "run", "--rm", "--cidfile", cidfile_fpath, image], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-    # Wait for the container to start up (i.e., for it to write its cidfile), but don't
-    # keep waiting if 'docker run' has already exited - that means it never started.
+    # Wait for the container to start up (i.e., for the Docker CLI to write the container
+    # ID into its cidfile), but don't keep waiting if 'docker run' has already exited -
+    # that means it never started. Note that we have to wait for the cidfile to have
+    # *contents*: the CLI creates it empty up front and only fills it in once the daemon
+    # has created the container, which can take a while when the daemon is busy building
+    # a bunch of images in parallel.
     started_at = time.time()
-    while not os.path.isfile(cidfile_fpath):
+    while True:
+        docker_id = _read_docker_id_from_cidfile(cidfile_fpath)
+        if docker_id:
+            break
         if p.poll() is not None:
             stderr = p.stderr.read().decode('utf-8').strip() if p.stderr else ""
             msg = f"Could not start a container from image {image} (docker run exited with {p.returncode}): {stderr}"
@@ -602,8 +627,6 @@ def docker_copy(image: str, paths_in_container: list, path_on_host: str):
             raise TimeoutError(msg)
         time.sleep(0.1)
 
-    # Get the docker ID
-    docker_id = _get_docker_id_from_cidfile(cidfile_fpath)
     short_id = docker_id[:8]
 
     if not isinstance(paths_in_container, list):
