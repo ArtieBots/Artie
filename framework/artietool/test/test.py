@@ -13,6 +13,8 @@ from typing import Iterable, List
 import argparse
 import datetime
 import os
+import traceback
+import xml.etree.ElementTree as ET
 
 # Populate the 'TEST_TASKS' list by parsing all the 'test' config files
 TEST_TASKS = task_importer.import_tasks(os.path.join(common.repo_root(), "framework", "artietool", "tasks", "test-tasks"))
@@ -107,6 +109,57 @@ def _write_results_to_output_folder(args, res: result.TaskResult, dpath):
         for testresult in testresults:
             f.writelines(testresult.to_verbose_str())
 
+def _collect_test_results(res) -> List[result.TestResult]:
+    """
+    Pull the individual TestResult objects out of a TaskResult (they live in
+    each JobResult's artifacts field).
+    """
+    testresults = []
+    for j in getattr(res, 'job_results', []):
+        for r in getattr(j, 'artifacts', []):
+            if issubclass(type(r), result.TestResult):
+                testresults.append(r)
+    return testresults
+
+def _write_junit_xml(results, fpath):
+    """
+    Write all test results to a JUnit XML file so CI systems can ingest per-test outcomes.
+    """
+    testsuites = ET.Element("testsuites")
+    for res in results:
+        suite = ET.SubElement(testsuites, "testsuite", name=res.name)
+        ntests = nfailures = nskipped = nerrors = 0
+        testresults = _collect_test_results(res)
+        if testresults:
+            for tr in testresults:
+                ntests += 1
+                case = ET.SubElement(suite, "testcase", name=tr.name, classname=tr.producing_task_name if tr.producing_task_name else res.name)
+                if tr.status == result.TestStatuses.FAIL:
+                    nfailures += 1
+                    failure = ET.SubElement(case, "failure", message=str(tr.msg) if tr.msg else "Test failed")
+                    if tr.exception:
+                        failure.text = os.linesep.join(traceback.format_exception(tr.exception))
+                elif tr.status == result.TestStatuses.DID_NOT_RUN:
+                    nskipped += 1
+                    ET.SubElement(case, "skipped")
+        else:
+            # A task that produced no individual test results still gets one testcase so its status is visible
+            ntests += 1
+            case = ET.SubElement(suite, "testcase", name=res.name, classname=res.name)
+            if not res.success:
+                nerrors += 1
+                error = ET.SubElement(case, "error", message="Task failed without producing individual test results")
+                if getattr(res, 'error', None):
+                    error.text = str(res.error)
+        suite.set("tests", str(ntests))
+        suite.set("failures", str(nfailures))
+        suite.set("skipped", str(nskipped))
+        suite.set("errors", str(nerrors))
+
+    dpath = os.path.dirname(os.path.abspath(fpath))
+    os.makedirs(dpath, exist_ok=True)
+    ET.ElementTree(testsuites).write(fpath, encoding="utf-8", xml_declaration=True)
+
 def test(args):
     """
     Top-level test function.
@@ -133,7 +186,7 @@ def test(args):
 
     # Create a time-stamped subfolder inside the results folder
     timestamp = datetime.datetime.now().strftime("%y-%b-%d-%H.%M")
-    git_tag = _create_test_folder_tag(args.docker_tag if hasattr(args, 'docker_tag') and args.docker_tag else common.git_tag())
+    git_tag = _create_test_folder_tag(args)
     subfolder_dpath = os.path.join(args.results_folder, f"{timestamp}-{git_tag}")
     if os.path.isdir(subfolder_dpath):
         common.error(f"Can't create log results because {subfolder_dpath} is already a folder somehow.")
@@ -155,6 +208,11 @@ def test(args):
         if not results.success:
             retcode = 1
 
+    # Write a JUnit XML report if requested
+    if args.junit_xml:
+        _write_junit_xml(results if isinstance(results, Iterable) else [results], args.junit_xml)
+        common.info(f"Wrote JUnit XML test report to {args.junit_xml}")
+
     # Clean the tmp folder and whatever else (not build artifacts though)
     common.clean_build_stuff()
 
@@ -171,6 +229,7 @@ def fill_subparser(parser_test: argparse.ArgumentParser, parent: argparse.Argume
     group.add_argument("--include-yocto", action='store_true', help="When testing with 'all', we typically exclude Yocto images. Use this flag if you want to include them in 'all'.")
     group.add_argument("--results-folder", default=common.default_test_results_location())
     group.add_argument("--test-timeout-s", default=120, type=int, help="Default timeout for all tests.")
+    group.add_argument("--junit-xml", default=None, type=str, help="If given, we write a JUnit XML report of all test results to this file path (for CI systems).")
     group.add_argument("--skip-teardown", action='store_true', help="If given, we do not tear down the Docker compose project(s) in the case of a failure - useful for debugging.")
 
     # Add the all* classes of tasks

@@ -3,20 +3,20 @@ version: 2.1
 executors:
   ubuntu-executor:
     machine:
-      image: ubuntu-2404:current
+      image: ubuntu-2404:2026.05.1
     resource_class: large
+  small-ubuntu-executor:
+    machine:
+      image: ubuntu-2404:2026.05.1
+    resource_class: medium
   arm-executor:
     machine:
-      image: ubuntu-2404:current
+      image: ubuntu-2404:2026.05.1
     resource_class: arm.medium
 
 commands:
   setup:
-    description: "Set up Docker environment and install dependencies."
-    parameters:
-      architecture:
-        type: string
-        default: "amd64"
+    description: "Set up environment variables, install dependencies, and log in to Docker Hub."
     steps:
       - run:
           name: Set up Docker Environment Variables
@@ -27,51 +27,67 @@ commands:
           name: Install Dependencies
           command: |
             sudo apt-get update
-            sudo apt-get install -y python3 python3-pip libsecret-1-0 libsecret-1-dev dbus-x11 gnome-keyring
+            sudo apt-get install -y python3 python3-pip
       - run:
           name: Install Python Requirements
           command: |
             pip install -r ./requirements.txt
           working_directory: framework
       - run:
-          name: Start D-Bus
+          name: Docker Login
           command: |
-            eval $(dbus-launch --sh-syntax)
-            echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" >> $BASH_ENV
-            echo "DBUS_SESSION_BUS_PID=$DBUS_SESSION_BUS_PID" >> $BASH_ENV
-      - run:
-          name: Set up Secret Service for Docker Credentials
-          command: |
-            wget -O docker-credential-secretservice https://github.com/docker/docker-credential-helpers/releases/download/v0.9.4/docker-credential-secretservice-v0.9.4.linux-<<parameters.architecture>>
-            chmod +x docker-credential-secretservice
-            sudo mv docker-credential-secretservice /usr/local/bin/
-      - run:
-          name: Set up Docker Config File
-          command: |
-            mkdir -p $HOME/.docker
-            echo '{"credsStore":"secretservice"}' > $HOME/.docker/config.json
+            echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
 jobs:
-  build:
+  # Each architecture builds natively on its own executor (no QEMU emulation).
+  # arm64 builds after amd64 because the drivers' arm64 images consume firmware
+  # artifacts produced by the (amd64-only) firmware builder images.
+  build-amd64:
     executor: ubuntu-executor
     steps:
       - checkout
-      - attach_workspace:
-          at: .
-      - setup:
-          architecture: "amd64"
+      - setup
       - run:
-          name: Build All
+          name: Build All (amd64)
           command: |
-            echo '$USER' | gnome-keyring-daemon --unlock
-            echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            docker buildx create --use --platform linux/amd64,linux/arm64
-            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --force-build --docker-tag $DOCKER_TAG --fail-fast
+            docker buildx create --use
+            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --force-build --docker-tag $DOCKER_TAG --fail-fast --platforms linux/amd64
           working_directory: framework
       - persist_to_workspace:
           root: .
           paths:
             - build-artifacts
+
+  build-arm64:
+    executor: arm-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup
+      - run:
+          name: Build All (arm64)
+          command: |
+            docker buildx create --use
+            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --force-build --docker-tag $DOCKER_TAG --fail-fast --platforms linux/arm64
+          working_directory: framework
+
+  # Multi-arch manifests are assembled from the already-pushed per-arch images.
+  # Without --force-build or --platforms, everything already pushed is treated as
+  # cached, so only the manifest steps do real work here.
+  assemble-manifests:
+    executor: small-ubuntu-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup
+      - run:
+          name: Assemble Multi-Arch Manifests
+          command: |
+            docker buildx create --use
+            python3 artie-tool.py build all --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --fail-fast
+          working_directory: framework
 
   test-sanity:
     executor: arm-executor
@@ -79,21 +95,15 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup:
-          architecture: "arm64"
+      - setup
       - run:
           name: Run Sanity Tests
           command: |
-            echo '$USER' | gnome-keyring-daemon --unlock
-            echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            python3 artie-tool.py test all-sanity --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-sanity.txt --test-timeout-s 120
+            python3 artie-tool.py test all-sanity --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-sanity.txt --test-timeout-s 120 --junit-xml junit-results/sanity.xml
           working_directory: framework
           no_output_timeout: 5m
-      - run:
-          name: Collect Test Results
-          command: grep "All tasks succeeded" testlog-sanity.txt
-          working_directory: framework
-          when: always
+      - store_test_results:
+          path: framework/junit-results
       - store_artifacts:
           path: framework/testlog-sanity.txt
 
@@ -103,22 +113,15 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup:
-          architecture: "arm64"
+      - setup
       - run:
           name: Run Unit Tests
           command: |
-            echo '$USER' | gnome-keyring-daemon --unlock
-            echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            python3 artie-tool.py test all-unit --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-unit.txt --test-timeout-s 120
+            python3 artie-tool.py test all-unit --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-unit.txt --test-timeout-s 120 --junit-xml junit-results/unit.xml
           working_directory: framework
           no_output_timeout: 5m
-          when: always
-      - run:
-          name: Collect Test Results
-          command: grep "All tasks succeeded" testlog-unit.txt
-          working_directory: framework
-          when: always
+      - store_test_results:
+          path: framework/junit-results
       - store_artifacts:
           path: framework/testlog-unit.txt
 
@@ -128,43 +131,46 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - setup:
-          architecture: "arm64"
+      - setup
       - run:
           name: Run Integration Tests
           command: |
-            echo '$USER' | gnome-keyring-daemon --unlock
-            echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-            python3 artie-tool.py test all-integration --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-integration.txt --test-timeout-s 120
+            python3 artie-tool.py test all-integration --enable-error-tracing --docker-repo $DOCKER_REPO --docker-tag $DOCKER_TAG --docker-logs --nprocs 1 --output testlog-integration.txt --test-timeout-s 120 --junit-xml junit-results/integration.xml
           working_directory: framework
           no_output_timeout: 5m
-          when: always
-      - run:
-          name: Collect Test Results
-          command: grep "All tasks succeeded" testlog-integration.txt
-          working_directory: framework
-          when: always
+      - store_test_results:
+          path: framework/junit-results
       - store_artifacts:
           path: framework/testlog-integration.txt
 
 workflows:
   artie-build-and-test:
     jobs:
-      - build:
+      - build-amd64:
+          context:
+            - docker-hub
+      - build-arm64:
+          requires:
+            - build-amd64
+          context:
+            - docker-hub
+      - assemble-manifests:
+          requires:
+            - build-arm64
           context:
             - docker-hub
       - test-sanity:
           requires:
-            - build
+            - build-arm64
           context:
             - docker-hub
       - test-unit:
           requires:
-            - build
+            - build-arm64
           context:
             - docker-hub
       - test-integration:
           requires:
-            - build
+            - build-arm64
           context:
             - docker-hub

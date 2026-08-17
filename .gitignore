@@ -150,3 +150,5 @@ telemetry-example/
 
 # Artie Tool
 artie-tool-log.txt
+artie-tool-test-log.txt
+testlog-*.txt

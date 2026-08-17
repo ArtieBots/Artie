@@ -2,7 +2,7 @@
 FROM python:3.11.2-bullseye
 
 # Install dependencies
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
+RUN apt-get update && apt-get install -y \
     i2c-tools \
     libusb-0.1-4 \
     libusb-1.0-0 \
@@ -10,42 +10,24 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     openssl \
     cmake \
     build-essential
-RUN pip install \
-    rpyc \
-    kafka-python
+RUN --mount=type=cache,target=/root/.cache/pip pip install \
+    rpyc==6.0.2 \
+    kafka-python==3.0.11
 
-# Build artie-util lib
-COPY ./tmp/artie-util /tmp/artie-util/
-WORKDIR /tmp/artie-util
-RUN pip install .
-RUN rm -rf /tmp/artie-util
-
-# Build artie-tooling lib
-COPY ./tmp/artie-tooling /tmp/artie-tooling/
-WORKDIR /tmp/artie-tooling
-RUN pip install .
-RUN rm -rf /tmp/artie-tooling
-
-# Build artie-i2c lib
-COPY ./tmp/artie-i2c /tmp/artie-i2c/
-WORKDIR /tmp/artie-i2c
-RUN pip install .
-RUN rm -rf /tmp/artie-i2c
-
-# Build artie-gpio lib
-COPY ./tmp/artie-gpio /tmp/artie-gpio/
-WORKDIR /tmp/artie-gpio
-RUN pip install .[rpi]
-RUN rm -rf /tmp/artie-gpio
-
-# Build artie-service-client
-COPY ./tmp/artie-service-client /tmp/artie-service-client/
-WORKDIR /tmp/artie-service-client
-RUN pip install .
-RUN rm -rf /tmp/artie-service-client
-
-# Build artie-can lib
-COPY ./tmp/artie-can /tmp/artie-can/
-WORKDIR /tmp/artie-can
-RUN pip install .
-RUN rm -rf /tmp/artie-can
+# Build the ardk libraries. They all go in one layer so that a change to any
+# one of them only invalidates a single (cheap, local-install) layer.
+COPY ./tmp/artie-util /tmp/ardk/artie-util/
+COPY ./tmp/artie-tooling /tmp/ardk/artie-tooling/
+COPY ./tmp/artie-i2c /tmp/ardk/artie-i2c/
+COPY ./tmp/artie-gpio /tmp/ardk/artie-gpio/
+COPY ./tmp/artie-service-client /tmp/ardk/artie-service-client/
+COPY ./tmp/artie-can /tmp/ardk/artie-can/
+RUN --mount=type=cache,target=/root/.cache/pip pip install \
+    /tmp/ardk/artie-util \
+    /tmp/ardk/artie-tooling \
+    /tmp/ardk/artie-i2c \
+    "/tmp/ardk/artie-gpio[rpi]" \
+    /tmp/ardk/artie-service-client \
+    /tmp/ardk/artie-can \
+    && rm -rf /tmp/ardk
+WORKDIR /

@@ -7,6 +7,7 @@ from . import task
 from .. import common
 from typing import List
 import multiprocessing
+import pickle
 import traceback
 
 class TaskWrapper:
@@ -25,13 +26,16 @@ class TaskWrapper:
             if args.enable_error_tracing:
                 common.error(f"Error running task {name}: {''.join(traceback.format_exception(e))}")
         common.info("Putting result onto queue")
+        # Queue.put() pickles in a background thread, so an unpicklable result would
+        # hang the whole run rather than raise. Verify picklability up front and fall
+        # back to a plain-string error result if needed.
         try:
-            # If we freeze here, it is likely because the result object can't be pickled
-            self._q.put((self._worker_index, res))
-        except AttributeError as e:
-            common.error(f"Cannot pickle the result object: {e}")
-            while True:
-                pass
+            pickle.dumps(res)
+        except Exception as e:
+            name = multiprocessing.current_process().name
+            common.error(f"Cannot pickle the result object for task {name}; substituting an error result: {e}")
+            res = result.ErrorTaskResult(name=name, error=Exception(f"Task result could not be pickled: {e!r}"))
+        self._q.put((self._worker_index, res))
 
 def _task_has_already_been_run(task_name: str, tasks_we_have_run_so_far) -> bool:
     """
@@ -148,21 +152,18 @@ def _run_all_multiprocess(args, tasks):
 
 def _recurse_dependencies(args, t: task.Task, remaining_tasks: List[task.Task], updated_tasks: List[task.Task], all_tasks: List[task.Task]):
     if t.dependencies is not None:
-        to_remove = []
-        for dep_index, dep in enumerate(t.dependencies):
+        for dep in t.dependencies:
             name = dep.producing_task_name
             dep_task = common.find_task_from_name(name, all_tasks)
             if dep_task is None:
-                common.error(f"Attempted to find a task: {name}, but task not found in all_tasks. We'll remove this dependency and try to run the task, but it will likely fail. All tasks: {[tsk.name for tsk in all_tasks]}")
-                to_remove.append(dep_index)
+                msg = f"Task {t.name} depends on a task named {name}, but no such task exists. Check the task's dependencies for typos. All tasks: {[tsk.name for tsk in all_tasks]}"
+                common.error(msg)
+                raise ValueError(msg)
             elif dep_task in remaining_tasks or dep_task in updated_tasks:
                 # Duplicate
                 continue
             else:
                 remaining_tasks.append(dep_task)
-        # If we encountered any errors, remove the offending dependency
-        for d in to_remove:
-            del t.dependencies[d]
 
     updated_tasks.append(t)
 

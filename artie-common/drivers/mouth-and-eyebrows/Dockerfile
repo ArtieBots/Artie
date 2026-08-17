@@ -2,7 +2,7 @@ ARG ARTIE_BASE_IMG=artie/ardk-base:latest
 FROM ${ARTIE_BASE_IMG}
 
 # Pip requirements
-RUN pip install numpy==1.24.3
+RUN --mount=type=cache,target=/root/.cache/pip pip install numpy==1.24.3
 
 # Copy in the FW
 ARG FW_FILE_NAME
