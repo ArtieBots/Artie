@@ -152,3 +152,7 @@ telemetry-example/
 artie-tool-log.txt
 artie-tool-test-log.txt
 testlog-*.txt
+
+# Rando folders
+.continue/
+.claude/
