@@ -30,6 +30,18 @@ class DockerBuildJob(job.Job):
         self.platform = platform
 
     def __call__(self, args) -> result.JobResult:
+        platform = self.platform if self.platform else ("linux/arm64" if self.buildx else "linux/amd64")
+        platforms_filter = getattr(args, 'platforms', None)
+        if platforms_filter and platform.split('/')[-1] not in [p.split('/')[-1] for p in platforms_filter]:
+            common.info(f"Skipping build of {self.img_base_name} for {platform}: not in --platforms {platforms_filter}.")
+            # If a matching image was already pushed (e.g. by another CI job), pick it up so dependent jobs can still run.
+            self.mark_if_cached(args)
+            return result.JobResult(self.name, success=True, artifacts=self.artifacts)
+
+        if self.artifacts and all(art.built for art in self.artifacts) and not args.force_build:
+            common.info(f"All artifacts of {self.img_base_name} for {platform} are already built or cached. Skipping this build job.")
+            return result.JobResult(self.name, success=True, artifacts=self.artifacts)
+
         common.info(f"Building {self.img_base_name}...")
 
         # Grab all the dependency file locations

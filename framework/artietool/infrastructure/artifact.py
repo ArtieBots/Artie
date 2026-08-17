@@ -106,7 +106,7 @@ class DockerManifestArtifact(DockerImageArtifact):
     A Docker manifest list. Can mostly be treated the same as a Docker Image Artifact.
     """
     def fill_manifest_item(self, args, name):
-        self._docker_image = docker.parse_docker_image_name(args, name)
+        self._docker_image = docker.parse_docker_image_name(name)
         self.item = str(self._docker_image)
 
 class HelmChartArtifact(Artifact):
@@ -194,13 +194,14 @@ def add_artifact(args, artifact: Artifact):
         args._artifacts[artifact.producing_task_name] = []
 
     # Replace an artifact if it already exists
-    for art in args._artifacts[artifact.producing_task_name]:
+    existing_artifacts = args._artifacts[artifact.producing_task_name]
+    for i, art in enumerate(existing_artifacts):
         if art.name == artifact.name:
-            art = artifact
+            existing_artifacts[i] = artifact
             return
 
     # If we couldn't find it, just add it to the end of the list
-    args._artifacts[artifact.producing_task_name].append(artifact)
+    existing_artifacts.append(artifact)
 
 def add_artifacts_from_result(args, result):
     """

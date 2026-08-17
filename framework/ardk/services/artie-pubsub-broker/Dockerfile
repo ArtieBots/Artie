@@ -1,15 +1,3 @@
-FROM ubuntu:latest as ubuntu
-
-# Get dos2unix for converting the entrypoint script to Unix line endings
-RUN apt-get update && apt-get install -y dos2unix
-
-# Copy in the entrypoint script and convert it to Unix line endings
-COPY entrypoint.sh /entrypoint.sh
-RUN dos2unix /entrypoint.sh
-
-# Clean up apt-get
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
 FROM apache/kafka:4.1.1
 
 # Artie configuration stuff
@@ -67,8 +55,9 @@ ENV KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 # This should be set to at least the expected number of concurrent consumers for load balancing.
 ENV KAFKA_NUM_PARTITIONS=3
 
+# The entrypoint script is guaranteed LF line endings by .gitattributes
 USER root
-COPY --from=ubuntu /entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

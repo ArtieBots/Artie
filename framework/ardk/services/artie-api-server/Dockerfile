@@ -1,17 +1,11 @@
 ARG ARTIE_BASE_IMG=artie/ardk-base:latest
 FROM ${ARTIE_BASE_IMG}
 
-# Pip requirements
-RUN pip install flask gunicorn
+# Pip requirements (openssl already comes from the base image)
+RUN --mount=type=cache,target=/root/.cache/pip pip install flask==3.1.3 gunicorn==26.0.0
 
-# Copy in the files
+# Copy in the files (last, so source edits don't invalidate the layers above)
 COPY ./src /app
-
-# Install apt dependencies
-RUN apt-get update && apt-get install -y openssl dos2unix
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN dos2unix /app/run.sh
 RUN chmod +x /app/run.sh
 
 # Configuration stuff

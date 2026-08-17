@@ -23,6 +23,10 @@ except ModuleNotFoundError:
     exit(1)
 
 API_CALL_TIMEOUT_S = 600
+BUILD_NRETRIES = 3
+
+# Cached result of `docker buildx inspect` driver detection (per process)
+_BUILDX_DRIVER = None
 
 class DockerImageName:
     def __init__(self, repo: str, name: str, tag: str) -> None:
@@ -159,17 +163,91 @@ def build_docker_image(args, builddpath: str, docker_image_name: DockerImageName
     extraargs = get_extra_docker_build_args(args)
     dockerargs = f"{extraargs} {extra_build_args}"
     if buildx:
-        dockercmd = f"docker buildx build --sbom=false --provenance=false --load --platform {platform} -f {dockerfile_name} {dockerargs} -t {str(docker_image_name)} {context}"
+        cacheargs = _get_registry_cache_args(args, docker_image_name, platform)
+        builderargs = ""
+        if getattr(args, 'docker_repo', None) is None and _get_buildx_driver() != "docker":
+            # Without a registry, FROM references to locally-built base images can only be
+            # resolved by a 'docker' driver builder (which shares the host image store);
+            # container-driver builders try (and fail) to pull them from a registry instead.
+            builder = _get_local_builder_name()
+            common.info(f"No docker repo configured: using the '{builder}' buildx builder so locally-built base images can be found.")
+            builderargs = f" --builder {builder}"
+        dockercmd = f"docker buildx build{builderargs} --sbom=false --provenance=false --load --platform {platform} -f {dockerfile_name} {dockerargs}{cacheargs} -t {str(docker_image_name)} {context}"
     else:
         dockercmd = f"docker build -f {dockerfile_name} {dockerargs} -t {str(docker_image_name)} {context}"
-    common.info(f"Running: {dockercmd}")
-    subprocess.run(dockercmd.split(), cwd=builddpath).check_returncode()
+    _run_build_command_with_retries(dockercmd, builddpath, docker_image_name)
 
     # Push the Docker image to the chosen repo (if given)
     if args.docker_repo is not None:
         push_docker_image(args, docker_image_name)
 
     return docker_image_name
+
+def _get_buildx_driver() -> str:
+    """
+    Returns the driver name of the currently selected buildx builder
+    ('docker', 'docker-container', etc.), or '' if it can't be determined.
+    """
+    global _BUILDX_DRIVER
+    if _BUILDX_DRIVER is None:
+        driver = ""
+        p = subprocess.run("docker buildx inspect".split(), capture_output=True, encoding='utf-8')
+        if p.returncode == 0:
+            for line in p.stdout.splitlines():
+                if line.strip().startswith("Driver:"):
+                    driver = line.split(":", 1)[1].strip()
+                    break
+        _BUILDX_DRIVER = driver
+    return _BUILDX_DRIVER
+
+def _get_local_builder_name() -> str:
+    """
+    Returns the name of the buildx builder that uses the 'docker' driver for the current
+    Docker context. That builder shares the host's local image store, so it can resolve
+    FROM references to locally-built images. The builder is named after the current
+    context; fall back to 'default' if we can't determine it.
+    """
+    p = subprocess.run("docker context show".split(), capture_output=True, encoding='utf-8')
+    if p.returncode == 0 and p.stdout.strip():
+        return p.stdout.strip()
+    return "default"
+
+def _get_registry_cache_args(args, docker_image_name: DockerImageName, platform: str) -> str:
+    """
+    Returns --cache-from/--cache-to arguments for a buildx build, using a per-image,
+    per-architecture cache manifest stored in the configured Docker repo. This is what
+    lets fresh CI machines reuse layers from previous pipelines; it composes with
+    --force-build, which only bypasses the task-level (whole-image) cache.
+    """
+    if getattr(args, 'docker_repo', None) is None or args.docker_no_cache:
+        return ""
+
+    arch = platform.split('/')[-1]
+    cacheref = f"{docker_image_name.repo}{docker_image_name.name}:buildcache-{arch}"
+    cacheargs = f" --cache-from type=registry,ref={cacheref}"
+    if _get_buildx_driver() == "docker":
+        # The default 'docker' driver can import a registry cache but cannot export one.
+        common.info("Buildx is using the default 'docker' driver, which does not support cache export. Using --cache-from only.")
+    else:
+        cacheargs += f" --cache-to type=registry,ref={cacheref},mode=max"
+    return cacheargs
+
+def _run_build_command_with_retries(dockercmd: str, builddpath: str, docker_image_name: DockerImageName, nretries=BUILD_NRETRIES):
+    """
+    Run the given docker build command, retrying on failure. Build failures are often
+    transient (registry pulls, apt/pip/git fetches inside the build), and Docker's
+    layer cache lets a retry resume from the layer that failed.
+    """
+    for attempt in range(1, nretries + 1):
+        common.info(f"Running: {dockercmd}")
+        p = subprocess.run(dockercmd.split(), cwd=builddpath)
+        if p.returncode == 0:
+            return
+        if attempt < nretries:
+            delay_s = 2 ** attempt
+            common.warning(f"Docker build of {docker_image_name} failed with return code {p.returncode} (attempt {attempt}/{nretries}). Retrying in {delay_s}s...")
+            time.sleep(delay_s)
+    p.check_returncode()
 
 def check_and_pull_if_docker_image_exists(args, imgname: DockerImageName) -> bool:
     """
@@ -312,6 +390,26 @@ def create_manifest(manifest_name: str, docker_image_names: List[str|DockerImage
         p.check_returncode()
 
     return manifest
+
+def create_and_push_manifest_via_imagetools(manifest_name: str, docker_image_names: List[str|DockerImageName], nretries=3):
+    """
+    Create and push a multi-arch manifest list in a single step using
+    'docker buildx imagetools create'. All of the constituent images must already
+    have been pushed to the registry; nothing needs to be present locally.
+    """
+    cmd = ["docker", "buildx", "imagetools", "create", "-t", manifest_name] + [str(name) for name in docker_image_names]
+    common.info(f"Running command: {' '.join(cmd)}")
+    for attempt in range(1, nretries + 1):
+        p = subprocess.run(cmd, capture_output=True)
+        if p.returncode == 0:
+            return
+        common.warning(f"Failed to create/push manifest {manifest_name} (attempt {attempt}/{nretries}): {p.stderr.decode('utf-8')}")
+        if attempt < nretries:
+            time.sleep(2)
+    common.error(f"Failed to run cmd: {cmd}")
+    common.error(f"Subprocess's stderr: {p.stderr.decode('utf-8')}")
+    common.error(f"Subprocess's stdout: {p.stdout.decode('utf-8')}")
+    p.check_returncode()
 
 def push_manifest(manifest: DockerManifest):
     """
@@ -628,10 +726,10 @@ def pull_docker_image(args, imgname: DockerImageName, nretries=3):
             time.sleep(1)
 
         err = _try_pull_once(imgname, client)
-        if err:
-            continue
+        if err is None:
+            break
 
-    if err:
+    if err is not None:
         raise Exception(f"Could not pull {imgname}: {err}")
 
 def _try_push_once(docker_image_name: DockerImageName, client):
