@@ -69,20 +69,20 @@ TODO:
 
 To build a driver, use Artie Tool like this:
 
-`python artie-tool.py build <target> -e --docker-repo <target-repo> --docker-logs [--insecure] -o artie-tool-log.txt`
+`artie-tool build <target> -e --docker-repo <target-repo> --docker-logs [--insecure] -o artie-tool-log.txt`
 
 This will run Artie Tool's build command over the given target task.
 
 ## Source Code
 
-Driver source code lives with the Artie it belongs to, in that Artie's `drivers/`
-directory - for example `artie00/drivers`. A driver that several Artie types share is
-still kept with one of them and referred to from the others' task definitions, rather
-than living in a shared bucket.
+For now, the only drivers live with Artie00:
+[Artie00's `drivers/` directory](https://github.com/ArtieBots/Artie00/tree/main/drivers).
+Ideally, we will eventually create a library of drivers separate from Artie00, and at that time,
+we will move this guide and flesh it out a bit more.
 
 Drivers are microservices and can therefore be written in any language
 so long as they are available on their buses, however they are typically
 written in Python and make use of some of the libraries found
-in `framework/ardk/libraries/`.
+in [ArDK's `libraries/` directory](https://github.com/ArtieBots/ArDK/tree/main/libraries).
 
 [Back to Yocto Contributions](./yocto-image-contributions.md) | [Forward to Library Contributions](https://github.com/ArtieBots/ArDK/blob/main/docs/contributing/library-contributions.md)

@@ -31,21 +31,24 @@ that can be swapped in/out based on the needs of a particular experiment.
 
 To build the firmware, use Artie Tool like this:
 
-`python artie-tool.py build <target> -e --docker-repo <target-repo> --docker-logs [--insecure] -o artie-tool-log.txt`
+`artie-tool build <target> -e --docker-repo <target-repo> --docker-logs [--insecure] -o artie-tool-log.txt`
 
 This will run Artie Tool's build command over the given target task.
 
 If you examine the build task of choice, say fw-eyebrows,
 by opening [its task file](https://github.com/ArtieBots/Artie00/blob/main/.artie/tasks/build-tasks/fw/fw-eyebrows.yaml),
-you can see that it has one dependency (the 'pico-base-image' which is another build task), and
+you can see that it has one dependency (the 'pico-base-image', another build task, which lives in
+[ArDK](https://github.com/ArtieBots/ArDK/blob/main/.artie/tasks/build-tasks/base-images/pico-base-image.yaml)), and
 two artifacts (the docker image and the FW files). It has two steps, a Docker build,
 which does the actual build, and a second step that transfers the built files from the image.
 
 ## Source Code
 
-Firmware application source lives with the Artie it runs on, in that Artie's `firmware/`
-directory - for example `artie00/firmware/`. The reusable firmware *libraries* live in
-ArDK, at `framework/ardk/firmware/libraries/`.
+Currently, the only firmware application source lives with Artie00:
+[Artie00's `firmware/` directory](https://github.com/ArtieBots/Artie00/tree/main/firmware).
+
+The reusable firmware *libraries* live in
+[ArDK's `firmware/libraries/` directory](https://github.com/ArtieBots/ArDK/tree/main/firmware/libraries).
 Firmware is mostly written in C and targets the Raspberry Pi Pico 1 and/or 2. But this is not a requirement -
 other MCUs or even FPGAs could be used if desired.
 
