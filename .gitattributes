@@ -1,3 +1,27 @@
-# Shell scripts get COPY'd into Linux containers and executed there;
-# never check them out with CRLF line endings, even on Windows.
-*.sh text eol=lf
+# Line endings: LF in the repository, and LF when checked out, on every platform.
+#
+# Most of what is in Artie ends up in a Linux container or on an embedded Linux image, where
+# a CRLF breaks shell scripts, Dockerfiles and config files. This overrides a Windows
+# machine's core.autocrlf, so a checkout there looks the same as one on Linux.
+* text=auto eol=lf
+
+# Windows-only scripts keep Windows line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files. Git detects these on its own; listing them makes sure it never guesses wrong.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.tgz  binary
+*.fzz  binary
+*.stl  binary
+*.uf2  binary
+*.bin  binary
+*.elf  binary
