@@ -22,8 +22,7 @@ Ensure that your development computer has the following software installed. **Ca
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/) - v1.32
 - [Helm](https://helm.sh/docs/intro/quickstart/) - 4.0 (don't install Kubernetes separately - we install K3S for you
   as part of setting up the Artie system later on)
-- If you haven't already, make sure to install the Python dependencies for Artie Tool after cloning this repo:
-  `pip install -r requirements.txt` from the 'framework' directory of the repo.
+- If you haven't already, install Artie Tool: `pip install artietool`.
   **See the [Note on Python Installation](#note-on-python-installation)**
   if you are running Linux.
 
