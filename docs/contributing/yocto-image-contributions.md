@@ -13,7 +13,7 @@ instead of unnecessary OS services.
 
 The Yocto Images are found in different GitHub repositories, depending on the target SBC architecture:
 
-* [artie-controller-node](https://github.com/MaxStrange/artie-controller-node): Yocto image for the controller node SBC (rPi 4b).
+* [artie-controller-node](https://github.com/ArtieBots/artie-controller-node): Yocto image for the controller node SBC (rPi 4b).
 
 ### Where the Yocto Images Live in the Ecosystem
 
