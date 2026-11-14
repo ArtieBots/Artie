@@ -44,10 +44,10 @@ which does the actual build, and a second step that transfers the built files fr
 
 ## Source Code
 
-For now, firmware application source lives with the Artie that first needed it: today, that is
+Currently, the only firmware application source lives with Artie00:
 [Artie00's `firmware/` directory](https://github.com/ArtieBots/Artie00/tree/main/firmware).
-This is temporary: firmware does not have a home of its own yet. When it gets one, the
-firmware and this guide will move there. The reusable firmware *libraries* live in
+
+The reusable firmware *libraries* live in
 [ArDK's `firmware/libraries/` directory](https://github.com/ArtieBots/ArDK/tree/main/firmware/libraries).
 Firmware is mostly written in C and targets the Raspberry Pi Pico 1 and/or 2. But this is not a requirement -
 other MCUs or even FPGAs could be used if desired.

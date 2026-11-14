@@ -75,11 +75,10 @@ This will run Artie Tool's build command over the given target task.
 
 ## Source Code
 
-For now, the drivers live with the Artie that first needed them: today, that is
+For now, the only drivers live with Artie00:
 [Artie00's `drivers/` directory](https://github.com/ArtieBots/Artie00/tree/main/drivers).
-This is temporary. A driver is not specific to one Artie type, and as more drivers are
-written they will move to a shared home of their own, from which each Artie type chooses
-the ones it deploys. When that happens, this guide will move there too.
+Ideally, we will eventually create a library of drivers separate from Artie00, and at that time,
+we will move this guide and flesh it out a bit more.
 
 Drivers are microservices and can therefore be written in any language
 so long as they are available on their buses, however they are typically
