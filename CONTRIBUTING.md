@@ -126,7 +126,7 @@ definitions, its own version, and its contributor guide.
 | [Artie00](https://github.com/ArtieBots/Artie00) | One specific robot: hardware manifest, BOM, `firmware/`, `drivers/`, `electrical-schematics/`, `deploy/artie00/` | [firmware](https://github.com/ArtieBots/Artie/blob/main/docs/contributing/firmware-contributions.md), [drivers](https://github.com/ArtieBots/Artie/blob/main/docs/contributing/driver-contributions.md), [electronics](https://github.com/ArtieBots/Artie00/blob/main/docs/contributing/electronic-design.md), [mechanical](https://github.com/ArtieBots/Artie00/blob/main/docs/contributing/mechanical-design.md) |
 
 The single board computers' Yocto images live in
-[artie-controller-node](https://github.com/MaxStrange/artie-controller-node), which Artie
+[artie-controller-node](https://github.com/ArtieBots/artie-controller-node), which Artie
 Tool clones when building them.
 
 Artie Tool builds across all of these at once. `artie-tool workspace sync` fetches them,
