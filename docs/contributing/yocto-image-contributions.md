@@ -4,6 +4,8 @@
 
 This document provides guidelines and best practices for contributing (to) Yocto images (to) the Artie project.
 
+The requirements for the Yocto images are in [Yocto Image Requirements](../requirements/yocto-image-requirements.md).
+
 ## Overview of Yocto Images
 
 Yocto images are custom Linux distributions built using the Yocto Project. They are tailored to run on Artie robots,
