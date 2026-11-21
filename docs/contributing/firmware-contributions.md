@@ -4,6 +4,8 @@
 
 This document provides guidelines and best practices for contributing firmware to the Artie project.
 
+The requirements for firmware are in [Firmware Requirements](../requirements/firmware-requirements.md).
+
 ## Overview of the Firmware
 
 Artie firmware is responsible for interfacing with the robot's hardware components (mostly sensors and actuators).

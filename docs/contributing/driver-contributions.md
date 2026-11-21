@@ -4,6 +4,8 @@
 
 This document provides guidelines and best practices for contributing drivers to the Artie project.
 
+The requirements for drivers are in [Driver Requirements](../requirements/driver-requirements.md).
+
 ## Overview of Drivers
 
 The term "drivers" in the Artie ecosystem typically refers to user-space
